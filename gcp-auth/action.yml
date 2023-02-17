@@ -25,7 +25,7 @@ runs:
       shell: bash
       run: |
         ID_DECODED=$(echo "${{ inputs.id }}" | base64 --decode)
-        echo "GCP_SERVICE_ACCOUNT=$($ID_DECODED" | jq -cr ".serviceAccount)" >> $GITHUB_ENV
+        echo "GCP_SERVICE_ACCOUNT=$(echo "$ID_DECODED" | jq -cr ".serviceAccount)" >> $GITHUB_ENV
         echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$ID_DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
     - id: auth
       name: 'Authenticate'
