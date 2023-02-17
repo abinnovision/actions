@@ -31,8 +31,8 @@ runs:
       name: 'Authenticate'
       uses: google-github-actions/auth@v1
       with:
-        workload_identity_provider: ${{ env.GCP_SERVICE_ACCOUNT }}
-        service_account: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
         token_format: ${{ inputs.token_format }}
 
 
