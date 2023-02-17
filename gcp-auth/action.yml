@@ -13,7 +13,7 @@ outputs:
     value: ${{ steps.auth.outputs.access_token }}
   credentials_file_path:
     description: ""
-    value: ${{ steps.auth.outputs.credentials_file_path
+    value: ${{ steps.auth.outputs.credentials_file_path }}
   id_token:
     description: ""
     value: ${{ steps.auth.outputs.id_token }}
