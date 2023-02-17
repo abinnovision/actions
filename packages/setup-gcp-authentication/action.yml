@@ -1,0 +1,68 @@
+name: Setup GCP authentication
+author: "AB innovision UG"
+description: |
+  Action to authentication for Google Cloud Platform. This uses the opinionated way of AB innovision.
+  As each repository gets an "GCP_ID" secret, which defines the Service Account & Workload Identity Provider to use.
+
+inputs:
+  id:
+    description: The "GCP_ID" secret which is present in all repositories.
+    required: true
+  token_format:
+    required: false
+    default: ''
+    description: |-
+      Output format for the generated authentication token. For OAuth 2.0 access
+      tokens, specify "access_token". For OIDC tokens, specify "id_token". To
+      skip token generation, leave this value empty.
+
+      See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L84-L90
+  delegates:
+    required: false
+    default: ""
+    description: |-
+      List of additional service account emails or unique identities to use for
+      impersonation in the chain.
+
+      See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L91-L96
+outputs:
+  access_token:
+    value: ${{ steps.auth.outputs.access_token }}
+    description: |-
+      The Google Cloud access token for calling other Google Cloud APIs. This is
+      only available when "token_format" is "access_token".
+
+      See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L169-L172
+  credentials_file_path:
+    value: ${{ steps.auth.outputs.credentials_file_path }}
+    description: |-
+      Path on the local filesystem where the generated credentials file resides.
+      This is only available if "create_credentials_file" was set to true.
+      
+      See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L165-L168
+  id_token:
+    value: ${{ steps.auth.outputs.id_token }}
+    description: |-
+      The Google Cloud ID token. This is only available when "token_format" is
+      "id_token".
+      
+      See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L177-L180
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      name: "Prepare"
+      shell: bash
+      run: |
+        DECODED=$(echo "${{ inputs.id }}" | base64 --decode)
+        echo "GCP_SERVICE_ACCOUNT=$(echo "$DECODED" | jq -cr ".serviceAccount")" >> $GITHUB_ENV
+        echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
+    - id: auth
+      name: "Authenticate"
+      uses: google-github-actions/auth@v1.0.0
+      with:
+        workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+        token_format: ${{ inputs.token_format }}
+        delegates: ${{ inputs.delegates }}
+        export_environment_variables: true
