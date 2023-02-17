@@ -1,22 +1,15 @@
-name: AB innovision / GCP / Auth
-description: Action to authenticate with GCP
+name: GitHub App Token
+author: "AB innovision UG"
+description: ""
+
 inputs:
-  id:
-    description: The "GCP_ID" secret which is present in all repositories.
+  name:
+    description: Name of the GitHub App to get the token for.
     required: true
-  token_format:
-    required: false
-    description: ""
 outputs:
   access_token:
     description: ""
     value: ${{ steps.auth.outputs.access_token }}
-  credentials_file_path:
-    description: ""
-    value: ${{ steps.auth.outputs.credentials_file_path }}
-  id_token:
-    description: ""
-    value: ${{ steps.auth.outputs.id_token }}
 runs:
   using: composite
   steps:
@@ -28,11 +21,9 @@ runs:
         echo "GCP_SERVICE_ACCOUNT=$(echo "$ID_DECODED" | jq -cr ".serviceAccount")" >> $GITHUB_ENV
         echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$ID_DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
     - id: auth
-      name: 'Authenticate'
+      name: "Authenticate"
       uses: google-github-actions/auth@v1
       with:
         workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
         token_format: ${{ inputs.token_format }}
-
-
