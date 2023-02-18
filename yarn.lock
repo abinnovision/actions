@@ -52,19 +52,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/config-angular-type-enum@npm:^17.4.0":
-  version: 17.4.0
-  resolution: "@commitlint/config-angular-type-enum@npm:17.4.0"
-  checksum: 4694dead27ccf8ce1efdf7d574b81905f45ea3bede13fc338dff70c175856a284b46c41ddef45446f1b1686959313a88a3465f38b754013b515749905824cba3
-  languageName: node
-  linkType: hard
-
-"@commitlint/config-angular@npm:^17.4.2":
+"@commitlint/config-conventional@npm:^17.4.4":
   version: 17.4.4
-  resolution: "@commitlint/config-angular@npm:17.4.4"
+  resolution: "@commitlint/config-conventional@npm:17.4.4"
   dependencies:
-    "@commitlint/config-angular-type-enum": ^17.4.0
-  checksum: 7dbb42097d7c4a7bc19fcdfc691702a239595c6119d1cee6d044dd61726a5e30c5c1e69380950c707726347ded4e40a19057b4878a1638bb9c48e84af6247b02
+    conventional-changelog-conventionalcommits: ^5.0.0
+  checksum: 679d92509fe6e53ee0cc4202f8069d88360c4f9dbd7ab74114bb28278a196da517ef711dfe69893033a66e54ffc29e8df2ccf63cfd746a89c82a053949473c4b
   languageName: node
   linkType: hard
 
@@ -372,7 +365,7 @@ __metadata:
   resolution: "abinnovision-actions@workspace:."
   dependencies:
     "@commitlint/cli": ^17.4.2
-    "@commitlint/config-angular": ^17.4.2
+    "@commitlint/config-conventional": ^17.4.4
     "@ocular-d/vale-bin": ^1.10.37
     husky: ^8.0.0
     lint-staged: ^13.1.0
@@ -795,6 +788,17 @@ __metadata:
     compare-func: ^2.0.0
     q: ^1.5.1
   checksum: 6ed4972fce25a50f9f038c749cc9db501363131b0fb2efc1fccecba14e4b1c80651d0d758d4c350a609f32010c66fa343eefd49c02e79e911884be28f53f3f90
+  languageName: node
+  linkType: hard
+
+"conventional-changelog-conventionalcommits@npm:^5.0.0":
+  version: 5.0.0
+  resolution: "conventional-changelog-conventionalcommits@npm:5.0.0"
+  dependencies:
+    compare-func: ^2.0.0
+    lodash: ^4.17.15
+    q: ^1.5.1
+  checksum: b67d12e4e0fdde5baa32c3d77af472de38646a18657b26f5543eecce041a318103092fbfcef247e2319a16957c9ac78c6ea78acc11a5db6acf74be79a28c561f
   languageName: node
   linkType: hard
 

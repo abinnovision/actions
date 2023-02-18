@@ -19,7 +19,7 @@
 	],
 	"devDependencies": {
 		"@commitlint/cli": "^17.4.2",
-		"@commitlint/config-angular": "^17.4.2",
+		"@commitlint/config-conventional": "^17.4.4",
 		"@ocular-d/vale-bin": "^1.10.37",
 		"husky": "^8.0.0",
 		"lint-staged": "^13.1.0",
