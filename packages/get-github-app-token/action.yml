@@ -7,7 +7,7 @@ inputs:
     description: Name of the GitHub App to get the token for.
     required: true
 outputs:
-  access_token:
+  token:
     description: ""
     value: ${{ steps.token.outputs.token }}
 runs:
