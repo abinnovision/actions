@@ -1,6 +1,6 @@
 {
 	"name": "abinnovision-actions",
-	"repository": "git@github.com:abinnovision/commons.git",
+	"repository": "git@github.com:abinnovision/actions.git",
 	"version": "0.0.0-development",
 	"author": {
 		"name": "AB INNOVISION UG (limited liability)",
