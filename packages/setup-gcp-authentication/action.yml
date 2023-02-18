@@ -5,8 +5,8 @@ description: |
   As each repository gets an "GCP_ID" secret, which defines the Service Account & Workload Identity Provider to use.
 
 inputs:
-  id:
-    description: The "GCP_ID" secret which is present in all repositories.
+  identification:
+    description: The "GCP_IDENTIFICATION" secret which is present in all repositories.
     required: true
   token_format:
     required: false
@@ -54,7 +54,7 @@ runs:
       name: "Prepare"
       shell: bash
       run: |
-        DECODED=$(echo "${{ inputs.id }}" | base64 --decode)
+        DECODED=$(echo "${{ inputs.identification }}" | base64 --decode)
         echo "GCP_SERVICE_ACCOUNT=$(echo "$DECODED" | jq -cr ".serviceAccount")" >> $GITHUB_ENV
         echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
     - id: auth
