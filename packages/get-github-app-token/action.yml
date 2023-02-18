@@ -1,4 +1,4 @@
-name: GitHub App Token
+name: Get GitHub App Token
 author: "AB innovision UG"
 description: ""
 
@@ -7,23 +7,22 @@ inputs:
     description: Name of the GitHub App to get the token for.
     required: true
 outputs:
-  access_token:
+  token:
     description: ""
-    value: ${{ steps.auth.outputs.access_token }}
+    value: ${{ steps.token.outputs.token }}
 runs:
   using: composite
   steps:
-    - id: prepare
-      name: "Prepare"
-      shell: bash
-      run: |
-        ID_DECODED=$(echo "${{ inputs.id }}" | base64 --decode)
-        echo "GCP_SERVICE_ACCOUNT=$(echo "$ID_DECODED" | jq -cr ".serviceAccount")" >> $GITHUB_ENV
-        echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$ID_DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
-    - id: auth
-      name: "Authenticate"
-      uses: google-github-actions/auth@v1
+    - id: secrets
+      name: "Load secrets"
+      uses: google-github-actions/get-secretmanager-secrets@v1.0.0
       with:
-        workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-        service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
-        token_format: ${{ inputs.token_format }}
+        secrets: |-
+          id:abi-provisioning/github-app-id-${{ inputs.name }}
+          certificate:abi-provisioning/github-app-certificate-${{ inputs.name }}
+    - id: token
+      name: "Generate token"
+      uses: tibdex/github-app-token@v1
+      with:
+        app_id: ${{ steps.secrets.outputs.id }}
+        private_key: ${{ steps.secrets.outputs.certificate }}
