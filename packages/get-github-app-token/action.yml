@@ -3,8 +3,8 @@ author: "AB innovision UG"
 description: ""
 
 inputs:
-  name:
-    description: Name of the GitHub App to get the token for.
+  identification:
+    description: "Identification value of the GitHub App. Secret: 'GH_APP_IDENTIFICATION_<UPPERCASE APP NAME>'"
     required: true
 outputs:
   token:
@@ -13,13 +13,20 @@ outputs:
 runs:
   using: composite
   steps:
+    - id: prepare
+      name: "Prepare"
+      shell: bash
+      run: |
+        DECODED=$(echo "${{ inputs.identification }}" | base64 --decode)
+        echo "APP_ID=$(echo "$DECODED" | jq -cr ".id")" >> $GITHUB_ENV
+        echo "APP_CERTIFICATE=$(echo "$DECODED" | jq -cr ".certificate")" >> $GITHUB_ENV
     - id: secrets
       name: "Load secrets"
       uses: google-github-actions/get-secretmanager-secrets@v1.0.0
       with:
         secrets: |-
-          id:abi-provisioning/github-app-id-${{ inputs.name }}
-          certificate:abi-provisioning/github-app-certificate-${{ inputs.name }}
+          id:${{ env.APP_ID }}
+          certificate:${{ env.APP_CERTIFICATE }}
     - id: token
       name: "Generate token"
       uses: tibdex/github-app-token@v1
