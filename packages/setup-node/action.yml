@@ -3,6 +3,10 @@ author: "AB innovision UG"
 description: |
 
 inputs:
+  token:
+    required: true
+    description: |
+      The token for the package registry. The GITHUB_TOKEN secret can be used.
   version:
     required: false
     default: ""
@@ -36,4 +40,4 @@ runs:
       name: "Configure registry for 'abinnovision' scope"
       shell: bash
       run: |
-        yarn config set -H --json npmScopes '{"abinnovision": {"npmPublishRegistry": "https://npm.pkg.github.com", "npmRegistryServer": "https://npm.pkg.github.com", "npmAlwaysAuth": false, "npmAuthToken": "${{ secrets.GITHUB_TOKEN }}"}}'
+        yarn config set -H --json npmScopes '{"abinnovision": {"npmPublishRegistry": "https://npm.pkg.github.com", "npmRegistryServer": "https://npm.pkg.github.com", "npmAlwaysAuth": false, "npmAuthToken": "${{ inputs.token }}"}}'
