@@ -1,7 +1,7 @@
 name: Setup Node
 author: "AB innovision UG"
 description: |
-
+  Setup a Node.js environment, including package mangers and private registries. This uses the opinionated way of AB innovision.
 inputs:
   token:
     required: true

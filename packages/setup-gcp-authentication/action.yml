@@ -1,16 +1,14 @@
 name: Setup GCP authentication
 author: "AB innovision UG"
 description: |
-  Action to authentication for Google Cloud Platform. This uses the opinionated way of AB innovision.
-  As each repository gets an "GCP_ID" secret, which defines the Service Account & Workload Identity Provider to use.
-
+  Setup authentication for the Google Cloud Platform. This uses the opinionated way of AB innovision.
 inputs:
   identification:
     description: The "GCP_IDENTIFICATION" secret which is present in all repositories.
     required: true
   token_format:
     required: false
-    default: ''
+    default: ""
     description: |-
       Output format for the generated authentication token. For OAuth 2.0 access
       tokens, specify "access_token". For OIDC tokens, specify "id_token". To
@@ -38,14 +36,14 @@ outputs:
     description: |-
       Path on the local filesystem where the generated credentials file resides.
       This is only available if "create_credentials_file" was set to true.
-      
+
       See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L165-L168
   id_token:
     value: ${{ steps.auth.outputs.id_token }}
     description: |-
       The Google Cloud ID token. This is only available when "token_format" is
       "id_token".
-      
+
       See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L177-L180
 runs:
   using: composite
