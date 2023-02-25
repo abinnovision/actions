@@ -9,9 +9,10 @@ streamline their workflows
 
 These are the currently available actions:
 
-- [setup-gcp-authentication](./packages/setup-gcp-authentication): Setup the authentication for Google Cloud Platform.
-	This works nicely with our Service Account provisioning.
-- [get-github-app-token](./packages/get-github-app-token): TBD
+- [setup-gcp-authentication](./packages/setup-gcp-authentication): Setup authentication for the Google Cloud Platform.
+- [setup-node](./packages/setup-node): Setup a Node.js environment, including package mangers and private registries.
+- [get-github-app-token](./packages/get-github-app-token): Gets the token for the GitHub App based on the given
+	identification.
 
 ## Usage
 
