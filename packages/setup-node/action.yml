@@ -22,9 +22,9 @@ runs:
         DEFAULT_VERSION: lts/hydrogen
         DEFAULT_VERSION_FILE: .tool-versions
       run: |
-        if [ -z "${{ inputs.version }}" ]; then
+        if [ -n "${{ inputs.version }}" ]; then
           echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
-        elif [ -f "${{ env.DEFAULT_VERSION_FILE }}" ]
+        elif [ -f "${{ env.DEFAULT_VERSION_FILE }}" ]; then
           echo "VERSION_FILE=${{ env.DEFAULT_VERSION_FILE }}" >> $GITHUB_ENV
         else
           echo "VERSION=${{ env.DEFAULT_VERSION }}" >> $GITHUB_ENV
