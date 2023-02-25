@@ -1,0 +1,39 @@
+name: Setup Node
+author: "AB innovision UG"
+description: |
+
+inputs:
+  version:
+    required: false
+    default: ""
+    description: |
+      Defines a version, which overrides the default version.
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      name: "Prepare"
+      shell: bash
+      env:
+        DEFAULT_VERSION: lts/hydrogen
+        DEFAULT_VERSION_FILE: .tool_versions
+      run: |
+        if [ -z "${{ inputs.version }}" ]; then
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+        elif [ -f "${{ env.DEFAULT_VERSION_FILE }}" ]
+          echo "VERSION_FILE=${{ env.DEFAULT_VERSION_FILE }}" >> $GITHUB_ENV
+        else
+          echo "VERSION=${{ env.DEFAULT_VERSION }}" >> $GITHUB_ENV
+        fi
+    - id: setup
+      name: "Setup"
+      uses: actions/setup-node@v3.6.0
+      with:
+        node-version-file: ${{ env.VERSION_FILE }}
+        node-version: ${{ env.VERSION }}
+        cache: yarn
+    - id: registry
+      name: "Configure registry for 'abinnovision' scope"
+      shell: bash
+      run: |
+        yarn config set -H --json npmScopes '{"abinnovision": {"npmPublishRegistry": "https://npm.pkg.github.com", "npmRegistryServer": "https://npm.pkg.github.com", "npmAlwaysAuth": false, "npmAuthToken": "${{ secrets.GITHUB_TOKEN }}"}}'
