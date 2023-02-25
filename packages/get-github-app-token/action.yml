@@ -1,7 +1,7 @@
 name: Get GitHub App Token
 author: "AB innovision UG"
-description: ""
-
+description: |
+  Gets the token for the GitHub App based on the given identification.
 inputs:
   identification:
     description: "Identification value of the GitHub App. Secret: 'GH_APP_IDENTIFICATION_<UPPERCASE APP NAME>'"
