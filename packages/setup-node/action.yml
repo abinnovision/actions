@@ -16,7 +16,7 @@ runs:
       shell: bash
       env:
         DEFAULT_VERSION: lts/hydrogen
-        DEFAULT_VERSION_FILE: .tool_versions
+        DEFAULT_VERSION_FILE: .tool-versions
       run: |
         if [ -z "${{ inputs.version }}" ]; then
           echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
