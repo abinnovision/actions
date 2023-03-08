@@ -15,7 +15,7 @@
 	},
 	"packageManager": "yarn@3.4.1",
 	"workspaces": [
-		"packages/*"
+		"actions/*"
 	],
 	"devDependencies": {
 		"@abinnovision/eslint-config-base": "^1.0.0",
@@ -35,6 +35,7 @@
 		"prettier": "^2.8.3"
 	},
 	"scripts": {
+		"build": "yarn workspaces foreach --topological -p run build",
 		"fix": "concurrently 'yarn:eslint:fix' 'yarn:prettier:fix'",
 		"check": "concurrently 'yarn:eslint:check' 'yarn:prettier:check'",
 		"commitlint:check": "commitlint --edit",
@@ -42,7 +43,7 @@
 		"eslint:fix": "eslint --ignore-path .gitignore --fix '**/src/**/*.{tsx,ts}'",
 		"prettier:check": "prettier --ignore-path .gitignore --check '**/*.{json,json5,yaml,yml,md}'",
 		"prettier:fix": "prettier --ignore-path .gitignore --write '**/*.{json,json5,yaml,yml,md}'",
-		"vale:check": "vale **/*.md",
+		"vale:check": "vale {*,actions/*/*}.md",
 		"postinstall": "husky install && vale sync",
 		"link": "ls packages | while read package; do ln -s \"packages/$package\" \".$package\"; done"
 	},
