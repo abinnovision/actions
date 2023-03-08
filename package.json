@@ -37,14 +37,19 @@
 	"scripts": {
 		"fix": "concurrently 'yarn:eslint:fix' 'yarn:prettier:fix'",
 		"check": "concurrently 'yarn:eslint:check' 'yarn:prettier:check'",
-		"commitlint:check": "commitlint --config .commitlintrc.yaml --edit",
+		"commitlint:check": "commitlint --edit",
 		"eslint:check": "eslint --ignore-path .gitignore '**/src/**/*.{tsx,ts}'",
 		"eslint:fix": "eslint --ignore-path .gitignore --fix '**/src/**/*.{tsx,ts}'",
-		"prettier:check": "prettier --ignore-path .gitignore --check '**/*.{json,json5,yaml,yml}'",
-		"prettier:fix": "prettier --ignore-path .gitignore --write '**/*.{json,json5,yaml,yml}'",
+		"prettier:check": "prettier --ignore-path .gitignore --check '**/*.{json,json5,yaml,yml,md}'",
+		"prettier:fix": "prettier --ignore-path .gitignore --write '**/*.{json,json5,yaml,yml,md}'",
 		"vale:check": "vale **/*.md",
 		"postinstall": "husky install && vale sync",
 		"link": "ls packages | while read package; do ln -s \"packages/$package\" \".$package\"; done"
+	},
+	"commitlint": {
+		"extends": [
+			"@abinnovision/commitlint-config"
+		]
 	},
 	"prettier": "@abinnovision/prettier-config",
 	"eslintConfig": {

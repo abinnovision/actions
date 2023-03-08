@@ -12,7 +12,7 @@ These are the currently available actions:
 - [setup-gcp-authentication](./packages/setup-gcp-authentication): Setup authentication for the Google Cloud Platform.
 - [setup-node](./packages/setup-node): Setup a Node.js environment, including package mangers and private registries.
 - [get-github-app-token](./packages/get-github-app-token): Gets the token for the GitHub App based on the given
-	identification.
+  identification.
 
 ## Usage
 
@@ -26,4 +26,4 @@ jobs:
 ```
 
 Each available action has a symlink in the root directory prefixed with a dot (`.`).
-Currently, there is no proper versioning of these actions, therefore we use `master` as ref. 
+Currently, there is no proper versioning of these actions, therefore we use `master` as ref.
