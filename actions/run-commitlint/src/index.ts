@@ -67,8 +67,8 @@ async function getCommitRange(octokit: OctokitType): Promise<CommitRange> {
 
 		// Fetch the PullRequest object.
 		const pullRequest = await octokit.rest.pulls.get({
-			owner: context.issue.owner,
-			repo: context.issue.repo,
+			owner: context.repo.owner,
+			repo: context.repo.repo,
 			pull_number: context.issue.number,
 		});
 
@@ -124,8 +124,8 @@ async function fetchCommits(
 		core.debug(`Fetching commits from '${range.from}' to '${range.to}'`);
 
 		const response = await octokit.rest.repos.compareCommits({
-			owner: context.issue.owner,
-			repo: context.issue.repo,
+			owner: context.repo.owner,
+			repo: context.repo.repo,
 			base: range.from,
 			head: range.to,
 		});
@@ -140,8 +140,8 @@ async function fetchCommits(
 		core.debug(`Fetching commit '${range.to}'`);
 
 		const response = await octokit.rest.repos.getCommit({
-			owner: context.issue.owner,
-			repo: context.issue.repo,
+			owner: context.repo.owner,
+			repo: context.repo.repo,
 			ref: range.to,
 		});
 
@@ -218,4 +218,7 @@ function hasLintErrors(results: CommitLintResult[]): boolean {
 	} else {
 		core.info(chalk.green(`All commit messages are valid!`));
 	}
-})();
+})().catch((error) => {
+	core.error(error)
+	return core.setFailed("Error while running action");
+});
