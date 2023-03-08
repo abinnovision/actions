@@ -18,22 +18,47 @@
 		"packages/*"
 	],
 	"devDependencies": {
+		"@abinnovision/eslint-config-base": "^1.0.0",
+		"@abinnovision/eslint-config-typescript": "^1.0.0",
+		"@abinnovision/prettier-config": "^1.0.0",
 		"@commitlint/cli": "^17.4.2",
 		"@commitlint/config-conventional": "^17.4.4",
 		"@ocular-d/vale-bin": "^1.10.37",
+		"@typescript-eslint/eslint-plugin": "^5.54.1",
+		"@typescript-eslint/parser": "^5.54.1",
+		"concurrently": "^7.6.0",
+		"eslint": "^8.35.0",
+		"eslint-config-prettier": "^8.7.0",
+		"eslint-plugin-import": "^2.27.5",
 		"husky": "^8.0.0",
 		"lint-staged": "^13.1.0",
 		"prettier": "^2.8.3"
 	},
 	"scripts": {
+		"fix": "concurrently 'yarn:eslint:fix' 'yarn:prettier:fix'",
+		"check": "concurrently 'yarn:eslint:check' 'yarn:prettier:check'",
 		"commitlint:check": "commitlint --config .commitlintrc.yaml --edit",
+		"eslint:check": "eslint --ignore-path .gitignore '**/src/**/*.{tsx,ts}'",
+		"eslint:fix": "eslint --ignore-path .gitignore --fix '**/src/**/*.{tsx,ts}'",
 		"prettier:check": "prettier --ignore-path .gitignore --check '**/*.{json,json5,yaml,yml}'",
 		"prettier:fix": "prettier --ignore-path .gitignore --write '**/*.{json,json5,yaml,yml}'",
 		"vale:check": "vale **/*.md",
 		"postinstall": "husky install && vale sync",
 		"link": "ls packages | while read package; do ln -s \"packages/$package\" \".$package\"; done"
 	},
+	"prettier": "@abinnovision/prettier-config",
+	"eslintConfig": {
+		"extends": [
+			"@abinnovision/base",
+			"@abinnovision/typescript",
+			"prettier"
+		]
+	},
 	"lint-staged": {
+		"**/src/**/*.{ts,tsx,js}": [
+			"prettier",
+			"eslint"
+		],
 		"**/*.{json,json5,yaml,yml,md}": [
 			"prettier"
 		],
