@@ -5,8 +5,7 @@ description: |
 inputs:
   auth:
     description: The "GCP_AUTH" variable which is present in all repositories.
-    default: ${{ vars.GCP_AUTH }}
-    required: true
+    required: false
   token_format:
     required: false
     default: ""
@@ -53,7 +52,7 @@ runs:
       name: "Prepare"
       shell: bash
       run: |
-        DECODED=$(echo "${{ inputs.auth }}" | base64 --decode)
+        DECODED=$(echo "${{ vars.GCP_AUTH }}" | base64 --decode)
         echo "GCP_SERVICE_ACCOUNT=$(echo "$DECODED" | jq -cr ".serviceAccount")" >> $GITHUB_ENV
         echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
     - id: auth
