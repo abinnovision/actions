@@ -1,4 +1,0 @@
-monorepo
-commitlint
-innovision
-config
