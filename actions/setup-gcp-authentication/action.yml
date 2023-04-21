@@ -3,8 +3,9 @@ author: "AB innovision UG"
 description: |
   Setup authentication for the Google Cloud Platform. This uses the opinionated way of AB innovision.
 inputs:
-  identification:
-    description: The "GCP_IDENTIFICATION" secret which is present in all repositories.
+  auth:
+    description: The "GCP_AUTH" variable which is present in all repositories.
+    default: ${{ vars.GCP_AUTH }}
     required: true
   token_format:
     required: false
@@ -52,7 +53,7 @@ runs:
       name: "Prepare"
       shell: bash
       run: |
-        DECODED=$(echo "${{ inputs.identification }}" | base64 --decode)
+        DECODED=$(echo "${{ inputs.auth }}" | base64 --decode)
         echo "GCP_SERVICE_ACCOUNT=$(echo "$DECODED" | jq -cr ".serviceAccount")" >> $GITHUB_ENV
         echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
     - id: auth
