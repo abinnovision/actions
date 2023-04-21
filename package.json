@@ -58,11 +58,11 @@
 	},
 	"lint-staged": {
 		"**/src/**/*.{ts,tsx,js}": [
-			"prettier",
-			"eslint"
+			"prettier --write",
+			"eslint --fix"
 		],
 		"**/*.{json,json5,yaml,yml,md}": [
-			"prettier"
+			"prettier --write"
 		]
 	}
 }
