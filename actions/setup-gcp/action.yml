@@ -1,7 +1,7 @@
-name: Setup GCP authentication
+name: Setup GCP
 author: "AB innovision UG"
 description: |
-  Setup authentication for the Google Cloud Platform. This uses the opinionated way of AB innovision.
+  Setup for the Google Cloud Platform. This uses the opinionated way of AB innovision.
 inputs:
   auth:
     description: The "GCP_AUTH" variable which is present in all repositories.
