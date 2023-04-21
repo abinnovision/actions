@@ -23,7 +23,6 @@
 		"@abinnovision/prettier-config": "^1.0.0",
 		"@commitlint/cli": "^17.4.2",
 		"@commitlint/config-conventional": "^17.4.4",
-		"@ocular-d/vale-bin": "^1.10.37",
 		"@typescript-eslint/eslint-plugin": "^5.54.1",
 		"@typescript-eslint/parser": "^5.54.1",
 		"concurrently": "^7.6.0",
@@ -37,14 +36,13 @@
 	"scripts": {
 		"build": "yarn workspaces foreach --topological -p run build",
 		"fix": "concurrently 'yarn:eslint:fix' 'yarn:prettier:fix'",
-		"check": "concurrently 'yarn:eslint:check' 'yarn:prettier:check' 'yarn:vale:check'",
+		"check": "concurrently 'yarn:eslint:check' 'yarn:prettier:check'",
 		"commitlint:check": "commitlint --edit",
 		"eslint:check": "eslint --ignore-path .gitignore '**/src/**/*.{tsx,ts}'",
 		"eslint:fix": "eslint --ignore-path .gitignore --fix '**/src/**/*.{tsx,ts}'",
 		"prettier:check": "prettier --ignore-path .gitignore --check '**/*.{json,json5,yaml,yml,md}'",
 		"prettier:fix": "prettier --ignore-path .gitignore --write '**/*.{json,json5,yaml,yml,md}'",
-		"vale:check": "vale {*,actions/*/*}.md",
-		"postinstall": "husky install && vale sync",
+		"postinstall": "husky install",
 		"link": "ls packages | while read package; do ln -s \"packages/$package\" \".$package\"; done"
 	},
 	"commitlint": {
@@ -67,9 +65,6 @@
 		],
 		"**/*.{json,json5,yaml,yml,md}": [
 			"prettier"
-		],
-		"**/*.md": [
-			"vale"
 		]
 	}
 }
