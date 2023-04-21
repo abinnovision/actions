@@ -37,7 +37,6 @@
 		"build": "yarn workspaces foreach --topological -p run build",
 		"fix": "concurrently 'yarn:eslint:fix' 'yarn:prettier:fix'",
 		"check": "concurrently 'yarn:eslint:check' 'yarn:prettier:check'",
-		"commitlint:check": "commitlint --edit",
 		"eslint:check": "eslint --ignore-path .gitignore '**/src/**/*.{tsx,ts}'",
 		"eslint:fix": "eslint --ignore-path .gitignore --fix '**/src/**/*.{tsx,ts}'",
 		"prettier:check": "prettier --ignore-path .gitignore --check '**/*.{json,json5,yaml,yml,md}'",
