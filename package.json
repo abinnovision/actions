@@ -41,8 +41,7 @@
 		"eslint:fix": "eslint --ignore-path .gitignore --fix '**/src/**/*.{tsx,ts}'",
 		"prettier:check": "prettier --ignore-path .gitignore --check '**/*.{json,json5,yaml,yml,md}'",
 		"prettier:fix": "prettier --ignore-path .gitignore --write '**/*.{json,json5,yaml,yml,md}'",
-		"postinstall": "husky install",
-		"link": "ls packages | while read package; do ln -s \"packages/$package\" \".$package\"; done"
+		"postinstall": "husky install"
 	},
 	"commitlint": {
 		"extends": [
