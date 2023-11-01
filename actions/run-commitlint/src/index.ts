@@ -12,6 +12,7 @@ import {
 	LintOutcome,
 } from "@commitlint/types";
 import chalk from "chalk";
+import "conventional-changelog-conventionalcommits";
 
 type OctokitType = ReturnType<typeof getOctokit>;
 
@@ -219,6 +220,6 @@ function hasLintErrors(results: CommitLintResult[]): boolean {
 		core.info(chalk.green(`All commit messages are valid!`));
 	}
 })().catch((error) => {
-	core.error(error)
+	core.error(error);
 	return core.setFailed("Error while running action");
 });
