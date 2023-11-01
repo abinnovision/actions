@@ -12,6 +12,8 @@ import {
 	LintOutcome,
 } from "@commitlint/types";
 import chalk from "chalk";
+// @ts-ignore
+import * as createParserOpts from "conventional-changelog-conventionalcommits";
 
 type OctokitType = ReturnType<typeof getOctokit>;
 
@@ -166,7 +168,11 @@ async function lintCommits(
 	return Promise.all(
 		commits.map(async (commit) => ({
 			...commit,
-			result: await lint(commit.message, rules),
+			result: await lint(commit.message, rules, {
+				parserOpts: (
+					await createParserOpts()
+				)["conventionalChangelog"].parserOpts,
+			}),
 		}))
 	);
 }
@@ -219,6 +225,6 @@ function hasLintErrors(results: CommitLintResult[]): boolean {
 		core.info(chalk.green(`All commit messages are valid!`));
 	}
 })().catch((error) => {
-	core.error(error)
+	core.error(error);
 	return core.setFailed("Error while running action");
 });

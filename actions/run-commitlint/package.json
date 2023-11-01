@@ -6,13 +6,14 @@
 		"build:watch": "ncc build --watch src/index.ts"
 	},
 	"dependencies": {
-		"@abinnovision/commitlint-config": "^1.0.1",
+		"@abinnovision/commitlint-config": "^1.1.0",
 		"@actions/core": "^1.10.0",
 		"@actions/github": "^5.1.1",
 		"@commitlint/execute-rule": "^18.1.0",
 		"@commitlint/format": "^18.1.0",
 		"@commitlint/lint": "^18.1.0",
-		"chalk": "^5.2.0"
+		"chalk": "^5.2.0",
+		"conventional-changelog-conventionalcommits": "^7.0.2"
 	},
 	"devDependencies": {
 		"@vercel/ncc": "^0.36.1"
