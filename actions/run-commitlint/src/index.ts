@@ -13,7 +13,7 @@ import {
 } from "@commitlint/types";
 import chalk from "chalk";
 // @ts-ignore
-import { createParserOpts } from "conventional-changelog-conventionalcommits";
+import createParserOpts from "conventional-changelog-conventionalcommits";
 
 type OctokitType = ReturnType<typeof getOctokit>;
 

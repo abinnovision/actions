@@ -27513,7 +27513,7 @@ async function lintCommits(rules, commits) {
     return Promise.all(commits.map(async (commit) => ({
         ...commit,
         result: await (0, lint_1.default)(commit.message, rules, {
-            parserOpts: (0, conventional_changelog_conventionalcommits_1.createParserOpts)(),
+            parserOpts: (0, conventional_changelog_conventionalcommits_1.default)(),
         }),
     })));
 }
