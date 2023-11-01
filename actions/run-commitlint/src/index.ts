@@ -12,7 +12,8 @@ import {
 	LintOutcome,
 } from "@commitlint/types";
 import chalk from "chalk";
-import "conventional-changelog-conventionalcommits";
+// @ts-ignore
+import { createParserOpts } from "conventional-changelog-conventionalcommits";
 
 type OctokitType = ReturnType<typeof getOctokit>;
 
@@ -167,7 +168,9 @@ async function lintCommits(
 	return Promise.all(
 		commits.map(async (commit) => ({
 			...commit,
-			result: await lint(commit.message, rules),
+			result: await lint(commit.message, rules, {
+				parserOpts: createParserOpts(),
+			}),
 		}))
 	);
 }
