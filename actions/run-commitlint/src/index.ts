@@ -169,7 +169,9 @@ async function lintCommits(
 		commits.map(async (commit) => ({
 			...commit,
 			result: await lint(commit.message, rules, {
-				parserOpts: (await createParserOpts())["conventionalChangelog"],
+				parserOpts: (
+					await createParserOpts()
+				)["conventionalChangelog"].parserOpts,
 			}),
 		}))
 	);
