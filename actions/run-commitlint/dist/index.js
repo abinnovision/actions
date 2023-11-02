@@ -27407,7 +27407,6 @@ const chalk_1 = __nccwpck_require__(1006);
 const createParserOpts = __nccwpck_require__(8801);
 const GIT_EMPTY_SHA = "0000000000000000000000000000000000000000";
 const PULL_REQUEST_EVENT_NAMES = ["pull_request", "pull_request_target"];
-console.log(createParserOpts());
 function setupOctokit() {
     return (0, github_1.getOctokit)(core.getInput("token"));
 }
@@ -27514,7 +27513,7 @@ async function lintCommits(rules, commits) {
     return Promise.all(commits.map(async (commit) => ({
         ...commit,
         result: await (0, lint_1.default)(commit.message, rules, {
-            parserOpts: createParserOpts(),
+            parserOpts: (await createParserOpts())['conventionalChangelog'],
         }),
     })));
 }
