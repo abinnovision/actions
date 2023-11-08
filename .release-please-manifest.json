@@ -1,1 +1,6 @@
-{}
+{
+	"actions/get-github-app-token": "0.0.0",
+	"actions/run-commitlint": "0.0.0",
+	"actions/setup-gcp": ".0.0",
+	"actions/setup-node": "0.0.0"
+}
