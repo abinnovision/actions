@@ -1,5 +1,5 @@
 name: Setup Node
-author: "AB INNOVISION UG"
+author: "AB INNOVISION GmbH"
 description: |
   Setup a Node.js environment, including package mangers and private registries.
   This uses the opinionated way of AB Innovision.
