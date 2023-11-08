@@ -13,7 +13,5 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
       - name: Run linter
-        uses: ./packages/run-commitlint
+        uses: abinnovision/actions@action/run-commitlint/v1.0.0
