@@ -117,7 +117,7 @@ jobs:
             cd "/opt/temporary/$package_name"
 
             # Unpack the 'package.tgz' file in the current folder and delete it.
-            tar -xzf package.tgz && rm package.tgz
+            tar --strip-components=1 -xzf package.tgz && rm package.tgz
 
             # Create an empty git repository.
             git init -b "$package_name/v$package_version"
