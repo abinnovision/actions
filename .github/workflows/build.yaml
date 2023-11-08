@@ -126,6 +126,8 @@ jobs:
             git add .
             git commit -m "chore: release $package_name@$package_version"
 
+            git fetch
+
             source_sha=$(git rev-list -n 1 "$package_name-v$package_version")
             dist_sha=$(git rev-list -n 1 HEAD)
 
