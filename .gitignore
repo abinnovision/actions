@@ -317,3 +317,6 @@ $RECYCLE.BIN/
 
 /.vale/*
 !/.vale/Vocab
+
+
+.turbo/

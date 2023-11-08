@@ -1,69 +1,55 @@
 {
 	"name": "abinnovision-actions",
-	"repository": "git@github.com:abinnovision/actions.git",
 	"version": "0.0.0-development",
+	"private": true,
+	"repository": "git@github.com:abinnovision/actions.git",
+	"license": "proprietary",
 	"author": {
 		"name": "AB INNOVISION UG (limited liability)",
 		"email": "info@abinnovision.com",
 		"url": "https://abinnovision.com/"
 	},
-	"private": true,
-	"license": "proprietary",
-	"engineStrict": true,
-	"engines": {
-		"node": ">=16"
-	},
-	"packageManager": "yarn@3.4.1",
 	"workspaces": [
 		"actions/*"
 	],
-	"devDependencies": {
-		"@abinnovision/commitlint-config": "^1.1.0",
-		"@abinnovision/eslint-config-base": "^1.1.0",
-		"@abinnovision/eslint-config-typescript": "^1.1.0",
-		"@abinnovision/prettier-config": "^1.1.0",
-		"@commitlint/cli": "^17.4.2",
-		"@commitlint/config-conventional": "^17.4.4",
-		"@typescript-eslint/eslint-plugin": "^5.54.1",
-		"@typescript-eslint/parser": "^5.54.1",
-		"concurrently": "^7.6.0",
-		"eslint": "^8.35.0",
-		"eslint-config-prettier": "^8.7.0",
-		"eslint-plugin-import": "^2.27.5",
-		"husky": "^8.0.0",
-		"lint-staged": "^13.1.0",
-		"prettier": "^2.8.3"
-	},
 	"scripts": {
 		"build": "yarn workspaces foreach --topological -p run build",
-		"fix": "concurrently 'yarn:eslint:fix' 'yarn:prettier:fix'",
-		"check": "concurrently 'yarn:eslint:check' 'yarn:prettier:check'",
-		"eslint:check": "eslint --ignore-path .gitignore '**/src/**/*.{tsx,ts}'",
-		"eslint:fix": "eslint --ignore-path .gitignore --fix '**/src/**/*.{tsx,ts}'",
-		"prettier:check": "prettier --ignore-path .gitignore --check '**/*.{json,json5,yaml,yml,md}'",
-		"prettier:fix": "prettier --ignore-path .gitignore --write '**/*.{json,json5,yaml,yml,md}'",
-		"postinstall": "husky install"
+		"check": "yarn prettier:check && turbo check",
+		"fix": "yarn prettier:fix && turbo fix",
+		"postinstall": "husky install",
+		"prettier:check": "prettier --ignore-path .gitignore --check '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
+		"prettier:fix": "prettier --ignore-path .gitignore --write '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
+		"sort:check": "sort-package-json 'actions/**!(node_modules)/package.json' 'package.json' --check",
+		"sort:fix": "sort-package-json 'actions/**!(node_modules)/package.json' 'package.json'"
 	},
 	"commitlint": {
 		"extends": [
 			"@abinnovision/commitlint-config"
 		]
 	},
-	"prettier": "@abinnovision/prettier-config",
-	"eslintConfig": {
-		"extends": [
-			"@abinnovision/base",
-			"@abinnovision/typescript",
-			"prettier"
+	"lint-staged": {
+		"{*,.github/**/*}.{json,json5,yaml,yml,md}": [
+			"prettier --write"
+		],
+		"**/package.json": [
+			"sort-package-json"
 		]
 	},
-	"lint-staged": {
-		"**/src/**/*.{ts,tsx,js}": [
-			"prettier --write",
-			"eslint --fix"
-		],
-		"**/*.{json,json5,yaml,yml,md}": [
-			"prettier --write"
-		]
-	}
+	"prettier": "@abinnovision/prettier-config",
+	"devDependencies": {
+		"@abinnovision/commitlint-config": "^1.1.0",
+		"@abinnovision/prettier-config": "^1.1.0",
+		"@commitlint/cli": "^17.4.2",
+		"concurrently": "^7.6.0",
+		"husky": "^8.0.0",
+		"lint-staged": "^13.1.0",
+		"prettier": "^2.8.3",
+		"sort-package-json": "^2.6.0",
+		"turbo": "^1.10.16"
+	},
+	"packageManager": "yarn@3.4.1",
+	"engines": {
+		"node": ">=16"
+	},
+	"engineStrict": true
 }

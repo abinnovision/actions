@@ -1,19 +1,21 @@
 // Chalk does not work by default on GitHub Actions (https://github.com/chalk/supports-color/issues/106).
-process.env["FORCE_COLOR"] = "2";
 import * as commitlintConfig from "@abinnovision/commitlint-config";
 import * as core from "@actions/core";
 import { getOctokit, context } from "@actions/github";
 import { execute as executeRule } from "@commitlint/execute-rule";
 import format from "@commitlint/format";
 import lint from "@commitlint/lint";
-import {
+import chalk from "chalk";
+// @ts-ignore
+import * as createParserOpts from "conventional-changelog-conventionalcommits";
+
+import type {
 	QualifiedConfig,
 	QualifiedRules,
 	LintOutcome,
 } from "@commitlint/types";
-import chalk from "chalk";
-// @ts-ignore
-import * as createParserOpts from "conventional-changelog-conventionalcommits";
+
+process.env["FORCE_COLOR"] = "2";
 
 type OctokitType = ReturnType<typeof getOctokit>;
 
@@ -165,13 +167,12 @@ async function lintCommits(
 	rules: QualifiedRules,
 	commits: CommitInfo[]
 ): Promise<CommitLintResult[]> {
-	return Promise.all(
+	return await Promise.all(
 		commits.map(async (commit) => ({
 			...commit,
 			result: await lint(commit.message, rules, {
-				parserOpts: (
-					await createParserOpts()
-				)["conventionalChangelog"].parserOpts,
+				parserOpts: (await createParserOpts())["conventionalChangelog"]
+					.parserOpts,
 			}),
 		}))
 	);
