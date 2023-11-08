@@ -1,0 +1,141 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request_target:
+    branches:
+      - master
+jobs:
+  # Configure the commit SHA to use.
+  configure:
+    name: Configure
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    outputs:
+      commit-sha: ${{ env.COMMIT_SHA }}
+    steps:
+      - name: Evaluate commit
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+              echo "PR is #${{ github.event.number }}..."
+              echo "PR Head SHA is ${{ github.event.pull_request.head.sha }}..."
+              echo "COMMIT_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          else
+              echo "Head SHA is ${{ github.sha }}..."
+              echo "COMMIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
+          fi
+
+  # Build and checks are unified into one job. This is because the build
+  # needs to be done before the checks, as the checks will use the built
+  # packages.
+  check_build:
+    name: Check & Build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    needs:
+      - configure
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+      - name: Setup Node
+        uses: abinnovision/actions/actions/setup-node@master
+      - name: Setup Turborepo cache
+        uses: dtinth/setup-github-actions-caching-for-turbo@v1
+      - name: Install dependencies
+        run: yarn install --immutable
+      - name: Check (lint & format)
+        run: yarn check
+      - name: Build
+        run: yarn build
+      - name: Check Dependencies
+        run: |
+          yarn dedupe
+          git diff --exit-code --quiet yarn.lock || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
+
+  # Will check if the release is needed and create a release PR if so.
+  release:
+    name: Release
+    needs:
+      - configure
+      - check_build
+    uses: abinnovision/workflows/.github/workflows/release-please.yaml@master
+    secrets: inherit
+    # Only run on push to "master" branch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs:
+      - configure
+      - release
+    if: needs.release.outputs.releases_created
+    permissions:
+      contents: "write"
+      id-token: "write"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+      - name: Setup Node
+        uses: abinnovision/actions/actions/setup-node@master
+      - name: Setup Turborepo cache
+        uses: dtinth/setup-github-actions-caching-for-turbo@v1
+      - name: Install dependencies
+        run: yarn install --immutable
+      - name: Build
+        run: yarn run build
+      - name: Publish
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          echo '${{ needs.release.outputs.paths_released }}' | jq -cr '.[]' | while read path; do
+            # Change to the package directory.
+            cd ${{ github.workspace }}
+
+            echo "Publishing '$path'..."
+
+            # Create the 'package.tgz' file..
+            yarn pack --cwd "$path"
+
+            # Get the package name and version from the 'package.json' file.
+            package_name=$(jq -r '.name' "$path/package.json")
+            package_version=$(jq -r '.version' "$path/package.json")
+            git_remote_url=$(git remote get-url origin)
+
+            # Create a staging environment for the package.
+            mkdir -p "/opt/temporary/$package_name"
+            mv "$path/package.tgz" "/opt/temporary/$package_name/package.tgz"
+
+            cd "/opt/temporary/$package_name"
+
+            # Unpack the 'package.tgz' file in the current folder and delete it.
+            tar --strip-components=1 -xzf package.tgz && rm package.tgz
+
+            # Create an empty git repository.
+            git init -b "action/$package_name/v$package_version"
+            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
+
+            # Add all files to the git repository.
+            git add .
+            git commit -m "chore: release $package_name@$package_version"
+
+            git fetch origin --tags -f
+
+            dist_sha=$(git rev-list -n 1 HEAD)
+
+            git tag -f "$package_name-v$package_version" "$dist_sha"
+
+            # Add additional tags for the package.
+            git tag -f "$package_name-v$(echo $package_version | cut -d. -f1-2)" "$dist_sha"
+            git tag -f "$package_name-v$(echo $package_version | cut -d. -f1)" "$dist_sha"
+
+              # Push the git repository to the remote.
+            git push --tags --force origin "action/$package_name/v$package_version"
+          done
