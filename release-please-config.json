@@ -3,9 +3,17 @@
 	"changelog-path": "CHANGELOG.md",
 	"release-type": "node",
 	"packages": {
-		"actions/get-github-app-token": {},
-		"actions/run-commitlint": {},
-		"actions/setup-gcp": {},
-		"actions/setup-node": {}
+		"actions/get-github-app-token": {
+			"extra-files": ["README.md"]
+		},
+		"actions/run-commitlint": {
+			"extra-files": ["README.md"]
+		},
+		"actions/setup-gcp": {
+			"extra-files": ["README.md"]
+		},
+		"actions/setup-node": {
+			"extra-files": ["README.md"]
+		}
 	}
 }
