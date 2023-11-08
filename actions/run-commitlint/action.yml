@@ -1,5 +1,5 @@
 name: Run Commitlint
-author: "AB innovision UG"
+author: "AB INNOVISION GmbH"
 description: |
   Runs commitlint based on the '@abinnovision/commitlint-config' config.
 inputs:
