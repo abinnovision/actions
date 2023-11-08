@@ -1,0 +1,4 @@
+{
+	"name": "setup-node",
+	"packageManager": "yarn@3.4.1"
+}
