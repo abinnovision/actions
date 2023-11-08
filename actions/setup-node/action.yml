@@ -38,8 +38,3 @@ runs:
         node-version-file: ${{ env.VERSION_FILE }}
         node-version: ${{ env.VERSION }}
         cache: yarn
-    - id: registry
-      name: "Configure registry for 'abinnovision' scope"
-      shell: bash
-      run: |
-        yarn config set -H --json npmScopes '{"abinnovision": {"npmPublishRegistry": "https://npm.pkg.github.com", "npmRegistryServer": "https://npm.pkg.github.com", "npmAlwaysAuth": false, "npmAuthToken": "${{ inputs.token }}"}}'
