@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/run-commitlint-v1.0.0...run-commitlint-v1.0.1) (2023-11-08)
+
+
+### Reverts
+
+* "chore: release master ([#6](https://github.com/abinnovision/actions/issues/6))" ([383e68d](https://github.com/abinnovision/actions/commit/383e68d5d94a98a3eb5cb253404405514cf4e86e))
+
 ## 1.0.0 (2023-11-08)
 
 
