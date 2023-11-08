@@ -128,5 +128,5 @@ jobs:
             git commit -m "chore: release $package_name@$package_version"
 
               # Push the git repository to the remote.
-            git push --force origin "$package_version/v$package_version"
+            git push --force origin "$package_name/v$package_version"
           done
