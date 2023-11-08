@@ -5,6 +5,11 @@
 		"build": "ncc build src/index.ts",
 		"build:watch": "ncc build --watch src/index.ts"
 	},
+	"files": [
+		"dist",
+		"README.md",
+		"action.yml"
+	],
 	"dependencies": {
 		"@abinnovision/commitlint-config": "^1.1.0",
 		"@actions/core": "^1.10.0",
