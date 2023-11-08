@@ -1,5 +1,5 @@
 name: Setup GCP
-author: "AB INNOVISION UG"
+author: "AB INNOVISION GmbH"
 description: |
   Setup for the Google Cloud Platform. This uses the opinionated way of AB Innovision.
 inputs:
