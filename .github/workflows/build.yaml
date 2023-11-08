@@ -126,13 +126,13 @@ jobs:
             git add .
             git commit -m "chore: release $package_name@$package_version"
 
-            git fetch
+            git fetch origin --tags -f
 
-            source_sha=$(git rev-list -n 1 "$package_name-v$package_version")
+            source_sha=$(git rev-list -n 1 "refs/tags/$package_name-v$package_version")
             dist_sha=$(git rev-list -n 1 HEAD)
 
             git tag -f "$package_name-v$package_version-source" "$source_sha"
-            git tag -f "$package_name-v$package_version" "dist_sha"
+            git tag -f "$package_name-v$package_version" "$dist_sha"
 
               # Push the git repository to the remote.
             git push --tags --force origin "action/$package_name/v$package_version"
