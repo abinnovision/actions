@@ -120,7 +120,7 @@ jobs:
             tar -xzf package.tgz && rm package.tgz
 
             # Create an empty git repository.
-            git init -b "$package_version/v$package_version"
+            git init -b "$package_name/v$package_version"
             git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
 
             # Add all files to the git repository.
