@@ -19,5 +19,6 @@
 		"@abinnovision/prettier-config": "^2.0.0",
 		"prettier": "^3.0.3"
 	},
-	"packageManager": "yarn@3.4.1"
+	"packageManager": "yarn@3.4.1",
+	"version": "1.0.0"
 }
