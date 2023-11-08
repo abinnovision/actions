@@ -9,6 +9,11 @@
 			"prettier --write"
 		]
 	},
+	"files": [
+		"action.yml",
+		"README.md",
+		"CHANGELOG.md"
+	],
 	"prettier": "@abinnovision/prettier-config",
 	"devDependencies": {
 		"@abinnovision/prettier-config": "^2.0.0",

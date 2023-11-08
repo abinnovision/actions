@@ -4,6 +4,7 @@
 	"files": [
 		"dist",
 		"README.md",
+		"CHANGELOG.md",
 		"action.yml"
 	],
 	"scripts": {
