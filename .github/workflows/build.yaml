@@ -120,7 +120,7 @@ jobs:
             tar --strip-components=1 -xzf package.tgz && rm package.tgz
 
             # Create an empty git repository.
-            git init -b "$package_name/v$package_version"
+            git init
             git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
 
             # Add all files to the git repository.
@@ -128,5 +128,5 @@ jobs:
             git commit -m "chore: release $package_name@$package_version"
 
               # Push the git repository to the remote.
-            git push --force origin "$package_name/v$package_version"
+            git push --force origin "action/$package_name/v$package_version"
           done
