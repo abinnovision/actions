@@ -15,3 +15,8 @@
 * use correct preset ([efcd082](https://github.com/abinnovision/actions/commit/efcd08213e44a4e02255a3e9b77797a0d0c03031))
 * use correct preset ([35cf6ec](https://github.com/abinnovision/actions/commit/35cf6ecbc8b877db706d00516da1fd26f5d3f148))
 * use correct preset ([a1676ec](https://github.com/abinnovision/actions/commit/a1676ecee9a91bff83cec620f2495914850a6197))
+
+
+### Reverts
+
+* "chore: release master ([#6](https://github.com/abinnovision/actions/issues/6))" ([383e68d](https://github.com/abinnovision/actions/commit/383e68d5d94a98a3eb5cb253404405514cf4e86e))
