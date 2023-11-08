@@ -15,37 +15,37 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@abinnovision/eslint-config-base@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "@abinnovision/eslint-config-base@npm:1.0.0::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40abinnovision%2Feslint-config-base%2F1.0.0%2F69563a8cc07e4ae082e14a4fb5fe89d5476677cc"
+"@abinnovision/eslint-config-base@npm:^1.1.0":
+  version: 1.2.0
+  resolution: "@abinnovision/eslint-config-base@npm:1.2.0"
   dependencies:
-    eslint-config-alloy: ^4.9.0
+    eslint-config-alloy: ^5.1.2
   peerDependencies:
-    eslint: ^8.0.0
+    eslint: ^8.24.0
     eslint-plugin-import: ^2.0.0
-  checksum: 6563b46c1a01fa0ff389730541cd2f12a135c34ddc04ac373e74fff2e8c6bc17db66ab53a896904694945a7c460b8ac993c26448b4eb3b8a1c0e522b40df15cf
+  checksum: 62b96050185be46d647c18695a48381db39bff680252c760b6095546152800aa8e8c39a00bf27cdb3414870c312386e3cada0fe10a7ab4186535a4b061e75f09
   languageName: node
   linkType: hard
 
-"@abinnovision/eslint-config-typescript@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "@abinnovision/eslint-config-typescript@npm:1.0.0::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40abinnovision%2Feslint-config-typescript%2F1.0.0%2F203017c1334465778e3f68fcdcc5f7898f32255c"
+"@abinnovision/eslint-config-typescript@npm:^1.1.0":
+  version: 1.2.0
+  resolution: "@abinnovision/eslint-config-typescript@npm:1.2.0"
   dependencies:
-    eslint-config-alloy: ^4.9.0
+    eslint-config-alloy: ^5.1.2
   peerDependencies:
-    "@typescript-eslint/eslint-plugin": ^5.0.0
-    "@typescript-eslint/parser": ^5.0.0
-    eslint: ^8.0.0
-  checksum: dfc41082f19effbe1dc216d759c26a3d4b0ec72ec7b0f05cf25a59244bf02706d74b7e1e3dde5766f52d148cf903d923909defdcb08830ddb736b76916a1706b
+    "@typescript-eslint/eslint-plugin": ^6.0.0
+    "@typescript-eslint/parser": ^6.0.0
+    eslint: ^8.24.0
+  checksum: c042ea08562d58b2411b5f15b857b256c7b2ac51db6149c124d59ac0c1af1edb778dbd590acd311fa11b8dd9e2a723cc3792e4ba70de0347b636c2fdd3de796a
   languageName: node
   linkType: hard
 
-"@abinnovision/prettier-config@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "@abinnovision/prettier-config@npm:1.0.0::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40abinnovision%2Fprettier-config%2F1.0.0%2F18d1b22901a75bee1a02189d4b526139d01247dd"
+"@abinnovision/prettier-config@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "@abinnovision/prettier-config@npm:1.1.0"
   bin:
     sync-editorconfig: ./dist/sync-editorconfig.js
-  checksum: 512bf2001c66f45e786158dbd1a322a39d25ddf076211bc0d021d3080c2222955a16980fef1673a2fab0704b8131daa07c477d19f1e2658ba4c7d76949f66d55
+  checksum: f3999a690503dd28f014640d2eba17e11784c7ef6fb1844ac37bf71eb7b03147419c2ebd3060fc7ff5526a2e731ead8dde9c9a2371488d77139f79b801c10d7b
   languageName: node
   linkType: hard
 
@@ -882,9 +882,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "abinnovision-actions@workspace:."
   dependencies:
-    "@abinnovision/eslint-config-base": ^1.0.0
-    "@abinnovision/eslint-config-typescript": ^1.0.0
-    "@abinnovision/prettier-config": ^1.0.0
+    "@abinnovision/commitlint-config": ^1.1.0
+    "@abinnovision/eslint-config-base": ^1.1.0
+    "@abinnovision/eslint-config-typescript": ^1.1.0
+    "@abinnovision/prettier-config": ^1.1.0
     "@commitlint/cli": ^17.4.2
     "@commitlint/config-conventional": ^17.4.4
     "@typescript-eslint/eslint-plugin": ^5.54.1
@@ -1803,18 +1804,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-config-alloy@npm:^4.9.0":
-  version: 4.9.0
-  resolution: "eslint-config-alloy@npm:4.9.0"
+"eslint-config-alloy@npm:^5.1.2":
+  version: 5.1.2
+  resolution: "eslint-config-alloy@npm:5.1.2"
   peerDependencies:
     "@babel/eslint-parser": 7.x
     "@babel/preset-react": 7.x
-    "@typescript-eslint/eslint-plugin": ">=5.38.1"
-    "@typescript-eslint/parser": 5.x
+    "@typescript-eslint/eslint-plugin": ">=5.55.0"
+    "@typescript-eslint/parser": ">=5.0.0"
     eslint: ">=8.24.0"
     eslint-plugin-react: ">=7.31.8"
     eslint-plugin-vue: ">=9.5.1"
-    typescript: 4.x
+    typescript: 5.x
     vue-eslint-parser: 9.x
   peerDependenciesMeta:
     "@babel/eslint-parser":
@@ -1833,7 +1834,7 @@ __metadata:
       optional: true
     vue-eslint-parser:
       optional: true
-  checksum: 32b65d9d65c4a94332aaeeede591b0958863ed7771983e08eea2801c110e66931c79ae69f8fee45eb391f6bdf24c12f6979c53ec9d8f9634a26ae5d5d871121e
+  checksum: 6b54cc2016739b5a0fa2632de4abe10dff6235c4e42ec4422f85e883fc241dfafbc471731b1bec2cb01fe1d2ac515e6fef719d506d011139b6394ed6488db8aa
   languageName: node
   linkType: hard
 
@@ -4071,7 +4072,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"semver@npm:7.3.8, semver@npm:^7.3.4, semver@npm:^7.3.5, semver@npm:^7.3.7":
+"semver@npm:7.3.8":
   version: 7.3.8
   resolution: "semver@npm:7.3.8"
   dependencies:
@@ -4082,7 +4083,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"semver@npm:7.5.4":
+"semver@npm:7.5.4, semver@npm:^7.3.4, semver@npm:^7.3.5, semver@npm:^7.3.7":
   version: 7.5.4
   resolution: "semver@npm:7.5.4"
   dependencies:
