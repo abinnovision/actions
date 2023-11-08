@@ -14,4 +14,4 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Run linter
-        uses: abinnovision/actions@action/run-commitlint/v1.0.0
+        uses: abinnovision/actions@run-commitlint-v1
