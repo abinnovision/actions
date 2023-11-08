@@ -13,7 +13,7 @@
 		"actions/*"
 	],
 	"scripts": {
-		"build": "yarn workspaces foreach --topological -p run build",
+		"build": "turbo build",
 		"check": "yarn prettier:check && turbo check",
 		"fix": "yarn prettier:fix && turbo fix",
 		"postinstall": "husky install",
