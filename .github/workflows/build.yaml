@@ -77,7 +77,6 @@ jobs:
     permissions:
       contents: "write"
       id-token: "write"
-      packages: "write"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -122,7 +121,7 @@ jobs:
 
             # Create an empty git repository.
             git init -b "$package_version/v$package_version"
-            git remote add origin "$git_remote_url"
+            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
 
             # Add all files to the git repository.
             git add .
