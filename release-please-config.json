@@ -1,0 +1,12 @@
+{
+	"$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+	"changelog-path": "CHANGELOG.md",
+	"release-type": "node",
+	"tag-separator": "-source-",
+	"packages": {
+		"actions/get-github-app-token": {},
+		"actions/run-commitlint": {},
+		"actions/setup-gcp": {},
+		"actions/setup-node": {}
+	}
+}
