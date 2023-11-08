@@ -1,10 +1,17 @@
 {
 	"name": "run-commitlint",
 	"version": "1.0.0",
+	"license": "Apache-2.0",
+	"author": {
+		"name": "AB INNOVISION GmbH",
+		"email": "info@abinnovision.com",
+		"url": "https://abinnovision.com/"
+	},
 	"files": [
 		"dist",
 		"README.md",
 		"CHANGELOG.md",
+		"LICENSE.md",
 		"action.yml"
 	],
 	"scripts": {
