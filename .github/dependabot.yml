@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "13:00"
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: "build(deps)"
+      prefix-development: "build(deps/dev)"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
