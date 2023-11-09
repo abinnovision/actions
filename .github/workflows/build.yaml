@@ -128,10 +128,8 @@ jobs:
 
             git fetch origin --tags -f
 
-            source_sha=$(git rev-list -n 1 "refs/tags/$package_name-v$package_version")
             dist_sha=$(git rev-list -n 1 HEAD)
 
-            git tag -f "$package_name-v$package_version-source" "$source_sha"
             git tag -f "$package_name-v$package_version" "$dist_sha"
 
             # Add additional tags for the package.
