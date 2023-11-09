@@ -47,15 +47,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@abinnovision/prettier-config@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "@abinnovision/prettier-config@npm:1.1.0"
-  bin:
-    sync-editorconfig: ./dist/sync-editorconfig.js
-  checksum: f3999a690503dd28f014640d2eba17e11784c7ef6fb1844ac37bf71eb7b03147419c2ebd3060fc7ff5526a2e731ead8dde9c9a2371488d77139f79b801c10d7b
-  languageName: node
-  linkType: hard
-
 "@abinnovision/prettier-config@npm:^2.0.0":
   version: 2.0.0
   resolution: "@abinnovision/prettier-config@npm:2.0.0"
@@ -927,7 +918,7 @@ __metadata:
   resolution: "abinnovision-actions@workspace:."
   dependencies:
     "@abinnovision/commitlint-config": ^1.1.0
-    "@abinnovision/prettier-config": ^1.1.0
+    "@abinnovision/prettier-config": ^2.0.0
     "@commitlint/cli": ^17.4.2
     concurrently: ^7.6.0
     husky: ^8.0.0

@@ -37,7 +37,7 @@
 	"prettier": "@abinnovision/prettier-config",
 	"devDependencies": {
 		"@abinnovision/commitlint-config": "^1.1.0",
-		"@abinnovision/prettier-config": "^1.1.0",
+		"@abinnovision/prettier-config": "^2.0.0",
 		"@commitlint/cli": "^17.4.2",
 		"concurrently": "^7.6.0",
 		"husky": "^8.0.0",
