@@ -12,13 +12,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@abinnovision/commitlint-config@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "@abinnovision/commitlint-config@npm:1.1.0"
+"@abinnovision/commitlint-config@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@abinnovision/commitlint-config@npm:2.0.0"
   dependencies:
-    "@commitlint/config-conventional": ^17.4.4
-    conventional-changelog-conventionalcommits: ^5.0.0
-  checksum: a04a2546882018cd6edc5cb95b73a073d08aec3d24ae9256d8252ee6099f00528f9846d3eab30eb18624b64004c55fdf429bf094ba2bbb8fd5ea021035c5122b
+    "@commitlint/config-conventional": ^18.1.0
+  checksum: 669ab8adaa9f5da85980b638e42e4563c0359a237ea81b5bc43f4cdb734e20299651a6b0277fb10576ac37a4044f6297c28aadd9c9e48f7c8ee0c0170910a4cf
   languageName: node
   linkType: hard
 
@@ -136,12 +135,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/config-conventional@npm:^17.4.4":
-  version: 17.4.4
-  resolution: "@commitlint/config-conventional@npm:17.4.4"
+"@commitlint/config-conventional@npm:^18.1.0":
+  version: 18.4.3
+  resolution: "@commitlint/config-conventional@npm:18.4.3"
   dependencies:
-    conventional-changelog-conventionalcommits: ^5.0.0
-  checksum: 679d92509fe6e53ee0cc4202f8069d88360c4f9dbd7ab74114bb28278a196da517ef711dfe69893033a66e54ffc29e8df2ccf63cfd746a89c82a053949473c4b
+    conventional-changelog-conventionalcommits: ^7.0.2
+  checksum: bb6c1559979002e79c5e7c575f57fd713638523cdadfa61754eaabb8aad042d688c859e82ccf58589bb9aa2a4497e820702744095c9b82f6018fbb3b5d75d08d
   languageName: node
   linkType: hard
 
@@ -917,7 +916,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "abinnovision-actions@workspace:."
   dependencies:
-    "@abinnovision/commitlint-config": ^1.1.0
+    "@abinnovision/commitlint-config": ^2.0.0
     "@abinnovision/prettier-config": ^2.0.0
     "@commitlint/cli": ^17.4.2
     concurrently: ^7.6.0
@@ -1481,17 +1480,6 @@ __metadata:
   dependencies:
     compare-func: ^2.0.0
   checksum: ddc59ead53a45b817d83208200967f5340866782b8362d5e2e34105fdfa3d3a31585ebbdec7750bdb9de53da869f847e8ca96634a9801f51e27ecf4e7ffe2bad
-  languageName: node
-  linkType: hard
-
-"conventional-changelog-conventionalcommits@npm:^5.0.0":
-  version: 5.0.0
-  resolution: "conventional-changelog-conventionalcommits@npm:5.0.0"
-  dependencies:
-    compare-func: ^2.0.0
-    lodash: ^4.17.15
-    q: ^1.5.1
-  checksum: b67d12e4e0fdde5baa32c3d77af472de38646a18657b26f5543eecce041a318103092fbfcef247e2319a16957c9ac78c6ea78acc11a5db6acf74be79a28c561f
   languageName: node
   linkType: hard
 
@@ -4112,7 +4100,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "run-commitlint@workspace:actions/run-commitlint"
   dependencies:
-    "@abinnovision/commitlint-config": ^1.1.0
+    "@abinnovision/commitlint-config": ^2.0.0
     "@abinnovision/eslint-config-base": ^2.0.0
     "@abinnovision/eslint-config-typescript": ^2.0.0
     "@abinnovision/prettier-config": ^2.0.0
