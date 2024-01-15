@@ -207,13 +207,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/format@npm:^18.1.0":
-  version: 18.1.0
-  resolution: "@commitlint/format@npm:18.1.0"
+"@commitlint/format@npm:^18.4.4":
+  version: 18.4.4
+  resolution: "@commitlint/format@npm:18.4.4"
   dependencies:
-    "@commitlint/types": ^18.1.0
+    "@commitlint/types": ^18.4.4
     chalk: ^4.1.0
-  checksum: ad631b7ab2c6a5f7d443a16406709066325be8449b75792c9f7d3e96e64a9a58bc098fcf630935d57b59055ab6dc9aa056b033af0a9102e4b08a446d5d8a8af0
+  checksum: 3560b3a99c3c13c652af627cc441d763b0bbc2944397cec387d9e673ae84392a87909d5ac8e2568be0603ea63b5f15b39d75b2eda089e7ae25bd579cfefc1218
   languageName: node
   linkType: hard
 
@@ -410,6 +410,15 @@ __metadata:
   dependencies:
     chalk: ^4.1.0
   checksum: 50501399dd2e280e06d9b6605a9b9b09a01977a662fc30c57fa70ac84a679f74cdcc7d8d3204937423be94707208983f5fcc43e4d488bbea25d4a2cdc80f3e82
+  languageName: node
+  linkType: hard
+
+"@commitlint/types@npm:^18.4.4":
+  version: 18.4.4
+  resolution: "@commitlint/types@npm:18.4.4"
+  dependencies:
+    chalk: ^4.1.0
+  checksum: bda09adc5f4a7d460120891ad85d2950cb3db17ee9ecf93b820c4782c5a9f8cb235b28fb559a3c4f38fbb5ada43b50bab4c2ee1eb87853be4febbcd8da30fd1f
   languageName: node
   linkType: hard
 
@@ -4119,7 +4128,7 @@ __metadata:
     "@actions/core": ^1.10.1
     "@actions/github": ^5.1.1
     "@commitlint/execute-rule": ^18.4.4
-    "@commitlint/format": ^18.1.0
+    "@commitlint/format": ^18.4.4
     "@commitlint/lint": ^18.1.0
     "@vercel/ncc": ^0.38.1
     chalk: ^5.3.0
