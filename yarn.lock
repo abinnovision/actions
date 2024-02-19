@@ -190,10 +190,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/execute-rule@npm:^18.4.4":
-  version: 18.4.4
-  resolution: "@commitlint/execute-rule@npm:18.4.4"
-  checksum: f09d966479a7d7521e095b1a78ae8b357a722e4fe62250a4c4a6834825fff3ccaad3991be0bc2c6ed3c88adfa3e5a3f57d794cabb5d0b84228ebc3b0926d4ce1
+"@commitlint/execute-rule@npm:^18.6.1":
+  version: 18.6.1
+  resolution: "@commitlint/execute-rule@npm:18.6.1"
+  checksum: 4bb7945b905012358cdd25f840473a702a9ddfbfec3b36620c1ceeeeed18ac24c4c137366bc7aa1fb3c6dea3873695949ea2e5cf3b3381feca2407227394a5cd
   languageName: node
   linkType: hard
 
@@ -4118,7 +4118,7 @@ __metadata:
     "@abinnovision/prettier-config": ^2.0.0
     "@actions/core": ^1.10.1
     "@actions/github": ^5.1.1
-    "@commitlint/execute-rule": ^18.4.4
+    "@commitlint/execute-rule": ^18.6.1
     "@commitlint/format": ^18.1.0
     "@commitlint/lint": ^18.1.0
     "@vercel/ncc": ^0.38.1
