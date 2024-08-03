@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.2...run-commitlint-source-v1.0.3) (2024-08-03)
+
+
+### Bug Fixes
+
+* patch external package to support ncc build ([#129](https://github.com/abinnovision/actions/issues/129)) ([43b550d](https://github.com/abinnovision/actions/commit/43b550d648b3eb36da06b3af277d84ff129991e2))
+
 ## [1.0.2](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.1...run-commitlint-source-v1.0.2) (2024-08-03)
 
 
