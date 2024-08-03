@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: abinnovision/actions@action/run-commitlint/v1.0.1
+      - uses: abinnovision/actions@action/run-commitlint/v1.0.2
 ```
 
 [//]: # "x-release-please-end"

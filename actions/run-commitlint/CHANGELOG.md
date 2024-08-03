@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.1...run-commitlint-source-v1.0.2) (2024-08-03)
+
+
+### Bug Fixes
+
+* use default export of conventional-changelog-conventionalcommits ([#127](https://github.com/abinnovision/actions/issues/127)) ([0e9ccf7](https://github.com/abinnovision/actions/commit/0e9ccf7f11c40b79ba478b8d69248bf9ae4ea257))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.0...run-commitlint-source-v1.0.1) (2024-08-03)
 
 
