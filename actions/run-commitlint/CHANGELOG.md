@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.3...run-commitlint-source-v1.0.4) (2024-08-03)
+
+
+### Bug Fixes
+
+* upgrade for new version of commitlint api ([#131](https://github.com/abinnovision/actions/issues/131)) ([9455071](https://github.com/abinnovision/actions/commit/945507129969769d33191b6599cd34ed71e8e234))
+
 ## [1.0.3](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.2...run-commitlint-source-v1.0.3) (2024-08-03)
 
 
