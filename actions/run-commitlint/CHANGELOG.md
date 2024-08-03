@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.0...run-commitlint-source-v1.0.1) (2024-08-03)
+
+
+### Bug Fixes
+
+* bump commitlint config ([#125](https://github.com/abinnovision/actions/issues/125)) ([154c0d3](https://github.com/abinnovision/actions/commit/154c0d342cacbca318260cce79cc11fcbbb8ca01))
+
 ## 1.0.0 (2023-11-09)
 
 
