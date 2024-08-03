@@ -35,6 +35,9 @@
 		]
 	},
 	"prettier": "@abinnovision/prettier-config",
+	"resolutions": {
+		"conventional-changelog-conventionalcommits@^8.0.0": "patch:conventional-changelog-conventionalcommits@npm%3A8.0.0#./.yarn/patches/conventional-changelog-conventionalcommits-npm-8.0.0-b17be6f278.patch"
+	},
 	"devDependencies": {
 		"@abinnovision/commitlint-config": "^2.1.0",
 		"@abinnovision/prettier-config": "^2.0.0",
