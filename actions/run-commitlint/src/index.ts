@@ -6,7 +6,6 @@ import { execute as executeRule } from "@commitlint/execute-rule";
 import format from "@commitlint/format";
 import lint from "@commitlint/lint";
 import chalk from "chalk";
-// @ts-ignore
 import createParserOpts from "conventional-changelog-conventionalcommits";
 
 import type {
