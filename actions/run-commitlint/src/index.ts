@@ -7,7 +7,7 @@ import format from "@commitlint/format";
 import lint from "@commitlint/lint";
 import chalk from "chalk";
 // @ts-ignore
-import * as createParserOpts from "conventional-changelog-conventionalcommits";
+import createParserOpts from "conventional-changelog-conventionalcommits";
 
 import type {
 	QualifiedConfig,
