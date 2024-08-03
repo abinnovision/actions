@@ -1,5 +1,5 @@
 // Chalk does not work by default on GitHub Actions (https://github.com/chalk/supports-color/issues/106).
-import * as commitlintConfig from "@abinnovision/commitlint-config";
+import commitlintConfig from "@abinnovision/commitlint-config";
 import * as core from "@actions/core";
 import { getOctokit, context } from "@actions/github";
 import { execute as executeRule } from "@commitlint/execute-rule";
