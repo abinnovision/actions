@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.4...run-commitlint-source-v1.0.5) (2024-08-05)
+
+
+### Bug Fixes
+
+* migrate to esm ([#133](https://github.com/abinnovision/actions/issues/133)) ([8b76208](https://github.com/abinnovision/actions/commit/8b762088d98c5a0f24967dadf4d553c5f7230308))
+
 ## [1.0.4](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.3...run-commitlint-source-v1.0.4) (2024-08-03)
 
 
