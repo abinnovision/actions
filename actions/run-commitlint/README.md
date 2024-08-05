@@ -5,16 +5,16 @@ the [@abinnovision/commitlint-config](https://www.npmjs.com/package/@abinnovisio
 
 ## Example usage
 
-[//]: # "x-release-please-start-version"
+[//]: # "x-release-please-start-major"
 
 ```yaml
 jobs:
-  lint-commits:
-    name: Lint commits
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: abinnovision/actions@action/run-commitlint/v1.0.4
+	lint-commits:
+		name: Lint commits
+		runs-on: ubuntu-latest
+		if: github.event_name == 'pull_request'
+		steps:
+			- uses: abinnovision/actions@run-commitlint-v1
 ```
 
 [//]: # "x-release-please-end"
