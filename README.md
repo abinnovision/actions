@@ -24,11 +24,11 @@ All actions within this repository can be used in other repositories like this:
 
 ```yaml
 jobs:
-	<job>:
-		steps:
-			- uses: abinnovision/actions@<name>-v<version>
-			# E.g., abinnovision/actions@run-commitlint-v1.0.4
-			# See readme of actions for configuration.
+  <job>:
+    steps:
+      - uses: abinnovision/actions@<name>-v<version>
+      # E.g., abinnovision/actions@run-commitlint-v1.0.4
+      # See readme of actions for configuration.
 ```
 
 [//]: # "x-release-please-end"
