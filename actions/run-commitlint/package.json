@@ -34,7 +34,7 @@
 	},
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
-		"@abinnovision/commitlint-config": "^2.1.0",
+		"@abinnovision/commitlint-config": "^2.2.0",
 		"@actions/core": "^1.10.1",
 		"@actions/github": "^5.1.1",
 		"@commitlint/execute-rule": "^19.0.0",
@@ -44,9 +44,9 @@
 		"conventional-changelog-conventionalcommits": "^8.0.0"
 	},
 	"devDependencies": {
-		"@abinnovision/eslint-config-base": "^2.0.0",
-		"@abinnovision/eslint-config-typescript": "^2.0.0",
-		"@abinnovision/prettier-config": "^2.0.0",
+		"@abinnovision/eslint-config-base": "^2.1.0",
+		"@abinnovision/eslint-config-typescript": "^2.1.0",
+		"@abinnovision/prettier-config": "^2.1.0",
 		"@vercel/ncc": "^0.38.1",
 		"eslint": "^9.8.0",
 		"globals": "^15.9.0",
