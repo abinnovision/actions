@@ -102,7 +102,7 @@ jobs:
             echo "Publishing '$path'..."
 
             # Create the 'package.tgz' file..
-            yarn --cwd pack "$path"
+            yarn --cwd "$path" pack
 
             # Get the package name and version from the 'package.json' file.
             package_name=$(jq -r '.name' "$path/package.json")
