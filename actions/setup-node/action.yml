@@ -42,7 +42,7 @@ runs:
       name: "Setup private registry"
       shell: bash
       run: |
-        cat <<EOF >> test.txt
+        cat <<EOF >> $HOME/.yarnrc.yml
           enableGlobalCache: true
           nmMode: hardlinks-global
           npmRegistryServer: "https://registry.npmjs.org"
