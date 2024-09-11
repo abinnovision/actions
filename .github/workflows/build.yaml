@@ -42,7 +42,7 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
       - name: Setup Node
-        uses: abinnovision/actions/actions/setup-node@master
+        uses: abinnovision/actions@setup-node-v1
       - name: Setup Turborepo cache
         uses: dtinth/setup-github-actions-caching-for-turbo@v1
       - name: Install dependencies
@@ -83,7 +83,7 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
       - name: Setup Node
-        uses: abinnovision/actions/actions/setup-node@master
+        uses: abinnovision/actions@setup-node-v1
       - name: Setup Turborepo cache
         uses: dtinth/setup-github-actions-caching-for-turbo@v1
       - name: Install dependencies
