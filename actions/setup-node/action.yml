@@ -38,3 +38,18 @@ runs:
         node-version-file: ${{ env.VERSION_FILE }}
         node-version: ${{ env.VERSION }}
         cache: yarn
+    - id: setup-private-registry
+      name: "Setup private registry"
+      shell: bash
+      run: |
+        cat <<EOF >> test.txt
+          enableGlobalCache: true
+          nmMode: hardlinks-global
+          npmRegistryServer: "https://registry.npmjs.org"
+          npmScopes:
+            abinnovision:
+              npmPublishRegistry: https://npm.pkg.github.com
+              npmRegistryServer: https://npm.pkg.github.com
+              npmAlwaysAuth: true
+              npmAuthToken: "${{ inputs.token }}"
+        EOF
