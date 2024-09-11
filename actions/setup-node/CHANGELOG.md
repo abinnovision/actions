@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.0...setup-node-source-v1.0.1) (2024-09-11)
+
+
+### Bug Fixes
+
+* add auth for github package registry ([#160](https://github.com/abinnovision/actions/issues/160)) ([c239d04](https://github.com/abinnovision/actions/commit/c239d04d906accd616a02b9e9e59efe77594ca69))
+* upgrade actions/setup-node ([#155](https://github.com/abinnovision/actions/issues/155)) ([17127ea](https://github.com/abinnovision/actions/commit/17127ea3f02d1eb5392b6dfa4062e2e06dba1adb))
+* use correct .yarnrc.yaml path for config ([#161](https://github.com/abinnovision/actions/issues/161)) ([3f35d85](https://github.com/abinnovision/actions/commit/3f35d85657fd3cfa50dba78fcfdbe6603d959dca))
+
 ## 1.0.0 (2023-11-09)
 
 
