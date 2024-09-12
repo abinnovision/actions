@@ -47,7 +47,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@abinnovision/prettier-config@npm:^2.0.0, @abinnovision/prettier-config@npm:^2.1.0":
+"@abinnovision/prettier-config@npm:^2.1.0":
   version: 2.1.0
   resolution: "@abinnovision/prettier-config@npm:2.1.0::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40abinnovision%2Fprettier-config%2F2.1.0%2Ffa39788b87fd96734b71c7b65e13f0607d183493"
   peerDependencies:
@@ -2021,7 +2021,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "get-github-app-token@workspace:actions/get-github-app-token"
   dependencies:
-    "@abinnovision/prettier-config": "npm:^2.0.0"
+    "@abinnovision/prettier-config": "npm:^2.1.0"
     prettier: "npm:^3.3.3"
   languageName: unknown
   linkType: soft
@@ -3736,7 +3736,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "setup-gcp@workspace:actions/setup-gcp"
   dependencies:
-    "@abinnovision/prettier-config": "npm:^2.0.0"
+    "@abinnovision/prettier-config": "npm:^2.1.0"
     prettier: "npm:^3.3.3"
   languageName: unknown
   linkType: soft
@@ -3745,7 +3745,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "setup-node@workspace:actions/setup-node"
   dependencies:
-    "@abinnovision/prettier-config": "npm:^2.0.0"
+    "@abinnovision/prettier-config": "npm:^2.1.0"
     prettier: "npm:^3.3.3"
   languageName: unknown
   linkType: soft
