@@ -38,18 +38,10 @@ runs:
         node-version-file: ${{ env.VERSION_FILE }}
         node-version: ${{ env.VERSION }}
         cache: yarn
+    # For the 'abinnovision'-scope we need to set up a private registry.
+    # This is hosted on GitHub Packages.
     - id: setup-private-registry
-      name: "Setup private registry"
+      name: "Setup private registry (for 'abinnovision' scope)"
       shell: bash
       run: |
-        cat <<EOF >> $HOME/.yarnrc.yml
-          enableGlobalCache: true
-          nmMode: hardlinks-global
-          npmRegistryServer: "https://registry.npmjs.org"
-          npmScopes:
-            abinnovision:
-              npmPublishRegistry: https://npm.pkg.github.com
-              npmRegistryServer: https://npm.pkg.github.com
-              npmAlwaysAuth: true
-              npmAuthToken: "${{ inputs.token }}"
-        EOF
+        yarn config set -H --json npmScopes '{"abinnovision": {"npmPublishRegistry": "https://npm.pkg.github.com", "npmRegistryServer": "https://npm.pkg.github.com", "npmAlwaysAuth": false, "npmAuthToken": "${{ inputs.token }}"}}'
