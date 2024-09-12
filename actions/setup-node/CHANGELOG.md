@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.1...setup-node-source-v1.0.2) (2024-09-12)
+
+
+### Bug Fixes
+
+* set the private registry by calling yarn ([#169](https://github.com/abinnovision/actions/issues/169)) ([b1e6876](https://github.com/abinnovision/actions/commit/b1e68768f214761a68a0fd3b0a4a39a99758b357))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.0...setup-node-source-v1.0.1) (2024-09-11)
 
 
