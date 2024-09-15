@@ -1,0 +1,59 @@
+name: Setup Node
+author: "AB INNOVISION GmbH"
+description: |
+  Setup a Node.js environment, including package mangers and private registries.
+  This uses the opinionated way of AB Innovision.
+inputs:
+  token:
+    required: true
+    description: |
+      The token for the package registry. The GITHUB_TOKEN secret can be used.
+    default: ${{ github.token }}
+  version:
+    required: false
+    default: ""
+    description: |
+      Defines a version, which overrides the default version.
+  enable-corepack:
+    required: false
+    default: "true"
+    description: |
+      If set to 'true', the corepack will be enabled.
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      name: "Prepare"
+      shell: bash
+      env:
+        DEFAULT_VERSION: lts/iron # Node.js 20.x LTS
+        DEFAULT_VERSION_FILE: .tool-versions
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+        elif [ -f "${{ env.DEFAULT_VERSION_FILE }}" ]; then
+          echo "VERSION_FILE=${{ env.DEFAULT_VERSION_FILE }}" >> $GITHUB_ENV
+        else
+          echo "VERSION=${{ env.DEFAULT_VERSION }}" >> $GITHUB_ENV
+        fi
+    - id: setup
+      name: "Setup"
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ env.VERSION_FILE }}
+        node-version: ${{ env.VERSION }}
+        cache: yarn
+    # For the 'abinnovision'-scope we need to set up a private registry.
+    # This is hosted on GitHub Packages.
+    - id: setup-private-registry
+      name: "Setup private registry (for 'abinnovision' scope)"
+      shell: bash
+      run: |
+        yarn config set -H --json npmScopes '{"abinnovision": {"npmPublishRegistry": "https://npm.pkg.github.com", "npmRegistryServer": "https://npm.pkg.github.com", "npmAlwaysAuth": false, "npmAuthToken": "${{ inputs.token }}"}}'
+    # Enable corepack if requested. By default, it is enabled.
+    - id: setup-corepack
+      name: "Setup corepack"
+      shell: bash
+      if: ${{ inputs.enable-corepack == 'true' }}
+      run: |
+        corepack enable
