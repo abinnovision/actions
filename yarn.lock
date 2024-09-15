@@ -80,16 +80,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@actions/http-client@npm:^2.0.1":
-  version: 2.1.0
-  resolution: "@actions/http-client@npm:2.1.0"
-  dependencies:
-    tunnel: "npm:^0.0.6"
-  checksum: 10/938fb20cb38d961d568f8f6e548673e8136cd526f7783ba67617482d7b94984fa490483e49a0a6e6bdda4621081c2291030edeb69eccbe29f80d034d8315f7e7
-  languageName: node
-  linkType: hard
-
-"@actions/http-client@npm:^2.2.0":
+"@actions/http-client@npm:^2.0.1, @actions/http-client@npm:^2.2.0":
   version: 2.2.3
   resolution: "@actions/http-client@npm:2.2.3"
   dependencies:
