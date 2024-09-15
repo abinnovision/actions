@@ -167,31 +167,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/execute-rule@npm:^19.0.0":
-  version: 19.0.0
-  resolution: "@commitlint/execute-rule@npm:19.0.0"
-  checksum: 10/4c5cbf9ab0e2b85b00ceea84e5598b1b3cceaa20a655ee954c45259cca9efc80cf5cf7d9eec04715a100c2da282cbcf6aba960ad53a47178090c0513426ac236
-  languageName: node
-  linkType: hard
-
-"@commitlint/execute-rule@npm:^19.5.0":
+"@commitlint/execute-rule@npm:^19.0.0, @commitlint/execute-rule@npm:^19.5.0":
   version: 19.5.0
   resolution: "@commitlint/execute-rule@npm:19.5.0"
   checksum: 10/ff05568c3a287ef8564171d5bc5d4510b2e00b552e4703f79db3d62f3cba9d669710717695d199e04c2117d41f9e72d7e43a342d5c1b62d456bc8e8bb7dda1e9
   languageName: node
   linkType: hard
 
-"@commitlint/format@npm:^19.3.0":
-  version: 19.3.0
-  resolution: "@commitlint/format@npm:19.3.0"
-  dependencies:
-    "@commitlint/types": "npm:^19.0.3"
-    chalk: "npm:^5.3.0"
-  checksum: 10/cc0e1e0e6d5eea76b856ad1be879de166c3d1385e1ae0e1bb78c575f9b78b53d92a56cd4719427cdba9cbb9a10235768da29144da9892596525c923d126951dd
-  languageName: node
-  linkType: hard
-
-"@commitlint/format@npm:^19.5.0":
+"@commitlint/format@npm:^19.3.0, @commitlint/format@npm:^19.5.0":
   version: 19.5.0
   resolution: "@commitlint/format@npm:19.5.0"
   dependencies:
