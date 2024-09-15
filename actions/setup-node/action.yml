@@ -26,7 +26,7 @@ runs:
       name: "Prepare"
       shell: bash
       env:
-        DEFAULT_VERSION: lts/hydrogen
+        DEFAULT_VERSION: lts/iron # Node.js 20.x LTS
         DEFAULT_VERSION_FILE: .tool-versions
       run: |
         if [ -n "${{ inputs.version }}" ]; then
