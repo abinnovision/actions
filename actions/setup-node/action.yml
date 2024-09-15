@@ -14,6 +14,11 @@ inputs:
     default: ""
     description: |
       Defines a version, which overrides the default version.
+  enable-corepack:
+    required: false
+    default: "true"
+    description: |
+      If set to 'true', the corepack will be enabled.
 runs:
   using: composite
   steps:
@@ -45,3 +50,10 @@ runs:
       shell: bash
       run: |
         yarn config set -H --json npmScopes '{"abinnovision": {"npmPublishRegistry": "https://npm.pkg.github.com", "npmRegistryServer": "https://npm.pkg.github.com", "npmAlwaysAuth": false, "npmAuthToken": "${{ inputs.token }}"}}'
+    # Enable corepack if requested. By default, it is enabled.
+    - id: setup-corepack
+      name: "Setup corepack"
+      shell: bash
+      if: ${{ inputs.enable-corepack == 'true' }}
+      run: |
+        corepack enable
