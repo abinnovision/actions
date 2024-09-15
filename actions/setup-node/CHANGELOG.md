@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.3...setup-node-source-v1.0.4) (2024-09-15)
+
+
+### Bug Fixes
+
+* enable corepack before actions/setup-node ([#178](https://github.com/abinnovision/actions/issues/178)) ([afa193f](https://github.com/abinnovision/actions/commit/afa193f29ff8168528fd043ff48a41dc9198f54d))
+
 ## [1.0.3](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.2...setup-node-source-v1.0.3) (2024-09-15)
 
 
