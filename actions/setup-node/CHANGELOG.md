@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.2...setup-node-source-v1.0.3) (2024-09-15)
+
+
+### Bug Fixes
+
+* enable corepack by default ([#173](https://github.com/abinnovision/actions/issues/173)) ([f5d47fc](https://github.com/abinnovision/actions/commit/f5d47fca99ef21b728be244eb19c29b9de336aca))
+* upgrade to lts/iron as default version ([#174](https://github.com/abinnovision/actions/issues/174)) ([08d86d1](https://github.com/abinnovision/actions/commit/08d86d16144df892fc1d66f1f5976f3b0992217b))
+
 ## [1.0.2](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.1...setup-node-source-v1.0.2) (2024-09-12)
 
 
