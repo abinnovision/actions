@@ -60,7 +60,20 @@ runs:
       name: "Prepare"
       shell: bash
       run: |
-        curl --header "Content-Type: application/json" \
-          --request POST \
-          --data '{"idToken":"'$ID_TOKEN'","target":{"owner":"'$TARGET_OWNER'","repo":"'$TARGET_REPO'","ref":"${{ inputs.workflow-ref }}","workflow":"${{ inputs.workflow }}"},"inputs":'$WORKFLOW_INPUTS'}' \
-          ${{ inputs.proxy }}/dispatch
+        STATUS_CODE=$(
+          curl -s -o response -w "%{http_code}" \
+            --header "Content-Type: application/json" \
+            --request POST \
+            --data '{"idToken":"'$ID_TOKEN'","target":{"owner":"'$TARGET_OWNER'","repo":"'$TARGET_REPO'","ref":"${{ inputs.workflow-ref }}","workflow":"${{ inputs.workflow }}"},"inputs":'$WORKFLOW_INPUTS'}' \
+            ${{ inputs.proxy }}/dispatch
+        )
+
+        # Check if the status code is 200.
+        if [[ $STATUS_CODE -ne "200" ]]; then
+          echo "Error: Failed to dispatch workflow. Status code: $STATUS_CODE"
+          echo "Response:"
+          cat response
+          exit 1
+        fi
+
+        echo "Dispatched workflow successfully"
