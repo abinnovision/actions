@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.4...setup-node-source-v1.1.0) (2024-09-19)
+
+
+### Features
+
+* automatically set up turbo cache ([#192](https://github.com/abinnovision/actions/issues/192)) ([c3c46f9](https://github.com/abinnovision/actions/commit/c3c46f924410f02926cde6901219b6fc8e962dcf))
+
 ## [1.0.4](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.3...setup-node-source-v1.0.4) (2024-09-15)
 
 
