@@ -16,6 +16,7 @@ These are the currently available actions:
   identification.
 - [run-commitlint](./actions/run-commitlint): Runs [commitlint](https://commitlint.js.org/) with the default AB
   innovision config.
+- [run-workflow-dispatch](./actions/run-workflow-dispatch): Runs a workflow on another repository.
 
 ## Usage
 
@@ -24,11 +25,11 @@ All actions within this repository can be used in other repositories like this:
 
 ```yaml
 jobs:
-  <job>:
-    steps:
-      - uses: abinnovision/actions@<name>-v<version>
-      # E.g., abinnovision/actions@run-commitlint-v1.0.4
-      # See readme of actions for configuration.
+	<job>:
+		steps:
+			- uses: abinnovision/actions@<name>-v<version>
+			# E.g., abinnovision/actions@run-commitlint-v1.0.4
+			# See readme of actions for configuration.
 ```
 
 [//]: # "x-release-please-end"

@@ -3599,6 +3599,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"run-workflow-dispatch@workspace:actions/run-workflow-dispatch":
+  version: 0.0.0-use.local
+  resolution: "run-workflow-dispatch@workspace:actions/run-workflow-dispatch"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.1.0"
+    prettier: "npm:^3.3.3"
+  languageName: unknown
+  linkType: soft
+
 "safe-array-concat@npm:^1.0.1":
   version: 1.0.1
   resolution: "safe-array-concat@npm:1.0.1"
