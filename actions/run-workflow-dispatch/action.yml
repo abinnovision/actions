@@ -54,7 +54,7 @@ runs:
       name: "Generate token"
       shell: bash
       run: |
-        ID_TOKEN_RESPONSE=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=github-workflow-dispatch-proxy")
+        ID_TOKEN_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=github-workflow-dispatch-proxy")
         echo "ID_TOKEN=$(echo $ID_TOKEN_RESPONSE | jq -r ".value")" >> $GITHUB_ENV
     - id: prepare
       name: "Prepare"
