@@ -9,10 +9,7 @@ the [@abinnovision/commitlint-config](https://www.npmjs.com/package/@abinnovisio
 
 ```yaml
 jobs:
-  lint-commits:
-    name: Lint commits
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+  <job>:
     steps:
       - uses: abinnovision/actions@run-commitlint-v1
 ```
