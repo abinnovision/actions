@@ -41,8 +41,8 @@ runs:
         fi
 
         # If the "workflow-inputs" input is not empty, it must be a valid JSON string.
-        if [[ -n "${{ inputs.workflow-inputs }}" ]]; then
-          WORKFLOW_INPUTS=$(echo "${{ inputs.workflow-inputs }}" | jq -cr ".")
+        if [[ -n '${{ inputs.workflow-inputs }}' ]]; then
+          WORKFLOW_INPUTS=$(echo '${{ inputs.workflow-inputs }}' | jq -cr ".")
         else
           WORKFLOW_INPUTS="{}"
         fi
