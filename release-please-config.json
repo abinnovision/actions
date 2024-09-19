@@ -15,6 +15,9 @@
 		},
 		"actions/setup-node": {
 			"extra-files": ["README.md"]
+		},
+		"actions/run-workflow-dispatch": {
+			"extra-files": ["README.md"]
 		}
 	}
 }
