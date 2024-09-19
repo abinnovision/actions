@@ -21,18 +21,15 @@ These are the currently available actions:
 ## Usage
 
 All actions within this repository can be used in other repositories like this:
-[//]: # "x-release-please-start-version"
 
 ```yaml
 jobs:
-	<job>:
-		steps:
-			- uses: abinnovision/actions@<name>-v<version>
-			# E.g., abinnovision/actions@run-commitlint-v1.0.4
-			# See readme of actions for configuration.
+  <job>:
+    steps:
+      - uses: abinnovision/actions@<name>-v<version>
+      # E.g., abinnovision/actions@run-commitlint-v1.0.4
+      # See readme of actions for configuration.
 ```
-
-[//]: # "x-release-please-end"
 
 Versioning follows the [semantic versioning](https://semver.org/) scheme. See
 the [releases](https://github.com/abinnovision/actions/releases) for the latest version of each action.
