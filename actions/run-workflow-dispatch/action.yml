@@ -13,12 +13,16 @@ inputs:
     description: The workflow name. E.g. "update-version.yaml"
     required: true
   workflow-ref:
-    description: The ref of the workflow. E.g. "master"
-    required: true
+    description: |
+      The git reference for the workflow. The reference can be a branch or tag name.
+      By default, the "master" branch is used.
+    required: false
+    default: "master"
   workflow-inputs:
     description: |
       The inputs for the workflow in JSON format. E.g. '{"application": "staging", "version": "1.0.0"}'
-    required: true
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -36,8 +40,12 @@ runs:
           TARGET_REPO="${{ inputs.target }}"
         fi
 
-        # The "workflow-input" must be a valid JSON string.
-        WORKFLOW_INPUTS=$(echo "${{ inputs.workflow-inputs }}" | jq -cr ".")
+        # If the "workflow-inputs" input is not empty, it must be a valid JSON string.
+        if [[ -n "${{ inputs.workflow-inputs }}" ]]; then
+          WORKFLOW_INPUTS=$(echo "${{ inputs.workflow-inputs }}" | jq -cr ".")
+        else
+          WORKFLOW_INPUTS="{}"
+        fi
 
         echo "TARGET_OWNER=$TARGET_OWNER" >> $GITHUB_ENV
         echo "TARGET_REPO=$TARGET_REPO" >> $GITHUB_ENV
