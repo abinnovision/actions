@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.0...run-workflow-dispatch-source-v1.0.1) (2024-09-23)
+
+
+### Bug Fixes
+
+* move id token into authorization header ([#197](https://github.com/abinnovision/actions/issues/197)) ([c5827db](https://github.com/abinnovision/actions/commit/c5827db834ef70e8e1c6205c9896856d76ea7a92))
+
 ## 1.0.0 (2024-09-19)
 
 
