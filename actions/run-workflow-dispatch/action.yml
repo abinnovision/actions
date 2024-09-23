@@ -63,8 +63,9 @@ runs:
         STATUS_CODE=$(
           curl -s -o response -w "%{http_code}" \
             --header "Content-Type: application/json" \
+            --header "Authorization: Bearer $ID_TOKEN" \
             --request POST \
-            --data '{"idToken":"'$ID_TOKEN'","target":{"owner":"'$TARGET_OWNER'","repo":"'$TARGET_REPO'","ref":"${{ inputs.workflow-ref }}","workflow":"${{ inputs.workflow }}"},"inputs":'$WORKFLOW_INPUTS'}' \
+            --data '{"target":{"owner":"'$TARGET_OWNER'","repo":"'$TARGET_REPO'","ref":"${{ inputs.workflow-ref }}","workflow":"${{ inputs.workflow }}"},"inputs":'$WORKFLOW_INPUTS'}' \
             ${{ inputs.proxy }}/dispatch
         )
 
