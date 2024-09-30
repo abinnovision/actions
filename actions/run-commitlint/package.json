@@ -47,7 +47,7 @@
 		"@abinnovision/eslint-config-base": "^2.1.0",
 		"@abinnovision/eslint-config-typescript": "^2.1.0",
 		"@abinnovision/prettier-config": "^2.1.0",
-		"@vercel/ncc": "^0.38.1",
+		"@vercel/ncc": "^0.38.2",
 		"eslint": "^9.11.1",
 		"globals": "^15.9.0",
 		"prettier": "^3.3.3",
