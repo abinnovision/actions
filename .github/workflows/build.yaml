@@ -224,4 +224,6 @@ jobs:
 
               # Push the git repository to the remote.
             git push --tags --force origin "action/$package_name/v$package_version"
+            git push --tags --force origin "action/$package_name/v$(echo $package_version | cut -d. -f1-2)"
+            git push --tags --force origin "action/$package_name/v$(echo $package_version | cut -d. -f1)"
           done
