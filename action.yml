@@ -1,0 +1,35 @@
+name: Get GitHub App Token
+author: "AB INNOVISION GmbH"
+description: |
+  Gets the token for the GitHub App based on the given identification.
+inputs:
+  identification:
+    description: "Identification value of the GitHub App. Secret: 'GH_APP_IDENTIFICATION_<UPPERCASE APP NAME>'"
+    required: true
+outputs:
+  token:
+    description: ""
+    value: ${{ steps.token.outputs.token }}
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      name: "Prepare"
+      shell: bash
+      run: |
+        DECODED=$(echo "${{ inputs.identification }}" | base64 --decode)
+        echo "APP_ID=$(echo "$DECODED" | jq -cr ".id")" >> $GITHUB_ENV
+        echo "APP_CERTIFICATE=$(echo "$DECODED" | jq -cr ".certificate")" >> $GITHUB_ENV
+    - id: secrets
+      name: "Load secrets"
+      uses: google-github-actions/get-secretmanager-secrets@v1.0.0
+      with:
+        secrets: |-
+          id:${{ env.APP_ID }}
+          certificate:${{ env.APP_CERTIFICATE }}
+    - id: token
+      name: "Generate token"
+      uses: tibdex/github-app-token@v1
+      with:
+        app_id: ${{ steps.secrets.outputs.id }}
+        private_key: ${{ steps.secrets.outputs.certificate }}
