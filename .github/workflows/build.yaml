@@ -216,14 +216,11 @@ jobs:
 
             dist_sha=$(git rev-list -n 1 HEAD)
 
+            # Tag with all versions.
             git tag -f "$package_name-v$package_version" "$dist_sha"
-
-            # Add additional tags for the package.
             git tag -f "$package_name-v$(echo $package_version | cut -d. -f1-2)" "$dist_sha"
             git tag -f "$package_name-v$(echo $package_version | cut -d. -f1)" "$dist_sha"
 
-              # Push the git repository to the remote.
+            # Push the git repository to the remote.
             git push --tags --force origin "action/$package_name/v$package_version"
-            git push --tags --force origin "action/$package_name/v$(echo $package_version | cut -d. -f1-2)"
-            git push --tags --force origin "action/$package_name/v$(echo $package_version | cut -d. -f1)"
           done
