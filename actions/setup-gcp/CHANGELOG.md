@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/setup-gcp-source-v1.0.0...setup-gcp-source-v1.0.1) (2024-10-19)
+
+
+### Bug Fixes
+
+* add the ability to override the default service account provided by auth input ([#210](https://github.com/abinnovision/actions/issues/210)) ([96ca6db](https://github.com/abinnovision/actions/commit/96ca6dbd721cedd2719b60775d426a3bfa7bac5f))
+* update google-github-actions/auth to v2 ([#208](https://github.com/abinnovision/actions/issues/208)) ([7f2705c](https://github.com/abinnovision/actions/commit/7f2705cea1c0180947087b3c340aaffafe63bcd7))
+
 ## 1.0.0 (2023-11-09)
 
 
