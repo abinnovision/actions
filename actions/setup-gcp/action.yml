@@ -23,6 +23,12 @@ inputs:
       impersonation in the chain.
 
       See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L91-L96
+  override-service-account:
+    required: false
+    default: ""
+    description: |-
+      Overrides the default service account used for the GCP authentication which is provided through the
+      "auth" input. This is useful when the default service account is not the one you want to use.
 outputs:
   access_token:
     value: ${{ steps.auth.outputs.access_token }}
@@ -60,7 +66,7 @@ runs:
       uses: google-github-actions/auth@v2
       with:
         workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-        service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+        service_account: ${{ inputs.override-service-account != '' && inputs.override-service-account || env.GCP_SERVICE_ACCOUNT }}
         token_format: ${{ inputs.token_format }}
         delegates: ${{ inputs.delegates }}
         export_environment_variables: true
