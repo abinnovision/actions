@@ -10,6 +10,12 @@ outputs:
   token:
     description: ""
     value: ${{ steps.token.outputs.token }}
+  app-commiter-email:
+    description: ""
+    value: ${{ steps.get-details.outputs.committer-email }}
+  app-commiter-name:
+    description: ""
+    value: ${{ steps.get-details.outputs.committer-name }}
 runs:
   using: composite
   steps:
@@ -29,7 +35,20 @@ runs:
           certificate:${{ env.APP_CERTIFICATE }}
     - id: token
       name: "Generate token"
-      uses: tibdex/github-app-token@v1
+      uses: actions/create-github-app-token@v1
       with:
-        app_id: ${{ steps.secrets.outputs.id }}
-        private_key: ${{ steps.secrets.outputs.certificate }}
+        app-id: ${{ steps.secrets.outputs.id }}
+        private-key: ${{ steps.secrets.outputs.certificate }}
+    - id: get-details
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      shell: bash
+      run: |
+        # Fetch the id of the bot user.
+        response=$(gh api "/users/${{ steps.token.outputs.app-slug }}[bot]") >> "$GITHUB_OUTPUT"
+
+        # Extract the id of the bot user.
+        user_id=$(echo "$response" | jq -cr ".id")
+
+        echo "committer-email=${{ steps.token.outputs.app-slug }}[bot] <$user_id+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+        echo "committer-name=${{ steps.token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
