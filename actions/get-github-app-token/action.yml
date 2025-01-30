@@ -41,7 +41,7 @@ runs:
         private-key: ${{ steps.secrets.outputs.certificate }}
     - id: get-details
       env:
-        GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        GH_TOKEN: ${{ steps.token.outputs.token }}
       shell: bash
       run: |
         # Fetch the id of the bot user.
