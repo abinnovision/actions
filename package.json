@@ -1,0 +1,30 @@
+{
+  "name": "get-github-app-token",
+  "version": "1.1.0",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "AB INNOVISION GmbH",
+    "email": "info@abinnovision.com",
+    "url": "https://abinnovision.com/"
+  },
+  "files": [
+    "action.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE.md"
+  ],
+  "scripts": {
+    "format:check": "prettier --check '*.{json,json5,yaml,yml,md}'",
+    "format:write": "prettier --write '*.{json,json5,yaml,yml,md}'"
+  },
+  "lint-staged": {
+    "*.{json,json5,yaml,yml,md}": [
+      "prettier --write"
+    ]
+  },
+  "prettier": "@abinnovision/prettier-config",
+  "devDependencies": {
+    "@abinnovision/prettier-config": "^2.1.0",
+    "prettier": "^3.3.3"
+  }
+}
