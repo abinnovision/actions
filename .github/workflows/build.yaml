@@ -155,7 +155,7 @@ jobs:
     needs:
       - configure
       - release
-    if: needs.release.outputs.releases_created
+    if: needs.release.outputs.releases-created
     permissions:
       contents: "write"
       id-token: "write"
@@ -175,7 +175,7 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          echo '${{ needs.release.outputs.paths_released }}' | jq -cr '.[]' | while read path; do
+          echo '${{ needs.release.outputs.paths-released }}' | jq -cr '.[]' | while read path; do
             # Change to the package directory.
             cd ${{ github.workspace }}
 
