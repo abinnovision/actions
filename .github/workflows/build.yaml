@@ -60,7 +60,7 @@ jobs:
     needs:
       - configure
       - check_build
-    uses: abinnovision/workflows/.github/workflows/release-please.yaml@master
+    uses: abinnovision/workflows/.github/workflows/release-v2.yaml@main
     secrets: inherit
     # Only run on push to "master" branch.
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
