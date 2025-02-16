@@ -1,12 +1,5 @@
 # Changelog
 
-## [1.1.1](https://github.com/abinnovision/actions/compare/setup-node-source-v1.1.0...setup-node-source-v1.1.1) (2025-02-16)
-
-
-### Bug Fixes
-
-* use output instead of env var to enable turbo cache ([#235](https://github.com/abinnovision/actions/issues/235)) ([9e85114](https://github.com/abinnovision/actions/commit/9e851142b48dbcb60c4221a1fbbd1754b1bf3ad8))
-
 ## [1.1.0](https://github.com/abinnovision/actions/compare/setup-node-source-v1.0.4...setup-node-source-v1.1.0) (2024-09-19)
 
 
