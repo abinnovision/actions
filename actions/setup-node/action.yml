@@ -74,14 +74,14 @@ runs:
         # If 'enable-turbo-cache' is 'auto', check if 'turbo.json' exists.
         if [[ ${{ inputs.enable-turbo-cache }} == 'auto' ]]; then
           if [[ -f 'turbo.json' ]]; then
-            echo "TURBO_CACHE=true" >> $GITHUB_ENV
+            echo "enable-turbo=true" >> $GITHUB_OUTPUT
           else
-            echo "TURBO_CACHE=false" >> $GITHUB_ENV
+            echo "enable-turbo=false" >> $GITHUB_OUTPUT
           fi
         else
-          echo "TURBO_CACHE=true" >> $GITHUB_ENV
+          echo "enable-turbo=true" >> $GITHUB_OUTPUT
         fi
     - id: setup-turbo-cache
       name: "Setup Turbo cache"
-      if: ${{ env.TURBO_CACHE == 'true' }}
+      if: ${{ steps.setup-turbo-cache-config.outputs.enable-turbo == 'true' }}
       uses: rharkor/caching-for-turbo@v1.5
