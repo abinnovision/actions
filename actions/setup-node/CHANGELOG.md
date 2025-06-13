@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/abinnovision/actions/compare/setup-node-source-v1.1.1...setup-node-source-v1.1.2) (2025-06-13)
+
+
+### Bug Fixes
+
+* update rharkor/caching-for-turbo action to v1.8 ([#242](https://github.com/abinnovision/actions/issues/242)) ([cb03d32](https://github.com/abinnovision/actions/commit/cb03d321cd093e598610b86d822b42b3e7984c60))
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/setup-node-source-v1.1.0...setup-node-source-v1.1.1) (2025-02-16)
 
 
