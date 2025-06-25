@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.1...run-workflow-dispatch-source-v1.0.2) (2025-06-25)
+
+
+### Bug Fixes
+
+* remove default for workflow-ref input to use auto-discovery of default branch ([#244](https://github.com/abinnovision/actions/issues/244)) ([f79e692](https://github.com/abinnovision/actions/commit/f79e692190442c11b495839b666c73b23d97b431))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.0...run-workflow-dispatch-source-v1.0.1) (2024-09-23)
 
 
