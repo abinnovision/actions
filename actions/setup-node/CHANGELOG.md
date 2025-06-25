@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/abinnovision/actions/compare/setup-node-source-v1.1.2...setup-node-source-v1.1.3) (2025-06-25)
+
+
+### Bug Fixes
+
+* update caching-for-turbo action ([c3acdfe](https://github.com/abinnovision/actions/commit/c3acdfe81c3731ef05d40ec71ad734f5e3910bb6))
+
 ## [1.1.2](https://github.com/abinnovision/actions/compare/setup-node-source-v1.1.1...setup-node-source-v1.1.2) (2025-06-13)
 
 

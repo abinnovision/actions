@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.3...run-workflow-dispatch-source-v1.0.4) (2025-06-25)
+
+
+### Bug Fixes
+
+* properly format request body ([f36e95a](https://github.com/abinnovision/actions/commit/f36e95a2f5ef1500150314927417271f1452b340))
+
 ## [1.0.3](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.2...run-workflow-dispatch-source-v1.0.3) (2025-06-25)
 
 
