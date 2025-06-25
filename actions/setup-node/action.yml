@@ -84,4 +84,4 @@ runs:
     - id: setup-turbo-cache
       name: "Setup Turbo cache"
       if: ${{ steps.setup-turbo-cache-config.outputs.enable-turbo == 'true' }}
-      uses: rharkor/caching-for-turbo@v1.8
+      uses: rharkor/caching-for-turbo@v2.1.1
