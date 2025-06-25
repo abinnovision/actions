@@ -102,26 +102,22 @@ runs:
       name: "Prepare"
       shell: bash
       run: |
-        # Build the target object with jq, conditionally adding ref if workflow-ref is provided
-        TARGET_OBJECT=$(NO_COLOR=1 jq -n -c \
-          --arg owner "$TARGET_OWNER" \
-          --arg repo "$TARGET_REPO" \
-          --arg workflow "${{ inputs.workflow }}" \
-          --arg ref "${{ inputs.workflow-ref }}" \
-          '{
-            owner: $owner,
-            repo: $repo,
-            workflow: $workflow
-          } + (if $ref != "" then {ref: $ref} else {} end)')
+        # Build the payload using a simpler approach
+        # First create the base target object
+        TARGET_BASE=$(printf '{"owner":"%s","repo":"%s","workflow":"%s"}' "$TARGET_OWNER" "$TARGET_REPO" "${{ inputs.workflow }}")
+
+        # Add ref field if workflow-ref is provided
+        if [[ -n "${{ inputs.workflow-ref }}" ]]; then
+          TARGET_OBJECT=$(echo "$TARGET_BASE" | NO_COLOR=1 jq -c --arg ref "${{ inputs.workflow-ref }}" '. + {ref: $ref}')
+        else
+          TARGET_OBJECT="$TARGET_BASE"
+        fi
 
         # Build the complete payload
-        PAYLOAD=$(NO_COLOR=1 jq -n -c \
-          --argjson target "$TARGET_OBJECT" \
-          --argjson inputs "$WORKFLOW_INPUTS" \
-          '{
-            target: $target,
-            inputs: $inputs
-          }')
+        PAYLOAD=$(NO_COLOR=1 jq -n -c --argjson target "$TARGET_OBJECT" --argjson inputs "$WORKFLOW_INPUTS" '{target: $target, inputs: $inputs}')
+
+        # Debug output
+        echo "Generated payload: $PAYLOAD"
 
         # Make the API request with timeout and better error handling
         STATUS_CODE=$(
