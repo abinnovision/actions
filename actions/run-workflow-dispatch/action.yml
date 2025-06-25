@@ -59,12 +59,33 @@ runs:
       name: "Prepare"
       shell: bash
       run: |
+        # Build the target object with jq, conditionally adding ref if workflow-ref is provided
+        TARGET_OBJECT=$(jq -n \
+          --arg owner "$TARGET_OWNER" \
+          --arg repo "$TARGET_REPO" \
+          --arg workflow "${{ inputs.workflow }}" \
+          --arg ref "${{ inputs.workflow-ref }}" \
+          '{
+            owner: $owner,
+            repo: $repo,
+            workflow: $workflow
+          } + (if $ref != "" then {ref: $ref} else {} end)')
+
+        # Build the complete payload
+        PAYLOAD=$(jq -n \
+          --argjson target "$TARGET_OBJECT" \
+          --argjson inputs "$WORKFLOW_INPUTS" \
+          '{
+            target: $target,
+            inputs: $inputs
+          }')
+
         STATUS_CODE=$(
           curl -s -o response -w "%{http_code}" \
             --header "Content-Type: application/json" \
             --header "Authorization: Bearer $ID_TOKEN" \
             --request POST \
-            --data '{"target":{"owner":"'$TARGET_OWNER'","repo":"'$TARGET_REPO'","ref":"${{ inputs.workflow-ref }}","workflow":"${{ inputs.workflow }}"},"inputs":'$WORKFLOW_INPUTS'}' \
+            --data "$PAYLOAD" \
             ${{ inputs.proxy }}/dispatch
         )
 
