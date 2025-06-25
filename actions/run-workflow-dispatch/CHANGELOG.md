@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.4...run-workflow-dispatch-source-v1.0.5) (2025-06-25)
+
+
+### Bug Fixes
+
+* adjust payload generation for valid json ([9dd585b](https://github.com/abinnovision/actions/commit/9dd585b2cf780fe11c591140f340d8c26d89bbba))
+
 ## [1.0.4](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.3...run-workflow-dispatch-source-v1.0.4) (2025-06-25)
 
 
