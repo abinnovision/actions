@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.6](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.5...run-workflow-dispatch-source-v1.0.6) (2025-06-25)
+
+
+### Bug Fixes
+
+* update escaping issue ([b2b3d30](https://github.com/abinnovision/actions/commit/b2b3d301e1ffee035e4c4bf71502b4607423baa9))
+
 ## [1.0.5](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.4...run-workflow-dispatch-source-v1.0.5) (2025-06-25)
 
 
