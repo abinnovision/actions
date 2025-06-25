@@ -118,15 +118,17 @@ runs:
 
         # Debug output
         echo "Generated payload: $PAYLOAD"
+        echo "Payload length: $(echo -n "$PAYLOAD" | wc -c) characters"
 
         # Make the API request with timeout and better error handling
+        # Using --data-raw to avoid shell escaping issues with JSON
         STATUS_CODE=$(
           curl -s -o response -w "%{http_code}" \
             --max-time 60 \
             --header "Content-Type: application/json" \
             --header "Authorization: Bearer $ID_TOKEN" \
             --request POST \
-            --data "$PAYLOAD" \
+            --data-raw "$PAYLOAD" \
             "${{ inputs.proxy }}/dispatch"
         )
 
