@@ -145,8 +145,11 @@ jobs:
 
             git tag -f "$package_name-dev" "$dist_sha"
 
-              # Push the git repository to the remote.
-            git push --tags --force origin "action/$package_name/dev"
+            # Push the git repository to the remote.
+            git push --force origin "action/$package_name/dev"
+
+            # Push all tags to ensure dev tags are updated
+            git push --tags --force origin
           done
 
   publish:
@@ -216,5 +219,8 @@ jobs:
             git tag -f "$package_name-v$(echo $package_version | cut -d. -f1)" "$dist_sha"
 
             # Push the git repository to the remote.
-            git push --tags --force origin "action/$package_name/v$package_version"
+            git push --force origin "action/$package_name/v$package_version"
+
+            # Push all tags to ensure major and minor version tags are updated
+            git push --tags --force origin
           done
