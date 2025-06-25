@@ -1,0 +1,79 @@
+name: Run Workflow Dispatch
+author: "AB INNOVISION GmbH"
+description: |
+  Runs a workflow on another repository. This uses the abinnovision/github-workflow-dispatch-proxy.
+inputs:
+  proxy:
+    description: The URL to the github-workflow-dispatch-proxy. This is the base URL of the proxy without trailing slash.
+    required: true
+  target:
+    description: The repository name. E.g. "repo" or "owner/repo".
+    required: true
+  workflow:
+    description: The workflow name. E.g. "update-version.yaml"
+    required: true
+  workflow-ref:
+    description: |
+      The git reference for the workflow. The reference can be a branch or tag name.
+      By default, the "master" branch is used.
+    required: false
+  workflow-inputs:
+    description: |
+      The inputs for the workflow in JSON format. E.g. '{"application": "staging", "version": "1.0.0"}'
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - id: validate
+      name: "Validate"
+      shell: bash
+      run: |
+        # The "target" input is the target repository. It can either be just the repo name or owner/repo.
+        if [[ "${{ inputs.target }}" =~ "/" ]]; then
+          TARGET_OWNER=$(echo "${{ inputs.target }}" | cut -d/ -f1)
+          TARGET_REPO=$(echo "${{ inputs.target }}" | cut -d/ -f2)
+        else
+          TARGET_OWNER="${{ github.repository_owner }}"
+          TARGET_REPO="${{ inputs.target }}"
+        fi
+
+        # If the "workflow-inputs" input is not empty, it must be a valid JSON string.
+        if [[ -n '${{ inputs.workflow-inputs }}' ]]; then
+          WORKFLOW_INPUTS=$(echo '${{ inputs.workflow-inputs }}' | jq -cr ".")
+        else
+          WORKFLOW_INPUTS="{}"
+        fi
+
+        echo "TARGET_OWNER=$TARGET_OWNER" >> $GITHUB_ENV
+        echo "TARGET_REPO=$TARGET_REPO" >> $GITHUB_ENV
+        echo "WORKFLOW_INPUTS=$WORKFLOW_INPUTS" >> $GITHUB_ENV
+    - id: token
+      name: "Generate token"
+      shell: bash
+      run: |
+        ID_TOKEN_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=github-workflow-dispatch-proxy")
+        echo "ID_TOKEN=$(echo $ID_TOKEN_RESPONSE | jq -r ".value")" >> $GITHUB_ENV
+    - id: prepare
+      name: "Prepare"
+      shell: bash
+      run: |
+        STATUS_CODE=$(
+          curl -s -o response -w "%{http_code}" \
+            --header "Content-Type: application/json" \
+            --header "Authorization: Bearer $ID_TOKEN" \
+            --request POST \
+            --data '{"target":{"owner":"'$TARGET_OWNER'","repo":"'$TARGET_REPO'","ref":"${{ inputs.workflow-ref }}","workflow":"${{ inputs.workflow }}"},"inputs":'$WORKFLOW_INPUTS'}' \
+            ${{ inputs.proxy }}/dispatch
+        )
+
+        # Check if the status code is 200.
+        if [[ $STATUS_CODE -ne "200" ]]; then
+          echo "Error: Failed to dispatch workflow. Status code: $STATUS_CODE"
+          echo "Response:"
+          cat response
+          exit 1
+        fi
+
+        echo "Dispatched workflow successfully"
