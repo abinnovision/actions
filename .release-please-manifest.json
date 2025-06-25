@@ -3,5 +3,5 @@
 	"actions/run-commitlint": "1.0.5",
 	"actions/setup-gcp": "1.0.1",
 	"actions/setup-node": "1.1.3",
-	"actions/run-workflow-dispatch": "1.0.5"
+	"actions/run-workflow-dispatch": "1.0.6"
 }
