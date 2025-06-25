@@ -84,6 +84,8 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
       - name: Setup Node
         uses: abinnovision/actions@setup-node-dev
+        with:
+          enable-turbo-cache: "false"
       - name: Install dependencies
         run: yarn install --immutable
       - name: Build
@@ -171,6 +173,8 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
       - name: Setup Node
         uses: abinnovision/actions@setup-node-dev
+        with:
+          enable-turbo-cache: "false"
       - name: Install dependencies
         run: yarn install --immutable
       - name: Build
