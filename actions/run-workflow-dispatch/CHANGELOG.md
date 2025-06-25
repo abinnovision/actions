@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.2...run-workflow-dispatch-source-v1.0.3) (2025-06-25)
+
+
+### Bug Fixes
+
+* include target.ref only if available ([#246](https://github.com/abinnovision/actions/issues/246)) ([342af4d](https://github.com/abinnovision/actions/commit/342af4d4ff01104371514a5a12f4c5d80233cf47))
+
 ## [1.0.2](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.1...run-workflow-dispatch-source-v1.0.2) (2025-06-25)
 
 
