@@ -102,34 +102,20 @@ runs:
       name: "Prepare"
       shell: bash
       run: |
-        # Build the payload using a simpler approach
-        # First create the base target object
-        TARGET_BASE=$(printf '{"owner":"%s","repo":"%s","workflow":"%s"}' "$TARGET_OWNER" "$TARGET_REPO" "${{ inputs.workflow }}")
-
-        # Add ref field if workflow-ref is provided
+        # Use the original string concatenation method that was working, but with conditional ref
         if [[ -n "${{ inputs.workflow-ref }}" ]]; then
-          TARGET_OBJECT=$(echo "$TARGET_BASE" | NO_COLOR=1 jq -c --arg ref "${{ inputs.workflow-ref }}" '. + {ref: $ref}')
+          PAYLOAD='{"target":{"owner":"'$TARGET_OWNER'","repo":"'$TARGET_REPO'","ref":"${{ inputs.workflow-ref }}","workflow":"${{ inputs.workflow }}"},"inputs":'$WORKFLOW_INPUTS'}'
         else
-          TARGET_OBJECT="$TARGET_BASE"
+          PAYLOAD='{"target":{"owner":"'$TARGET_OWNER'","repo":"'$TARGET_REPO'","workflow":"${{ inputs.workflow }}"},"inputs":'$WORKFLOW_INPUTS'}'
         fi
 
-        # Build the complete payload
-        PAYLOAD=$(NO_COLOR=1 jq -n -c --argjson target "$TARGET_OBJECT" --argjson inputs "$WORKFLOW_INPUTS" '{target: $target, inputs: $inputs}')
-
-        # Debug output
-        echo "Generated payload: $PAYLOAD"
-        echo "Payload length: $(echo -n "$PAYLOAD" | wc -c) characters"
-
-        # Make the API request with timeout and better error handling
-        # Using --data-raw to avoid shell escaping issues with JSON
         STATUS_CODE=$(
           curl -s -o response -w "%{http_code}" \
-            --max-time 60 \
             --header "Content-Type: application/json" \
             --header "Authorization: Bearer $ID_TOKEN" \
             --request POST \
-            --data-raw "$PAYLOAD" \
-            "${{ inputs.proxy }}/dispatch"
+            --data "$PAYLOAD" \
+            ${{ inputs.proxy }}/dispatch
         )
 
         # Check if the status code is 200.
