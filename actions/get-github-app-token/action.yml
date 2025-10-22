@@ -1,5 +1,5 @@
 name: Get GitHub App Token
-author: "AB INNOVISION GmbH"
+author: "abi group GmbH"
 description: |
   Gets the token for the GitHub App based on the given identification.
 inputs:
