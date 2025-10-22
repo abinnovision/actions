@@ -1,44 +1,56 @@
 # abinnovision/actions
 
-This repository contains a collection of GitHub Actions as a monorepo. This repository has been designed to provide a
-comprehensive set of actions that can be used to automate common development tasks and workflows. By organizing multiple
-actions in a single repository, we aim to make it easier for developers to find and use the tools they need to
-streamline their workflows.
-Most of the actions are opinionated and are designed to work with the AB INNOVISION development workflow.
+This repository contains a collection of GitHub Actions and Reusable Workflows as a monorepo. This repository has been
+designed to provide a comprehensive set of actions and workflows that can be used to automate common development tasks.
+By organizing multiple actions and workflows in a single repository, we aim to make it easier for developers to find and
+use the tools they need to streamline their workflows.
+Most of the actions and workflows are opinionated and are designed to work with the abi group development workflow.
 
 ## Actions
 
-These are the currently available actions:
+Browse all available actions in the [actions](./actions) directory. Each action has its own README with detailed usage
+instructions.
 
-- [setup-gcp](./actions/setup-gcp): Setup authentication for the Google Cloud Platform.
-- [setup-node](./actions/setup-node): Set up a Node.js environment, including package mangers and private registries.
-- [get-github-app-token](./actions/get-github-app-token): Gets the token for the GitHub App based on the given
-  identification.
-- [run-commitlint](./actions/run-commitlint): Runs [commitlint](https://commitlint.js.org/) with the default AB
-  innovision config.
-- [run-workflow-dispatch](./actions/run-workflow-dispatch): Runs a workflow on another repository.
+### Usage
 
-## Usage
-
-All actions within this repository can be used in other repositories like this:
+Actions can be used in other repositories like this:
 
 ```yaml
 jobs:
   <job>:
     steps:
-      - uses: abinnovision/actions@<name>-v<version>
-      # E.g., abinnovision/actions@run-commitlint-v1.0.4
-      # See readme of actions for configuration.
+      - uses: abinnovision/actions@<action-name>-v<version>
+      # E.g., abinnovision/actions@run-commitlint-v1
+      # See readme of each action for configuration.
 ```
 
+## Workflows
+
+Browse all available reusable workflows in the [workflows](./workflows) directory. Each workflow has its own README with
+detailed usage instructions.
+
+### Usage
+
+Reusable workflows can be used in other repositories like this:
+
+```yaml
+jobs:
+  <job>:
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@<workflow-name>-v<version>
+    # E.g., abinnovision/actions/.github/workflows/workflow.yaml@release-v1
+    # See readme of each workflow for configuration.
+```
+
+## Versioning
+
 Versioning follows the [semantic versioning](https://semver.org/) scheme. See
-the [releases](https://github.com/abinnovision/actions/releases) for the latest version of each action.
+the [releases](https://github.com/abinnovision/actions/releases) for the latest version of each action and workflow.
 
-The following tags are available:
+The following version ranges are available:
 
-- `v1`: Targeting major version
-- `v1.2`: Targeting minor version
-- `v1.2.3`: Targeting a patch version
+- `<name>-v1`: Targeting major version
+- `<name>-v1.2`: Targeting minor version
+- `<name>-v1.2.3`: Targeting a patch version
 
 ## Development
 
