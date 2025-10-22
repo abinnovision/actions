@@ -253,7 +253,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with: &checkout-inputs
+        with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           token: ${{ inputs.github-token }}
       - name: Setup Node.js
@@ -290,7 +290,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          <<: *checkout-inputs
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          token: ${{ inputs.github-token }}
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-v1
       - name: Install dependencies
@@ -679,13 +680,13 @@ jobs:
 
       - name: Prepare app-specific secrets
         id: app-secrets
-        env:
-          # Dynamically access secret using APP_SECRETS_{APP_NAME_UPPERCASE} pattern
-          APP_SECRET: ${{ secrets[format('APP_SECRETS_{0}', matrix.app)] }}
         run: |
-          if [[ -n "$APP_SECRET" ]]; then
+          # Dynamically access secret using APP_SECRETS_{app-name} pattern
+          app_secret='${{ secrets[format('APP_SECRETS_{0}', matrix.app)] }}'
+
+          if [[ -n "$app_secret" ]] && [[ "$app_secret" != "null" ]]; then
             # Write secrets to a temporary file for BuildKit
-            echo "$APP_SECRET" > /tmp/app-secrets
+            echo "$app_secret" > /tmp/app-secrets
             echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
             echo "App-specific secrets prepared for ${{ matrix.app }}"
           else
