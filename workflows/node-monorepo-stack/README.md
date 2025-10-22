@@ -124,7 +124,7 @@ Packages are published based on their `publishConfig` in `package.json`. The wor
 ```yaml
 jobs:
   node-monorepo-stack:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v0
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1
     secrets:
       GH_APP_IDENTIFICATION_RELEASER: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
     # Or to inherit the secrets from the caller:
@@ -137,9 +137,9 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v0`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v0.0`: Targeting minor version <!-- x-release-please-minor -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1.0`: Targeting minor version <!-- x-release-please-minor -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
