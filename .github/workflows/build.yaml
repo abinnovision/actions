@@ -85,10 +85,31 @@ jobs:
       contents: "write"
       id-token: "write"
     steps:
+      - id: gh-app-token
+        name: "Generate GitHub App Token"
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_RELASER_CUSTOM_ID }}
+          private-key: ${{ secrets.APP_RELASER_CUSTOM_PK }}
+      - id: gh-app-details
+        name: "Get GitHub App Details"
+        env:
+          GH_TOKEN: ${{ steps.gh-app-token.outputs.token }}
+        shell: bash
+        run: |
+          # Fetch the id of the bot user.
+          response=$(gh api "/users/${{ steps.gh-app-token.outputs.app-slug }}[bot]") >> "$GITHUB_OUTPUT"
+
+          # Extract the id of the bot user.
+          user_id=$(echo "$response" | jq -cr ".id")
+
+          echo "committer-email=${{ steps.gh-app-token.outputs.app-slug }}[bot] <$user_id+${{ steps.gh-app-token.outputs.app-slug }}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+          echo "committer-name=${{ steps.gh-app-token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
+          token: ${{ steps.gh-app-token.outputs.token }}
       - name: Setup Node
         uses: abinnovision/actions@setup-node-dev
       - name: Install dependencies
@@ -100,8 +121,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "${{ steps.gh-app-details.outputs.committer-name }}"
+          git config --global user.email "${{ steps.gh-app-details.outputs.committer-email }}"
 
           # Unified function to publish both actions and workflows
           publish_item() {
