@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.7...run-workflow-dispatch-source-v1.1.0) (2025-10-22)
+
+
+### Features
+
+* update author and LICENSE files ([#255](https://github.com/abinnovision/actions/issues/255)) ([01ae229](https://github.com/abinnovision/actions/commit/01ae229ceab3629ecbc163e393d6135b5bb35de2))
+
 ## [1.0.7](https://github.com/abinnovision/actions/compare/run-workflow-dispatch-source-v1.0.6...run-workflow-dispatch-source-v1.0.7) (2025-06-25)
 
 
