@@ -45,7 +45,7 @@ async function resolveConfigRules(): Promise<QualifiedConfig["rules"]> {
 	if (commitlintConfig.rules) {
 		rules = (
 			await Promise.all(
-				Object.entries(commitlintConfig.rules).map((it) => executeRule(it))
+				Object.entries(commitlintConfig.rules).map((it) => executeRule(it)),
 			)
 		).reduce<QualifiedRules>((registry, item) => {
 			const [key, value] = item!;
@@ -84,7 +84,7 @@ async function getCommitRange(octokit: OctokitType): Promise<CommitRange> {
 		let fromSha: string | undefined;
 
 		core.debug(
-			`Detected an event which is not related to a pull request (${context.eventName})`
+			`Detected an event which is not related to a pull request (${context.eventName})`,
 		);
 
 		// Check if the event payload has a 'before' field.
@@ -98,7 +98,7 @@ async function getCommitRange(octokit: OctokitType): Promise<CommitRange> {
 				fromSha = beforeSha;
 			} else {
 				core.debug(
-					`Event payload provided a before sha '${beforeSha}', which is not a valid commit`
+					`Event payload provided a before sha '${beforeSha}', which is not a valid commit`,
 				);
 			}
 		} else {
@@ -121,7 +121,7 @@ async function getCommitRange(octokit: OctokitType): Promise<CommitRange> {
  */
 async function fetchCommits(
 	octokit: OctokitType,
-	range: CommitRange
+	range: CommitRange,
 ): Promise<CommitInfo[]> {
 	if (range.from && range.to) {
 		core.debug(`Fetching commits from '${range.from}' to '${range.to}'`);
@@ -164,7 +164,7 @@ async function fetchCommits(
  */
 async function lintCommits(
 	rules: QualifiedRules,
-	commits: CommitInfo[]
+	commits: CommitInfo[],
 ): Promise<CommitLintResult[]> {
 	return await Promise.all(
 		commits.map(async (commit) => ({
@@ -172,13 +172,13 @@ async function lintCommits(
 			result: await lint(commit.message, rules, {
 				parserOpts: (await createParserOpts())["parser"],
 			}),
-		}))
+		})),
 	);
 }
 
 function hasLintWarnings(results: CommitLintResult[]): boolean {
 	return results.some(
-		(it) => it.result.warnings && it.result.warnings.length > 0
+		(it) => it.result.warnings && it.result.warnings.length > 0,
 	);
 }
 
@@ -201,7 +201,7 @@ function hasLintErrors(results: CommitLintResult[]): boolean {
 		core.info(
 			commits
 				.map((commit) => `${commit.message}\n\n(${chalk.grey(commit.sha)})`)
-				.join(`\n${chalk.bold(chalk.grey("----"))}\n`)
+				.join(`\n${chalk.bold(chalk.grey("----"))}\n`),
 		);
 	});
 
@@ -211,13 +211,13 @@ function hasLintErrors(results: CommitLintResult[]): boolean {
 	if (hasLintErrors(result)) {
 		const output = format(
 			{ results: result.map((it) => it.result) },
-			{ color: true }
+			{ color: true },
 		);
 		core.setFailed(`There are commits with invalid messages!\n\n${output}`);
 	} else if (hasLintWarnings(result)) {
 		const output = format(
 			{ results: result.map((it) => it.result) },
-			{ color: true }
+			{ color: true },
 		);
 		core.info(`${chalk.blue("There are commits with warnings!")}\n\n${output}`);
 	} else {

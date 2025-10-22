@@ -1,7 +1,6 @@
 # run-commitlint
 
-This action runs [commitlint](https://commitlint.js.org/) on your commits with
-the [@abinnovision/commitlint-config](https://www.npmjs.com/package/@abinnovision/commitlint-config) config.
+This action runs [commitlint](https://commitlint.js.org/) on your commits with the [@abinnovision/commitlint-config](https://www.npmjs.com/package/@abinnovision/commitlint-config) config.
 
 ## Example usage
 
