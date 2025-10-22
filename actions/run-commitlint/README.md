@@ -20,5 +20,5 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@run-commitlint-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@run-commitlint-v1.0`: Targeting minor version <!-- x-release-please-minor -->
-- `abinnovision/actions@run-commitlint-v1.0.5`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@run-commitlint-v1.1`: Targeting minor version <!-- x-release-please-minor -->
+- `abinnovision/actions@run-commitlint-v1.1.0`: Targeting a patch version <!-- x-release-please-version -->

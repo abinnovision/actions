@@ -1,7 +1,9 @@
 {
-	"actions/get-github-app-token": "1.1.0",
-	"actions/run-commitlint": "1.0.5",
-	"actions/setup-gcp": "1.0.1",
-	"actions/setup-node": "1.1.3",
-	"actions/run-workflow-dispatch": "1.0.7"
+	"actions/get-github-app-token": "1.2.0",
+	"actions/run-commitlint": "1.1.0",
+	"actions/setup-gcp": "1.1.0",
+	"actions/setup-node": "1.2.0",
+	"actions/run-workflow-dispatch": "1.1.0",
+	"workflows/release": "1.0.0",
+	"workflows/node-monorepo-stack": "1.0.0"
 }
