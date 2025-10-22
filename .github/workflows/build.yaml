@@ -58,6 +58,10 @@ jobs:
         run: yarn check
       - name: Build
         run: yarn build
+      - name: Check README
+        run: |
+          yarn readme:generate
+          git diff --exit-code || (echo "README files are not up to date, run 'yarn readme:generate'" && exit 1)
       - name: Check Dependencies
         run: |
           yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
