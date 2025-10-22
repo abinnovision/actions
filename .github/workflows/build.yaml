@@ -203,7 +203,7 @@ jobs:
 
             # Create git repository
             git init -b "$branch_name"
-            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
+            git remote add origin https://x-access-token:${{ steps.gh-app-token.outputs.token }}@github.com/$GITHUB_REPOSITORY
 
             # Commit all files
             git add .
