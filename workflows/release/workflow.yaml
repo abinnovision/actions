@@ -1,0 +1,60 @@
+# This workflow is used to release any repository using release-please.
+
+name: Release
+
+on:
+  workflow_call:
+    secrets:
+      GH_APP_IDENTIFICATION_RELEASER:
+        required: true
+    inputs:
+      gcp-auth:
+        type: string
+        required: false
+        default: ${{ vars.GCP_AUTH }}
+      target-branch:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Branch to release from. Defaults to the repository default branch.
+    outputs:
+      releases-created:
+        value: ${{ jobs.release.outputs.releases_created }}
+        description: |-
+          If any releases have been created. This is a boolean value, either "true" or "false".
+      paths-released:
+        value: ${{ jobs.release.outputs.paths_released }}
+        description: |-
+          All paths which have been released, represented as a JSON array. The output is always encoded as a string.
+
+          Example: `["packages/package-a", "packages/package-b"]`
+
+jobs:
+  release:
+    name: release-please
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup GCP Authentication
+        uses: abinnovision/actions@setup-gcp-v1
+        with:
+          auth: ${{ inputs.gcp-auth }}
+      - id: token
+        name: Generate GitHub App token
+        uses: abinnovision/actions@get-github-app-token-v1
+        with:
+          identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
+      - id: release
+        name: Run release-please
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ steps.token.outputs.token }}
+          target-branch: ${{ inputs.target-branch }}

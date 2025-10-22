@@ -9,7 +9,8 @@
 		"url": "https://abinnovision.com/"
 	},
 	"workspaces": [
-		"actions/*"
+		"actions/*",
+		"workflows/*"
 	],
 	"scripts": {
 		"build": "turbo build",
@@ -18,8 +19,8 @@
 		"postinstall": "husky install",
 		"prettier:check": "prettier --ignore-path .gitignore --check '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
 		"prettier:fix": "prettier --ignore-path .gitignore --write '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
-		"sort:check": "sort-package-json 'actions/**!(node_modules)/package.json' 'package.json' --check",
-		"sort:fix": "sort-package-json 'actions/**!(node_modules)/package.json' 'package.json'"
+		"sort:check": "sort-package-json '{actions,workflows}/**!(node_modules)/package.json' 'package.json' --check",
+		"sort:fix": "sort-package-json '{actions,workflows}/**!(node_modules)/package.json' 'package.json'"
 	},
 	"commitlint": {
 		"extends": [

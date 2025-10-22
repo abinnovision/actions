@@ -1,12 +1,21 @@
 name: Build
 
+concurrency:
+  # Group by workflow, branch and PR number.
+  # If the event is a merge group, use the merge group id as the PR number.
+  # If it's not a PR or merge group, use 'main' as the PR number.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number || github.event.merge_group.id || 'main' }}
+  # Cancel only in-progress jobs when it's a PR.
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' || github.event_name == 'merge_group' }}
+
 on:
   push:
     branches:
-      - master
+      - main
   pull_request_target:
     branches:
-      - master
+      - main
+
 jobs:
   # Configure the commit SHA to use.
   configure:
@@ -51,8 +60,8 @@ jobs:
         run: yarn build
       - name: Check Dependencies
         run: |
-          yarn dedupe
-          git diff --exit-code --quiet yarn.lock || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
+          yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
+          yarn turbo boundaries || (echo "turbo boundaries failed" && exit 1)
 
   # Will check if the release is needed and create a release PR if so.
   release:
@@ -62,95 +71,8 @@ jobs:
       - check_build
     uses: abinnovision/workflows/.github/workflows/release-v2.yaml@main
     secrets: inherit
-    # Only run on push to "master" branch.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-
-  publish_master:
-    name: Publish (master)
-    runs-on: ubuntu-latest
-    needs:
-      - configure
-      - release
-    if: github.ref == 'refs/heads/master'
-    permissions:
-      contents: "write"
-      id-token: "write"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.configure.outputs.commit-sha }}
-      - name: Setup Node
-        uses: abinnovision/actions@setup-node-dev
-      - name: Install dependencies
-        run: yarn install --immutable
-      - name: Build
-        run: yarn run build
-      - name: Publish
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          package_locations=()
-
-          # Get the list of workspaces.
-          workspace_output=$(yarn workspaces list --json)
-
-          while read -r raw; do
-          location=$(echo "$raw" | jq -r '.location')
-
-          # Check if it the location starts with 'actions/'.
-          if [[ "$location" != *"actions/"* ]]; then
-          continue
-          fi
-
-          # Append the location to the package_locations array.
-          package_locations+=("$location")
-          done <<< "$workspace_output"
-
-          for path in "${package_locations[@]}"; do
-            # Change to the package directory.
-            cd ${{ github.workspace }}
-
-            echo "Publishing '$path'..."
-
-            # Create the 'package.tgz' file..
-            yarn --cwd "$path" pack
-
-            # Get the package name and version from the 'package.json' file.
-            package_name=$(jq -r '.name' "$path/package.json")
-            package_version=$(jq -r '.version' "$path/package.json")
-            git_remote_url=$(git remote get-url origin)
-
-            # Create a staging environment for the package.
-            mkdir -p "/opt/temporary/$package_name"
-            mv "$path/package.tgz" "/opt/temporary/$package_name/package.tgz"
-
-            cd "/opt/temporary/$package_name"
-
-            # Unpack the 'package.tgz' file in the current folder and delete it.
-            tar --strip-components=1 -xzf package.tgz && rm package.tgz
-
-            # Create an empty git repository.
-            git init -b "action/$package_name/dev"
-            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
-
-            # Add all files to the git repository.
-            git add .
-            git commit -m "chore: release $package_name@dev"
-
-            git fetch origin --tags -f
-
-            dist_sha=$(git rev-list -n 1 HEAD)
-
-            git tag -f "$package_name-dev" "$dist_sha"
-
-            # Push the git repository to the remote.
-            git push --force origin "action/$package_name/dev"
-
-            # Push all tags to ensure dev tags are updated
-            git push --tags --force origin
-          done
+    # Only run on push to "main" branch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
   publish:
     name: Publish
@@ -158,7 +80,7 @@ jobs:
     needs:
       - configure
       - release
-    if: needs.release.outputs.releases-created
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: "write"
       id-token: "write"
@@ -174,53 +96,157 @@ jobs:
       - name: Build
         run: yarn run build
       - name: Publish
+        shell: bash
         run: |
+          set -euo pipefail
+
           git config --global user.name "GitHub Actions"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          echo '${{ needs.release.outputs.paths-released }}' | jq -cr '.[]' | while read path; do
-            # Change to the package directory.
+          # Unified function to publish both actions and workflows
+          publish_item() {
+            local path=$1
+            local mode=$2  # "dev" or "release"
+
             cd ${{ github.workspace }}
 
-            echo "Publishing '$path'..."
+            echo "Publishing '$path' ($mode mode)..."
 
-            # Create the 'package.tgz' file..
+            # Detect type and set type-specific variables
+            local item_type
+            local item_name
+            local commit_prefix
+            local staging_dir
+
+            # Define item type, name, and other variables based on path
+            if [[ "$path" == *"actions/"* ]]; then
+              item_type="action"
+              item_name=$(jq -r '.name' "$path/package.json")
+              commit_prefix=""
+              staging_dir="/opt/temporary/action-$item_name"
+            else
+              item_type="workflow"
+              item_name=$(jq -r '.name' "$path/package.json")
+              commit_prefix="workflow "
+              staging_dir="/opt/temporary/workflow-$item_name"
+            fi
+
+            # Validate item name
+            if [[ -z "$item_name" || "$item_name" == "null" ]]; then
+              echo "Error: Invalid or missing 'name' in $path/package.json"
+              exit 1
+            fi
+
+            local item_version=$(jq -r '.version' "$path/package.json")
+
+            # Validate item version
+            if [[ -z "$item_version" || "$item_version" == "null" ]]; then
+              echo "Error: Invalid or missing 'version' in $path/package.json"
+              exit 1
+            fi
+
+            # Pack the package
             yarn --cwd "$path" pack
 
-            # Get the package name and version from the 'package.json' file.
-            package_name=$(jq -r '.name' "$path/package.json")
-            package_version=$(jq -r '.version' "$path/package.json")
-            git_remote_url=$(git remote get-url origin)
+            # Create staging environment
+            mkdir -p "$staging_dir"
+            mv "$path/package.tgz" "$staging_dir/package.tgz"
 
-            # Create a staging environment for the package.
-            mkdir -p "/opt/temporary/$package_name"
-            mv "$path/package.tgz" "/opt/temporary/$package_name/package.tgz"
+            cd "$staging_dir"
 
-            cd "/opt/temporary/$package_name"
-
-            # Unpack the 'package.tgz' file in the current folder and delete it.
+            # Unpack and clean up
             tar --strip-components=1 -xzf package.tgz && rm package.tgz
 
-            # Create an empty git repository.
-            git init -b "action/$package_name/v$package_version"
+            # Workflow-specific: restructure files and move the workflow file
+            if [[ "$item_type" == "workflow" ]]; then
+              mkdir -p .github/workflows
+              mv workflow.yaml .github/workflows/workflow.yaml
+            fi
+
+            # Determine branch name and version based on mode
+            local branch_name
+            local version_tag
+
+            if [[ "$mode" == "dev" ]]; then
+              branch_name="$item_type/$item_name/dev"
+              version_tag="dev"
+            else
+              branch_name="$item_type/$item_name/v$item_version"
+              version_tag="$item_version"
+            fi
+
+            # Create git repository
+            git init -b "$branch_name"
             git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
 
-            # Add all files to the git repository.
+            # Commit all files
             git add .
-            git commit -m "chore: release $package_name@$package_version"
+            git commit -m "chore: release ${commit_prefix}${item_name}@${version_tag}"
 
+            # Fetch existing tags
             git fetch origin --tags -f
 
             dist_sha=$(git rev-list -n 1 HEAD)
 
-            # Tag with all versions.
-            git tag -f "$package_name-v$package_version" "$dist_sha"
-            git tag -f "$package_name-v$(echo $package_version | cut -d. -f1-2)" "$dist_sha"
-            git tag -f "$package_name-v$(echo $package_version | cut -d. -f1)" "$dist_sha"
+            # Create and collect tags based on mode
+            # Tag format is consistent for both actions and workflows: name-v{version}
+            local tags_to_push=()
 
-            # Push the git repository to the remote.
-            git push --force origin "action/$package_name/v$package_version"
+            if [[ "$mode" == "dev" ]]; then
+              # Dev tags: name-dev
+              git tag -f "${item_name}-dev" "$dist_sha"
+              tags_to_push+=("${item_name}-dev")
+            else
+              # Release tags: name-v{version} (patch, minor, major)
+              git tag -f "${item_name}-v${item_version}" "$dist_sha"
+              git tag -f "${item_name}-v$(echo $item_version | cut -d. -f1-2)" "$dist_sha"
+              git tag -f "${item_name}-v$(echo $item_version | cut -d. -f1)" "$dist_sha"
 
-            # Push all tags to ensure major and minor version tags are updated
-            git push --tags --force origin
+              tags_to_push+=("${item_name}-v${item_version}")
+              tags_to_push+=("${item_name}-v$(echo $item_version | cut -d. -f1-2)")
+              tags_to_push+=("${item_name}-v$(echo $item_version | cut -d. -f1)")
+            fi
+
+            # Push branch
+            git push --force origin "$branch_name"
+
+            # Push only the specific tags we created
+            for tag in "${tags_to_push[@]}"; do
+              git push --force origin "refs/tags/$tag"
+            done
+
+            # Cleanup: return to workspace and remove staging directory
+            cd ${{ github.workspace }}
+            rm -rf "$staging_dir"
+          }
+
+          # Phase 1: Publish releases (if any were created)
+          if [[ "${{ needs.release.outputs.releases-created }}" == "true" ]]; then
+            echo "==> Publishing versioned releases..."
+            echo '${{ needs.release.outputs.paths-released }}' | jq -cr '.[]' | while read path; do
+              publish_item "$path" "release"
+            done
+          else
+            echo "==> No releases created, skipping versioned publishing"
+          fi
+
+          # Phase 2: Always publish dev builds
+          echo "==> Publishing dev builds..."
+
+          # Get the list of all workspaces
+          workspace_output=$(yarn workspaces list --json)
+
+          all_locations=()
+          while read -r raw; do
+            location=$(echo "$raw" | jq -r '.location')
+
+            # Include both actions and workflows
+            if [[ "$location" == *"actions/"* ]] || [[ "$location" == *"workflows/"* ]]; then
+              all_locations+=("$location")
+            fi
+          done <<< "$workspace_output"
+
+          # Publish all items as dev builds
+          for path in "${all_locations[@]}"; do
+            publish_item "$path" "dev"
           done
