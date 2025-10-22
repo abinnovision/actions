@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/setup-node-source-v1.1.3...setup-node-source-v1.2.0) (2025-10-22)
+
+
+### Features
+
+* update author and LICENSE files ([#255](https://github.com/abinnovision/actions/issues/255)) ([01ae229](https://github.com/abinnovision/actions/commit/01ae229ceab3629ecbc163e393d6135b5bb35de2))
+
 ## [1.1.3](https://github.com/abinnovision/actions/compare/setup-node-source-v1.1.2...setup-node-source-v1.1.3) (2025-06-25)
 
 

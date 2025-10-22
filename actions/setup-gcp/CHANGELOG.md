@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/setup-gcp-source-v1.0.1...setup-gcp-source-v1.1.0) (2025-10-22)
+
+
+### Features
+
+* update author and LICENSE files ([#255](https://github.com/abinnovision/actions/issues/255)) ([01ae229](https://github.com/abinnovision/actions/commit/01ae229ceab3629ecbc163e393d6135b5bb35de2))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/setup-gcp-source-v1.0.0...setup-gcp-source-v1.0.1) (2024-10-19)
 
 
