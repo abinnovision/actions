@@ -1,5 +1,5 @@
 name: Run Workflow Dispatch
-author: "AB INNOVISION GmbH"
+author: "abi group GmbH"
 description: |
   Runs a workflow on another repository. This uses the abinnovision/github-workflow-dispatch-proxy.
 inputs:
