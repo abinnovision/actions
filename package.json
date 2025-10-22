@@ -15,11 +15,11 @@
 	],
 	"scripts": {
 		"build": "turbo build",
-		"check": "yarn prettier:check && turbo check",
-		"fix": "yarn prettier:fix && turbo fix",
+		"check": "yarn format:check && turbo check",
+		"fix": "yarn format:fix && turbo fix",
+		"format:check": "prettier --ignore-path .gitignore --check '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
+		"format:fix": "prettier --ignore-path .gitignore --write '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
 		"postinstall": "husky install",
-		"prettier:check": "prettier --ignore-path .gitignore --check '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
-		"prettier:fix": "prettier --ignore-path .gitignore --write '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
 		"readme:generate": "tsx scripts/generate-readme.ts && yarn turbo format:fix",
 		"sort:check": "sort-package-json '{actions,workflows}/**!(node_modules)/package.json' 'package.json' --check",
 		"sort:fix": "sort-package-json '{actions,workflows}/**!(node_modules)/package.json' 'package.json'"

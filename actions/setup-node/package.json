@@ -14,8 +14,8 @@
 		"LICENSE.md"
 	],
 	"scripts": {
-		"format:check": "prettier --check '*.{json,json5,yaml,yml,md}'",
-		"format:write": "prettier --write '*.{json,json5,yaml,yml,md}'"
+		"format:check": "prettier --check '*.{md,json,json5,yaml,yml}'",
+		"format:fix": "prettier --write '*.{md,json,json5,yaml,yml}'"
 	},
 	"lint-staged": {
 		"*.{json,json5,yaml,yml,md}": [

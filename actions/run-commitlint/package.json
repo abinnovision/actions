@@ -18,8 +18,8 @@
 	"scripts": {
 		"build": "ncc build src/index.ts",
 		"build:watch": "ncc build --watch src/index.ts",
-		"format:check": "prettier --check 'src/**/*.{ts,js}' '**/*.{md,json,json5,yaml,yml}'",
-		"format:fix": "prettier --write 'src/**/*.{ts,js}' '**/*.{md,json,json5,yaml,yml}'",
+		"format:check": "prettier --check 'src/**/*.{ts,js}' '*.{md,json,json5,yaml,yml}'",
+		"format:fix": "prettier --write 'src/**/*.{ts,js}' '*.{md,json,json5,yaml,yml}'",
 		"lint:check": "eslint 'src/**/*.{ts,js}'",
 		"lint:fix": "eslint --fix 'src/**/*.{ts,js}'"
 	},
@@ -28,7 +28,7 @@
 			"prettier --write",
 			"eslint --fix"
 		],
-		"{**/*,*}.{md,json,json5,yaml,yml}": [
+		"*.{md,json,json5,yaml,yml}": [
 			"prettier --write"
 		]
 	},
