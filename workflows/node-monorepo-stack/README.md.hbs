@@ -1,0 +1,130 @@
+# {{name}}
+
+Automate building, validation, and deployment for Node.js monorepos with an opinionated Yarn + Turborepo setup.
+
+This workflow provides a complete CI/CD pipeline for Node.js monorepos, handling:
+- Dependency validation and build checks
+- Package publishing (for non-private packages)
+- Image builds for deployable apps
+
+## Monorepo Requirements
+
+Your repository must follow this structure:
+
+### Package Manager & Build System
+- **Yarn (Berry)** - Package manager with workspaces support
+- **Turborepo** - Build system for monorepo orchestration and caching
+- **`.tool-versions`** - asdf version file (must specify `nodejs` version)
+
+### Directory Structure
+
+```
+your-repo/
+├── packages/           # Publishable npm packages (libraries, shared code)
+│   ├── package-a/
+│   │   └── package.json
+│   └── package-b/
+│       └── package.json
+└── apps/              # Deployable applications (Docker images)
+├── api/
+│   ├── package.json
+│   └── Dockerfile    # Required for Docker build
+└── web/
+├── package.json
+└── Dockerfile
+```
+
+**Validation Rules:**
+- **Packages**: Must contain a `package.json` file
+- **Apps**: Must contain both a `package.json` AND a `Dockerfile` to be considered valid for deployment
+- **Private packages**: Packages with `"private": true` in package.json will not be published to npm
+
+### Required Scripts
+
+Your root `package.json` must define these scripts:
+
+```json
+{
+"scripts": {
+"build": "turbo run build",
+"check": "turbo run lint:check format:check"
+}
+}
+```
+
+- **`build`** - Compiles all workspaces (packages and apps)
+- **`check`** - Runs linting and formatting validation across the monorepo
+
+## Package Publishing Configuration
+
+Packages are published based on their `publishConfig` in `package.json`. The workflow reads these flags to determine which registries to publish to.
+
+### publishConfig Options
+
+```json
+{
+  "name": "@your-org/package-name",
+  "version": "1.0.0",
+  "private": false,
+  "publishConfig": {
+    "npm": true,
+    "ghpr": true,
+    "npmAccess": "public"
+  }
+}
+```
+
+**Available fields:**
+- **`npm`** (boolean) - Publish to NPM registry (requires `enable-packages-registry-npm` and `REGISTRY_NPM_TOKEN`)
+- **`ghpr`** (boolean) - Publish to GitHub Package Registry (requires `enable-packages-registry-ghpr`, uses `GITHUB_TOKEN`)
+- **`npmAccess`** (string) - Access level for NPM: `"public"` or `"restricted"` (default: `"public"`)
+
+**Important:**
+- Packages with `"private": true` are never published, regardless of `publishConfig`
+- GitHub Package Registry (ghpr) requires a scoped package name (e.g., `@your-org/package-name`)
+- Both workflow-level inputs AND package-level `publishConfig` must be enabled for publishing to occur
+
+## Docker Build Details
+
+**Automatic Turbo Prune:**
+- The workflow runs `turbo prune --docker` before building images
+- Creates optimized structure in `out/{app-name}/` with `json/` (package files) and `full/` (source)
+- Requires Turbo in root `package.json` and package `name` field in each app's `package.json`
+
+**Available Build Arguments:**
+- `app_name` - Application name from directory
+- `node_version` - From `.tool-versions` file
+- `build_version` - Semantic version with commit (e.g., `v1.2.3-abc1234`)
+- `build_commit` - Full commit SHA
+
+**App-Specific Secrets:**
+- Each app can have its own secrets via GitHub secret named `APP_SECRETS_{app-name}`
+- Use standard `.env` format (KEY=VALUE pairs, one per line)
+- Example: For app in `apps/api/`, create secret `APP_SECRETS_api`:
+  ```
+  SENTRY_TOKEN=abc123
+  DATABASE_URL=postgres://...
+  API_KEY=secret-value
+  ```
+- Accessed in Dockerfile via BuildKit secret mount: `--mount=type=secret,id=app_secrets`
+- Secrets are not stored in image layers
+
+## Usage
+
+{{{usage-example type="workflow" name=name inputs=inputs secrets=secrets version=version}}}
+
+## Latest versions
+
+{{{version-examples type="workflow" name=name version=version}}}
+
+## Inputs
+
+{{> inputs-table inputs}}
+
+## Secrets
+
+{{> secrets-table secrets}}
+
+## Outputs
+
+{{> outputs-table outputs}}

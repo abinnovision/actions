@@ -3759,6 +3759,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"node-monorepo-stack@workspace:workflows/node-monorepo-stack":
+  version: 0.0.0-use.local
+  resolution: "node-monorepo-stack@workspace:workflows/node-monorepo-stack"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.1.3"
+    prettier: "npm:^3.6.2"
+  languageName: unknown
+  linkType: soft
+
 "nopt@npm:^6.0.0":
   version: 6.0.0
   resolution: "nopt@npm:6.0.0"
