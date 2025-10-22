@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/get-github-app-token-source-v1.1.0...get-github-app-token-source-v1.2.0) (2025-10-22)
+
+
+### Features
+
+* update author and LICENSE files ([#255](https://github.com/abinnovision/actions/issues/255)) ([01ae229](https://github.com/abinnovision/actions/commit/01ae229ceab3629ecbc163e393d6135b5bb35de2))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/get-github-app-token-source-v1.0.0...get-github-app-token-source-v1.1.0) (2025-01-30)
 
 
