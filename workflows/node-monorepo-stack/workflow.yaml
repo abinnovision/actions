@@ -422,8 +422,6 @@ jobs:
     timeout-minutes: 20
     needs:
       - configure
-      - check_build
-      - test
       - release
     if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && fromJSON(needs.configure.outputs.apps)[0] != null
     strategy:
