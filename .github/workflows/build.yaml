@@ -95,6 +95,7 @@ jobs:
           permission-issues: "write"
           permission-pull-requests: "write"
           permission-workflows: "write"
+          permission-actions: "write"
       - id: gh-app-details
         name: "Get GitHub App Details"
         env:
@@ -110,7 +111,7 @@ jobs:
           echo "committer-email=${{ steps.gh-app-token.outputs.app-slug }}[bot] <$user_id+${{ steps.gh-app-token.outputs.app-slug }}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
           echo "committer-name=${{ steps.gh-app-token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           token: ${{ steps.gh-app-token.outputs.token }}
