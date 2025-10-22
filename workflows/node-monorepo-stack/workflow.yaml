@@ -304,7 +304,8 @@ jobs:
     uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
     secrets: inherit
     # Only run on push to the default branch.
-    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
+    # Use always() to prevent skipping when test job is skipped (no tests configured)
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
 
   packages_publish:
     name: Publish Packages
