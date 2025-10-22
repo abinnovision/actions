@@ -15,12 +15,6 @@ on:
         description: |-
           DockerHub registry authentication token for publishing Docker images.
           Required if enable-apps-registry-dockerhub is true.
-      APP_BUILD_SECRETS:
-        required: false
-        description: |-
-          JSON object containing app-specific secrets for Docker builds (passed via BuildKit secrets).
-          Format: {"app-name": "SECRET_KEY=value\nANOTHER_SECRET=value2"}
-          Example: {"api": "SENTRY_TOKEN=abc123", "web": "ANALYTICS_KEY=xyz789"}
     inputs:
       github-token:
         type: string
@@ -685,24 +679,18 @@ jobs:
 
       - name: Prepare app-specific secrets
         id: app-secrets
+        env:
+          # Dynamically access secret using APP_SECRETS_{APP_NAME_UPPERCASE} pattern
+          APP_SECRET: ${{ secrets[format('APP_SECRETS_{0}', matrix.app)] }}
         run: |
-          # Extract app-specific secrets from APP_BUILD_SECRETS JSON
-          app_secrets='${{ secrets.APP_BUILD_SECRETS }}'
-
-          if [[ -n "$app_secrets" ]] && [[ "$app_secrets" != "null" ]]; then
-            secret_content=$(echo "$app_secrets" | jq -r --arg app "${{ matrix.app }}" '.[$app] // ""')
-
-            if [[ -n "$secret_content" ]]; then
-              # Write secrets to a temporary file for BuildKit
-              echo "$secret_content" > /tmp/app-secrets
-              echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
-              echo "App-specific secrets prepared for ${{ matrix.app }}"
-            else
-              echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
-              echo "No app-specific secrets found for ${{ matrix.app }}"
-            fi
+          if [[ -n "$APP_SECRET" ]]; then
+            # Write secrets to a temporary file for BuildKit
+            echo "$APP_SECRET" > /tmp/app-secrets
+            echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
+            echo "App-specific secrets prepared for ${{ matrix.app }}"
           else
             echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
+            echo "No app-specific secrets found for ${{ matrix.app }}"
           fi
 
       - name: Build and push Docker image

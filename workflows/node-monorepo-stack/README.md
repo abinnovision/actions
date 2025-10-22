@@ -106,7 +106,14 @@ Packages are published based on their `publishConfig` in `package.json`. The wor
 
 **App-Specific Secrets:**
 
-- Configure via `APP_BUILD_SECRETS` as JSON: `{"app-name": "KEY=value\nKEY2=value2"}`
+- Each app can have its own secrets via GitHub secret named `APP_SECRETS_{app-name}`
+- Use standard `.env` format (KEY=VALUE pairs, one per line)
+- Example: For app in `apps/api/`, create secret `APP_SECRETS_api`:
+  ```
+  SENTRY_TOKEN=abc123
+  DATABASE_URL=postgres://...
+  API_KEY=secret-value
+  ```
 - Accessed in Dockerfile via BuildKit secret mount: `--mount=type=secret,id=app_secrets`
 - Secrets are not stored in image layers
 
@@ -156,11 +163,10 @@ This workflow can be used with different version ranges. The following ranges ar
 
 ## Secrets
 
-| Secret                           | Description                                                                                                                                                                                                                         | Required |
-| :------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
-| `GH_APP_IDENTIFICATION_RELEASER` |                                                                                                                                                                                                                                     | Yes      |
-| `REGISTRY_NPM_TOKEN`             | NPM registry authentication token for publishing packages. Required if enable-packages-registry-npm is true.                                                                                                                        | No       |
-| `REGISTRY_DOCKERHUB_TOKEN`       | DockerHub registry authentication token for publishing Docker images. Required if enable-apps-registry-dockerhub is true.                                                                                                           | No       |
-| `APP_BUILD_SECRETS`              | JSON object containing app-specific secrets for Docker builds (passed via BuildKit secrets). Format: {"app-name": "SECRET_KEY=value\nANOTHER_SECRET=value2"} Example: {"api": "SENTRY_TOKEN=abc123", "web": "ANALYTICS_KEY=xyz789"} | No       |
+| Secret                           | Description                                                                                                               | Required |
+| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :------- |
+| `GH_APP_IDENTIFICATION_RELEASER` |                                                                                                                           | Yes      |
+| `REGISTRY_NPM_TOKEN`             | NPM registry authentication token for publishing packages. Required if enable-packages-registry-npm is true.              | No       |
+| `REGISTRY_DOCKERHUB_TOKEN`       | DockerHub registry authentication token for publishing Docker images. Required if enable-apps-registry-dockerhub is true. | No       |
 
 ## Outputs

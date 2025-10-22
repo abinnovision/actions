@@ -98,7 +98,14 @@ Packages are published based on their `publishConfig` in `package.json`. The wor
 - `build_commit` - Full commit SHA
 
 **App-Specific Secrets:**
-- Configure via `APP_BUILD_SECRETS` as JSON: `{"app-name": "KEY=value\nKEY2=value2"}`
+- Each app can have its own secrets via GitHub secret named `APP_SECRETS_{app-name}`
+- Use standard `.env` format (KEY=VALUE pairs, one per line)
+- Example: For app in `apps/api/`, create secret `APP_SECRETS_api`:
+  ```
+  SENTRY_TOKEN=abc123
+  DATABASE_URL=postgres://...
+  API_KEY=secret-value
+  ```
 - Accessed in Dockerfile via BuildKit secret mount: `--mount=type=secret,id=app_secrets`
 - Secrets are not stored in image layers
 
