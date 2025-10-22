@@ -50,13 +50,13 @@
 		"handlebars": "^4.7.8",
 		"husky": "^9.1.7",
 		"js-yaml": "^4.1.0",
-		"lint-staged": "^16.2.5",
+		"lint-staged": "^16.2.6",
 		"prettier": "^3.6.2",
 		"sort-package-json": "^3.4.0",
 		"tablemark": "^3.1.0",
-		"tsx": "^4.19.2",
-		"turbo": "^2.5.4",
-		"typescript": "^5.7.2"
+		"tsx": "^4.20.6",
+		"turbo": "^2.5.8",
+		"typescript": "^5.9.3"
 	},
 	"packageManager": "yarn@4.10.3",
 	"engines": {
