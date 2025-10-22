@@ -91,6 +91,10 @@ jobs:
         with:
           app-id: ${{ secrets.APP_RELASER_CUSTOM_ID }}
           private-key: ${{ secrets.APP_RELASER_CUSTOM_PK }}
+          permission-contents: "write"
+          permission-issues: "write"
+          permission-pull-requests: "write"
+          permission-workflows: "write"
       - id: gh-app-details
         name: "Get GitHub App Details"
         env:
