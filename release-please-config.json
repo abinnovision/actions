@@ -18,6 +18,9 @@
 		},
 		"actions/run-workflow-dispatch": {
 			"extra-files": ["README.md"]
+		},
+		"workflows/release": {
+			"extra-files": ["README.md"]
 		}
 	}
 }
