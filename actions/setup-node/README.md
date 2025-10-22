@@ -28,9 +28,9 @@ This action can be used with different version ranges. The following ranges are 
 
 ## Inputs
 
-| Input                | Description                                                                                                                                                   | Required | Default               |
-| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------- | :-------------------- |
-| `token`              | The token for the package registry. The GITHUB_TOKEN secret can be used.                                                                                      | Yes      | `${{ github.token }}` |
-| `version`            | Defines a version, which overrides the default version.                                                                                                       | No       | _empty_               |
-| `enable-corepack`    | If set to 'true', the corepack will be enabled.                                                                                                               | No       | `true`                |
-| `enable-turbo-cache` | The following values are supported: - 'auto': Enables turbo cache if 'turbo.json' is present. - 'true': Enables turbo cache. - 'false': Disables turbo cache. | No       | `auto`                |
+| Input                | Description                                                                                                                                                                | Required | Default               |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :-------------------- |
+| `token`              | The token for the package registry. The GITHUB_TOKEN secret can be used.<br>                                                                                               | Yes      | `${{ github.token }}` |
+| `version`            | Defines a version, which overrides the default version.<br>                                                                                                                | No       | _empty_               |
+| `enable-corepack`    | If set to 'true', the corepack will be enabled.<br>                                                                                                                        | No       | `true`                |
+| `enable-turbo-cache` | The following values are supported:<br>- 'auto': Enables turbo cache if 'turbo.json' is present.<br>- 'true': Enables turbo cache.<br>- 'false': Disables turbo cache.<br> | No       | `auto`                |

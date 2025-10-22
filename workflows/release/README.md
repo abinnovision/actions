@@ -41,10 +41,10 @@ This workflow can be used with different version ranges. The following ranges ar
 
 ## Outputs
 
-| Output             | Description                                                                                                                                                        |
-| :----------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `releases-created` | If any releases have been created. This is a boolean value, either "true" or "false".                                                                              |
-| `paths-released`   | All paths which have been released, represented as a JSON array. The output is always encoded as a string. Example: `["packages/package-a", "packages/package-b"]` |
+| Output             | Description                                                                                                                                                               |
+| :----------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `releases-created` | If any releases have been created. This is a boolean value, either "true" or "false".                                                                                     |
+| `paths-released`   | All paths which have been released, represented as a JSON array. The output is always encoded as a string.<br><br>Example: `["packages/package-a", "packages/package-b"]` |
 
 ## Example with Custom Publishing
 

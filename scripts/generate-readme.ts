@@ -184,7 +184,7 @@ Handlebars.registerPartial(
 
 			return {
 				Input: `\`${name}\``,
-				Description: (config.description ?? "").replace(/\n/g, " "),
+				Description: (config.description ?? "").replace(/\n/g, "<br>"),
 				Required: config.required ? "Yes" : "No",
 				Default: config.default
 					? `\`${config.default}\``
@@ -194,7 +194,7 @@ Handlebars.registerPartial(
 			};
 		});
 
-		return tablemark(rows);
+		return tablemark(rows, {});
 	},
 );
 
@@ -212,7 +212,7 @@ Handlebars.registerPartial(
 
 			return {
 				Output: `\`${name}\``,
-				Description: (config.description ?? "").replace(/\n/g, " "),
+				Description: (config.description ?? "").replace(/\n/g, "<br>"),
 			};
 		});
 
@@ -234,7 +234,7 @@ Handlebars.registerPartial(
 
 			return {
 				Secret: `\`${name}\``,
-				Description: (config.description ?? "").replace(/\n/g, " "),
+				Description: (config.description ?? "").replace(/\n/g, "<br>"),
 				Required: config.required ? "Yes" : "No",
 			};
 		});

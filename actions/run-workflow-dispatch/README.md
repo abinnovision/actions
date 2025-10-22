@@ -46,10 +46,10 @@ This action can be used with different version ranges. The following ranges are 
 
 ## Inputs
 
-| Input             | Description                                                                                                             | Required | Default |
-| :---------------- | :---------------------------------------------------------------------------------------------------------------------- | :------- | :------ |
-| `proxy`           | The URL to the github-workflow-dispatch-proxy. This is the base URL of the proxy without trailing slash.                | Yes      |         |
-| `target`          | The repository name. E.g. "repo" or "owner/repo".                                                                       | Yes      |         |
-| `workflow`        | The workflow name. E.g. "update-version.yaml"                                                                           | Yes      |         |
-| `workflow-ref`    | The git reference for the workflow. The reference can be a branch or tag name. By default, the "master" branch is used. | No       | _empty_ |
-| `workflow-inputs` | The inputs for the workflow in JSON format. E.g. '{"application": "staging", "version": "1.0.0"}'                       | No       | _empty_ |
+| Input             | Description                                                                                                                    | Required | Default |
+| :---------------- | :----------------------------------------------------------------------------------------------------------------------------- | :------- | :------ |
+| `proxy`           | The URL to the github-workflow-dispatch-proxy. This is the base URL of the proxy without trailing slash.                       | Yes      |         |
+| `target`          | The repository name. E.g. "repo" or "owner/repo".                                                                              | Yes      |         |
+| `workflow`        | The workflow name. E.g. "update-version.yaml"                                                                                  | Yes      |         |
+| `workflow-ref`    | The git reference for the workflow. The reference can be a branch or tag name.<br>By default, the "master" branch is used.<br> | No       | _empty_ |
+| `workflow-inputs` | The inputs for the workflow in JSON format. E.g. '{"application": "staging", "version": "1.0.0"}'<br>                          | No       | _empty_ |
