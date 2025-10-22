@@ -20,6 +20,7 @@
 		"postinstall": "husky install",
 		"prettier:check": "prettier --ignore-path .gitignore --check '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
 		"prettier:fix": "prettier --ignore-path .gitignore --write '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
+		"readme:generate": "tsx scripts/generate-readme.ts && yarn turbo format:fix",
 		"sort:check": "sort-package-json '{actions,workflows}/**!(node_modules)/package.json' 'package.json' --check",
 		"sort:fix": "sort-package-json '{actions,workflows}/**!(node_modules)/package.json' 'package.json'"
 	},
@@ -44,11 +45,18 @@
 		"@abinnovision/commitlint-config": "^2.2.0",
 		"@abinnovision/prettier-config": "^2.1.0",
 		"@commitlint/cli": "^19.5.0",
+		"@types/js-yaml": "^4.0.9",
+		"@types/node": "^22.10.0",
+		"handlebars": "^4.7.8",
 		"husky": "^9.1.7",
+		"js-yaml": "^4.1.0",
 		"lint-staged": "^15.2.10",
 		"prettier": "^3.3.3",
 		"sort-package-json": "^2.12.0",
-		"turbo": "^2.5.4"
+		"tablemark": "^3.1.0",
+		"tsx": "^4.19.2",
+		"turbo": "^2.5.4",
+		"typescript": "^5.7.2"
 	},
 	"packageManager": "yarn@4.5.0",
 	"engines": {

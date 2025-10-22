@@ -12,8 +12,8 @@ jobs:
     uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
     secrets:
       GH_APP_IDENTIFICATION_RELEASER: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
-    # Only run on push to main/master branch
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # Or to inherit the secrets from the caller:
+    secrets: inherit
 ```
 
 [//]: # "x-release-please-end"
@@ -28,23 +28,23 @@ This workflow can be used with different version ranges. The following ranges ar
 
 ## Inputs
 
-| Input           | Description                                                       | Required | Default                |
-| --------------- | ----------------------------------------------------------------- | -------- | ---------------------- |
-| `gcp-auth`      | GCP authentication configuration                                  | No       | `${{ vars.GCP_AUTH }}` |
-| `target-branch` | Branch to release from. Defaults to the repository default branch | No       | `""`                   |
+| Input           | Description                                                        | Required | Default                |
+| :-------------- | :----------------------------------------------------------------- | :------- | :--------------------- |
+| `gcp-auth`      |                                                                    | No       | `${{ vars.GCP_AUTH }}` |
+| `target-branch` | Branch to release from. Defaults to the repository default branch. | No       | _empty_                |
 
 ## Secrets
 
-| Secret                           | Description                                  | Required |
-| -------------------------------- | -------------------------------------------- | -------- |
-| `GH_APP_IDENTIFICATION_RELEASER` | GitHub App identification for release-please | Yes      |
+| Secret                           | Description | Required |
+| :------------------------------- | :---------- | :------- |
+| `GH_APP_IDENTIFICATION_RELEASER` |             | Yes      |
 
 ## Outputs
 
-| Output             | Description                                                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `releases-created` | If any releases have been created. This is a boolean value, either "true" or "false"                                     |
-| `paths-released`   | All paths which have been released, represented as a JSON array. Example: `["packages/package-a", "packages/package-b"]` |
+| Output             | Description                                                                                                                                                        |
+| :----------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `releases-created` | If any releases have been created. This is a boolean value, either "true" or "false".                                                                              |
+| `paths-released`   | All paths which have been released, represented as a JSON array. The output is always encoded as a string. Example: `["packages/package-a", "packages/package-b"]` |
 
 ## Example with Custom Publishing
 
