@@ -21,9 +21,6 @@
 		},
 		"workflows/release": {
 			"extra-files": ["README.md"]
-		},
-		"workflows/node-monorepo-stack": {
-			"extra-files": ["README.md"]
 		}
 	}
 }
