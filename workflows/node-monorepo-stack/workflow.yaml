@@ -138,8 +138,8 @@ jobs:
       packages: ${{ steps.evaluate.outputs.packages_available }}
 
       # - Boolean flags for existence checks.
-      has-apps: ${{ fromJson(steps.evaluate.outputs.apps_available)[0] != null }}
-      has-packages: ${{ fromJson(steps.evaluate.outputs.packages_available)[0] != null }}
+      has-apps: ${{ fromJSON(steps.evaluate.outputs.apps_available)[0] != null }}
+      has-packages: ${{ fromJSON(steps.evaluate.outputs.packages_available)[0] != null }}
 
       # - Information about test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
@@ -269,7 +269,7 @@ jobs:
       - name: Build
         run: yarn run build
       - name: Unit Tests
-        if: ${{ inputs.run-unit-tests-in-build && contains(fromJson(needs.configure.outputs.test-types), 'unit') }}
+        if: ${{ inputs.run-unit-tests-in-build && contains(fromJSON(needs.configure.outputs.test-types), 'unit') }}
         run: yarn run test-unit
 
   # Run tests in parallel for each test type (excluding unit tests if they run in build).
@@ -281,11 +281,11 @@ jobs:
     needs:
       - configure
       - check_build
-    if: ${{ fromJson(needs.configure.outputs.test-types-for-matrix)[0] != null }}
+    if: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix)[0] != null }}
     strategy:
       fail-fast: false
       matrix:
-        test-type: ${{ fromJson(needs.configure.outputs.test-types-for-matrix) }}
+        test-type: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -433,11 +433,11 @@ jobs:
       - check_build
       - test
       - release
-    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && fromJson(needs.configure.outputs.apps)[0] != null
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && fromJSON(needs.configure.outputs.apps)[0] != null
     strategy:
       fail-fast: false
       matrix:
-        app: ${{ fromJson(needs.configure.outputs.apps) }}
+        app: ${{ fromJSON(needs.configure.outputs.apps) }}
     permissions:
       contents: "read"
       id-token: "write"
