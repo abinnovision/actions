@@ -15,6 +15,18 @@ on:
         description: |-
           DockerHub registry authentication token for publishing Docker images.
           Required if enable-apps-registry-dockerhub is true.
+      APP_IMAGE_SECRETS:
+        required: false
+        description: |-
+          App-specific build secrets for Docker image builds in CSV format (one per line).
+          Format: app-name,secret-name,secret-value
+          Example:
+            my-api,NPM_TOKEN,npm_abc123xyz
+            my-api,API_KEY,secret_key_here
+            my-frontend,BUILD_KEY,value,with,commas,is,ok
+          Note: Only the first two commas are used as delimiters. The secret value can contain commas.
+          These secrets are passed to Docker BuildKit during image builds via the 'app_secrets' secret mount.
+          Optional - only needed if your Dockerfiles require build-time secrets.
     inputs:
       default-branch:
         type: string
@@ -669,18 +681,46 @@ jobs:
 
       - name: Prepare app-specific secrets
         id: app-secrets
+        env:
+          # CSV format: app-name,secret-name,secret-value (one per line)
+          APP_IMAGE_SECRETS: ${{ secrets.APP_IMAGE_SECRETS }}
         run: |
-          # Dynamically access secret using APP_SECRETS_{app-name} pattern
-          app_secret='${{ secrets[format('APP_SECRETS_{0}', matrix.app)] }}'
+          if [[ -n "$APP_IMAGE_SECRETS" ]]; then
+            # Parse CSV and extract secrets for this specific app
+            # Format: app-name,secret-name,secret-value
+            # Only first two commas are delimiters; value can contain commas
+            secrets_file=$(mktemp)
+            secrets_found=false
 
-          if [[ -n "$app_secret" ]] && [[ "$app_secret" != "null" ]]; then
-            # Write secrets to a temporary file for BuildKit
-            echo "$app_secret" > /tmp/app-secrets
-            echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
-            echo "App-specific secrets prepared for ${{ matrix.app }}"
+            while IFS= read -r line; do
+              # Skip empty lines
+              [[ -z "$line" ]] && continue
+
+              # Check if line starts with our app name followed by comma
+              if [[ "$line" =~ ^${{ matrix.app }}, ]]; then
+                # Remove "app-name," prefix
+                rest="${line#${{ matrix.app }},}"
+
+                # Split on first comma only: secret-name,secret-value
+                secret_name="${rest%%,*}"
+                secret_value="${rest#*,}"
+
+                # Write to secrets file
+                echo "${secret_name}=${secret_value}" >> "$secrets_file"
+                secrets_found=true
+              fi
+            done <<< "$APP_IMAGE_SECRETS"
+
+            if [[ "$secrets_found" == "true" ]] && [[ -s "$secrets_file" ]]; then
+              echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
+              echo "SECRETS_FILE=$secrets_file" >> $GITHUB_OUTPUT
+              echo "App-specific secrets prepared for ${{ matrix.app }}"
+            else
+              echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
+              rm -f "$secrets_file"
+            fi
           else
             echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
-            echo "No app-specific secrets found for ${{ matrix.app }}"
           fi
 
       - name: Build and push Docker image
@@ -699,4 +739,4 @@ jobs:
             build_version=${{ steps.build-version.outputs.BUILD_VERSION }}
             build_commit=${{ steps.build-version.outputs.BUILD_COMMIT }}
           secrets: |
-            ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && format('id=app_secrets,src=/tmp/app-secrets') || '' }}
+            ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && format('id=app_secrets,src={0}', steps.app-secrets.outputs.SECRETS_FILE) || '' }}
