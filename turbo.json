@@ -12,9 +12,17 @@
 		"check": {
 			"dependsOn": ["format:check", "lint:check"]
 		},
-		"format:fix": {},
-		"format:check": {},
-		"lint:fix": {},
-		"lint:check": {}
+		"format:fix": {
+			"cache": false
+		},
+		"format:check": {
+			"cache": false
+		},
+		"lint:fix": {
+			"cache": false
+		},
+		"lint:check": {
+			"cache": false
+		}
 	}
 }
