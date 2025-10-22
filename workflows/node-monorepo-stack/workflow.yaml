@@ -313,7 +313,7 @@ jobs:
     needs:
       - configure
       - release
-    if: needs.release.outputs.releases-created && inputs.enable-package-publishing
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.releases-created && inputs.enable-package-publishing
     permissions:
       contents: "write"
       id-token: "write"
@@ -417,13 +417,13 @@ jobs:
   # Build and publish Docker images for apps.
   # Images are built on every push to default branch, with tags changing based on release status.
   apps_build_images:
-    name: Build Image / ${{ matrix.app }}
+    name: Build Image - ${{ matrix.app }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
       - configure
       - release
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds
     strategy:
       fail-fast: false
       matrix:
