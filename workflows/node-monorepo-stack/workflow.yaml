@@ -27,6 +27,12 @@ on:
           Note: Only the first two commas are used as delimiters. The secret value can contain commas.
           These secrets are passed to Docker BuildKit during image builds via the 'app_secrets' secret mount.
           Optional - only needed if your Dockerfiles require build-time secrets.
+      GITOPS_PROXY_URL:
+        required: false
+        description: |-
+          GitHub Workflow Dispatch Proxy URL for triggering GitOps workflows.
+          Optional - only required if gitops-app-config is provided.
+          Example: https://gwdp.example.com
     inputs:
       default-branch:
         type: string
@@ -121,6 +127,26 @@ on:
         description: |-
           GCP authentication configuration (Workload Identity Federation). This is public configuration, not a secret.
           Required if enable-apps-registry-gcpar is true. Can be reused for other GCP services in the workflow.
+      gitops-workflow-file:
+        type: string
+        required: false
+        default: "update-tags.yaml"
+        description: |-
+          GitOps workflow file to dispatch (e.g., 'update-tags.yaml').
+          Only used if gitops-app-config is provided.
+      gitops-app-config:
+        type: string
+        required: false
+        description: |-
+          Per-app GitOps configuration in CSV format (one per line).
+          Format: app-name,target-repo,dev-application,release-application,registry,image-name
+          Example:
+            my-api,my-gitops-repo,my-api-dev,my-api-prod,ghcr,app-my-api
+            my-worker,my-gitops-repo,worker-dev,worker-prod,gcpar,app-my-worker
+          Registry options: ghcr, gcpar, dockerhub (defaults to ghcr)
+          Only first 5 commas are delimiters; remaining fields can contain commas.
+          Optional - if not provided, uses defaults: app name for all fields, ghcr for registry, app-{name} for image.
+          Dev deployments use sha-* tags, release deployments use semver (v*.*.*) tags.
     outputs: {}
 
 env:
@@ -450,6 +476,14 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
 
+      - name: Validate GitOps configuration
+        if: inputs.gitops-app-config != ''
+        run: |
+          if [[ -z "${{ secrets.GITOPS_PROXY_URL }}" ]]; then
+            echo "::error::GITOPS_PROXY_URL secret is required when gitops-app-config is provided"
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-v1
 
@@ -724,6 +758,7 @@ jobs:
           fi
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: "."
@@ -740,3 +775,141 @@ jobs:
             build_commit=${{ steps.build-version.outputs.BUILD_COMMIT }}
           secrets: |
             ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && format('id=app_secrets,src={0}', steps.app-secrets.outputs.SECRETS_FILE) || '' }}
+
+      - name: Parse GitOps configuration and extract deployment tag
+        if: inputs.gitops-app-config != ''
+        id: gitops-config
+        env:
+          GITOPS_APP_CONFIG: ${{ inputs.gitops-app-config }}
+        run: |
+          # Parse GitOps config for this app
+          # Format: app-name,target-repo,dev-application,release-application,registry,image-name
+          target_repo=""
+          dev_app=""
+          release_app=""
+          registry=""
+          image_name=""
+
+          if [[ -n "$GITOPS_APP_CONFIG" ]]; then
+            while IFS= read -r line; do
+              # Skip empty lines
+              [[ -z "$line" ]] && continue
+
+              # Check if line starts with our app name followed by comma
+              if [[ "$line" =~ ^${{ matrix.app }}, ]]; then
+                # Remove "app-name," prefix
+                rest="${line#${{ matrix.app }},}"
+
+                # Split on first 5 commas
+                target_repo="${rest%%,*}"
+                rest="${rest#*,}"
+
+                dev_app="${rest%%,*}"
+                rest="${rest#*,}"
+
+                release_app="${rest%%,*}"
+                rest="${rest#*,}"
+
+                registry="${rest%%,*}"
+                rest="${rest#*,}"
+
+                image_name="$rest"
+                break
+              fi
+            done <<< "$GITOPS_APP_CONFIG"
+          fi
+
+          # Use defaults if not configured
+          if [[ -z "$target_repo" ]]; then
+            target_repo="${{ matrix.app }}"
+          fi
+          if [[ -z "$dev_app" ]]; then
+            dev_app="${{ matrix.app }}"
+          fi
+          if [[ -z "$release_app" ]]; then
+            release_app="${{ matrix.app }}"
+          fi
+          if [[ -z "$registry" ]]; then
+            registry="ghcr"
+          fi
+          if [[ -z "$image_name" ]]; then
+            image_name="app-${{ matrix.app }}"
+          fi
+
+          # Determine the image base URL based on registry for filtering
+          case "$registry" in
+            ghcr)
+              registry_url="${{ steps.image-names.outputs.IMAGE_GHCR }}"
+              ;;
+            gcpar)
+              registry_url="${{ steps.image-names.outputs.IMAGE_GCPAR }}"
+              ;;
+            dockerhub)
+              registry_url="${{ steps.image-names.outputs.IMAGE_DOCKERHUB }}"
+              ;;
+            *)
+              echo "::error::Invalid registry '$registry' for app ${{ matrix.app }}. Valid options: ghcr, gcpar, dockerhub"
+              exit 1
+              ;;
+          esac
+
+          # Extract deployment tag from metadata-action generated tags
+          # Tags are newline-separated, e.g.:
+          #   ghcr.io/owner/repo-my-api:sha-abc123
+          #   ghcr.io/owner/repo-my-api:v1.2.3
+          tags="${{ steps.meta.outputs.tags }}"
+
+          # Filter tags for the selected registry
+          registry_tags=$(echo "$tags" | grep "$registry_url")
+
+          # Select appropriate tag based on release status
+          if [[ "${{ steps.release-check.outputs.IS_RELEASE }}" == "true" ]]; then
+            # For releases, prefer semver tag (contains :v)
+            deployment_tag=$(echo "$registry_tags" | grep ":v" | head -1)
+            # Fallback to sha tag if no semver tag found
+            if [[ -z "$deployment_tag" ]]; then
+              deployment_tag=$(echo "$registry_tags" | grep ":sha-" | head -1)
+            fi
+          else
+            # For dev builds, use sha tag
+            deployment_tag=$(echo "$registry_tags" | grep ":sha-" | head -1)
+          fi
+
+          if [[ -z "$deployment_tag" ]]; then
+            echo "::error::No suitable deployment tag found for registry '$registry'"
+            exit 1
+          fi
+
+          echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
+          echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
+          echo "RELEASE_APP=$release_app" >> $GITHUB_OUTPUT
+          echo "IMAGE_NAME=$image_name" >> $GITHUB_OUTPUT
+          echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
+
+          echo "GitOps config for ${{ matrix.app }}:"
+          echo "  Target: $target_repo"
+          echo "  Dev app: $dev_app"
+          echo "  Release app: $release_app"
+          echo "  Registry: $registry"
+          echo "  Image name: $image_name"
+          echo "  Deployment tag: $deployment_tag"
+
+      - name: Update Release Deployment
+        if: inputs.gitops-app-config != '' && steps.release-check.outputs.IS_RELEASE == 'true'
+        uses: abinnovision/actions@run-workflow-dispatch-v1
+        with:
+          proxy: ${{ secrets.GITOPS_PROXY_URL }}
+          target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
+          workflow: ${{ inputs.gitops-workflow-file }}
+          workflow-inputs: |
+            {"application": "${{ steps.gitops-config.outputs.RELEASE_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
+
+      - name: Update Dev Deployment
+        if: inputs.gitops-app-config != '' && steps.release-check.outputs.IS_RELEASE == 'false'
+        uses: abinnovision/actions@run-workflow-dispatch-v1
+        with:
+          proxy: ${{ secrets.GITOPS_PROXY_URL }}
+          target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
+          workflow: ${{ inputs.gitops-workflow-file }}
+          workflow-inputs: |
+            {"application": "${{ steps.gitops-config.outputs.DEV_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
