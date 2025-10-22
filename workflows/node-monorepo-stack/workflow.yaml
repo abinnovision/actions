@@ -423,7 +423,7 @@ jobs:
     needs:
       - configure
       - release
-    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && fromJSON(needs.configure.outputs.apps)[0] != null
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds
     strategy:
       fail-fast: false
       matrix:
