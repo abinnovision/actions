@@ -423,7 +423,7 @@ jobs:
     needs:
       - configure
       - release
-    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
     strategy:
       fail-fast: false
       matrix:
