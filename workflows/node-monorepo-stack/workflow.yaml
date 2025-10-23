@@ -867,20 +867,23 @@ jobs:
           # Select appropriate tag based on release status
           if [[ "${{ steps.release-check.outputs.IS_RELEASE }}" == "true" ]]; then
             # For releases, prefer semver tag (contains :v)
-            deployment_tag=$(echo "$registry_tags" | grep ":v" | head -1)
+            deployment_image=$(echo "$registry_tags" | grep ":v" | head -1)
             # Fallback to sha tag if no semver tag found
-            if [[ -z "$deployment_tag" ]]; then
-              deployment_tag=$(echo "$registry_tags" | grep ":sha-" | head -1)
+            if [[ -z "$deployment_image" ]]; then
+              deployment_image=$(echo "$registry_tags" | grep ":sha-" | head -1)
             fi
           else
             # For dev builds, use sha tag
-            deployment_tag=$(echo "$registry_tags" | grep ":sha-" | head -1)
+            deployment_image=$(echo "$registry_tags" | grep ":sha-" | head -1)
           fi
 
-          if [[ -z "$deployment_tag" ]]; then
+          if [[ -z "$deployment_image" ]]; then
             echo "::error::No suitable deployment tag found for registry '$registry'"
             exit 1
           fi
+
+          # Extract just the tag portion (everything after the last colon)
+          deployment_tag="${deployment_image##*:}"
 
           echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
           echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
