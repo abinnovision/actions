@@ -778,6 +778,15 @@ jobs:
           secrets: |
             ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && format('id=app_secrets,src={0}', steps.app-secrets.outputs.SECRETS_FILE) || '' }}
 
+      - name: Display built image references
+        run: |
+          echo "Successfully built and pushed the following images for ${{ matrix.app }}:"
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            echo "  - $tag"
+          done
+          echo ""
+          echo "Image digest: ${{ steps.build.outputs.digest }}"
+
       - name: Parse GitOps configuration and extract deployment tag
         if: inputs.gitops-app-config != ''
         id: gitops-config
