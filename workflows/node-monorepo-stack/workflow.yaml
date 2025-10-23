@@ -5,149 +5,178 @@ on:
     secrets:
       GH_APP_IDENTIFICATION_RELEASER:
         required: true
+        description: |-
+          GitHub App identification for the release workflow.
+          **Required:** Always
       REGISTRY_NPM_TOKEN:
         required: false
         description: |-
           NPM registry authentication token for publishing packages.
-          Required if enable-packages-registry-npm is true.
+          **Required:** When `enable-packages-registry-npm` is enabled
+          **Example:** `npm_1a2b3c4d5e6f7g8h9i0j`
       REGISTRY_DOCKERHUB_TOKEN:
         required: false
         description: |-
           DockerHub registry authentication token for publishing Docker images.
-          Required if enable-apps-registry-dockerhub is true.
+          **Required:** When `enable-apps-registry-dockerhub` is enabled
+          **Example:** `dckr_pat_1a2b3c4d5e6f7g8h9i0j`
       APP_IMAGE_SECRETS:
         required: false
         description: |-
-          App-specific build secrets for Docker image builds in CSV format (one per line).
-          Format: app-name,secret-name,secret-value
-          Example:
-            my-api,NPM_TOKEN,npm_abc123xyz
-            my-api,API_KEY,secret_key_here
-            my-frontend,BUILD_KEY,value,with,commas,is,ok
-          Note: Only the first two commas are used as delimiters. The secret value can contain commas.
-          These secrets are passed to Docker BuildKit during image builds via the 'app_secrets' secret mount.
-          Optional - only needed if your Dockerfiles require build-time secrets.
+          App-specific build secrets for Docker image builds in **CSV format** (one per line).
+          **Format:** `app-name,secret-name,secret-value`
+          **Example:**
+          ```
+          my-api,NPM_TOKEN,npm_abc123xyz
+          my-api,API_KEY,secret_key_here
+          my-frontend,BUILD_KEY,value,with,commas,is,ok
+          ```
+          **Note:** Only the first two commas are delimiters; the secret value can contain commas.
+          Secrets are passed to Docker BuildKit via the `app_secrets` secret mount.
+          **Required:** Only when Dockerfiles require build-time secrets
       GITOPS_PROXY_URL:
         required: false
         description: |-
           GitHub Workflow Dispatch Proxy URL for triggering GitOps workflows.
-          Optional - only required if gitops-app-config is provided.
-          Example: https://gwdp.example.com
+          **Required:** When `gitops-app-config` is provided
+          **Example:** `https://gwdp.example.com`
     inputs:
       default-branch:
         type: string
         required: false
         default: "main"
         description: |-
-          Default branch name. Defaults to "main".
+          Default branch name for the repository.
+          **Default:** `main`
+          **Example:** `main`, `master`, `develop`
       test-types:
         type: string
         required: false
         default: "unit"
         description: |-
-          Comma-separated list of test types to run. Valid values are "unit", "integration", "e2e".
-          By default, only unit tests are run.
+          Comma-separated list of test types to run.
+          **Valid values:** `unit`, `integration`, `e2e`
+          **Default:** `unit`
+          **Example:** `unit,integration,e2e`
       run-unit-tests-in-build:
         type: boolean
         required: false
         default: true
         description: |-
-          If set to 'true', unit tests are run as part of the build step. Otherwise, they are run in a separate job.
-          This is recommended for smaller monorepos, as it reduces the overall execution time.
-          NOTE: You still need to include "unit" in the 'test-types' input for this to have any effect.
+          Run unit tests as part of the build step instead of a separate job.
+          Recommended for smaller monorepos to reduce overall execution time.
+          **Default:** `true`
+          **Note:** You must include `unit` in the `test-types` input for this to have any effect.
       enable-package-publishing:
         type: boolean
         required: false
         default: false
         description: |-
-          If set to 'true', packages are published to configured registries. Otherwise, the publish step is skipped.
+          Enable publishing packages to configured registries.
+          **Default:** `false`
       enable-packages-registry-npm:
         type: boolean
         required: false
         default: false
         description: |-
-          If set to 'true', packages are published to NPM registry.
-          Requires REGISTRY_NPM_TOKEN secret.
+          Enable publishing packages to NPM registry.
+          **Default:** `false`
+          **Requires:** `REGISTRY_NPM_TOKEN` secret
       enable-packages-registry-ghpr:
         type: boolean
         required: false
         default: false
         description: |-
-          If set to 'true', packages are published to GitHub Package Registry.
-          Uses GITHUB_TOKEN for authentication (automatically available).
+          Enable publishing packages to GitHub Package Registry.
+          **Default:** `false`
+          **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
       enable-app-image-builds:
         type: boolean
         required: false
         default: false
         description: |-
-          If set to 'true', Docker images are built for apps and published to configured registries.
-          At least one apps registry must be enabled (ghcr, dockerhub, or gcpar).
+          Enable building and publishing Docker images for apps.
+          **Default:** `false`
+          **Note:** At least one registry must be enabled (`ghcr`, `dockerhub`, or `gcpar`)
       enable-apps-registry-ghcr:
         type: boolean
         required: false
         default: true
         description: |-
-          If set to 'true', Docker images are published to GitHub Container Registry (GHCR).
-          Uses GITHUB_TOKEN for authentication (automatically available).
-          Default: true (free and automatically available in GitHub Actions).
+          Enable publishing Docker images to GitHub Container Registry (GHCR).
+          **Default:** `true` (automatically available in GitHub Actions)
+          **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
       enable-apps-registry-dockerhub:
         type: boolean
         required: false
         default: false
         description: |-
-          If set to 'true', Docker images are published to DockerHub.
-          Requires REGISTRY_DOCKERHUB_TOKEN secret and registry-dockerhub-username input.
+          Enable publishing Docker images to DockerHub.
+          **Default:** `false`
+          **Requires:** `REGISTRY_DOCKERHUB_TOKEN` secret and `registry-dockerhub-username` input
       registry-dockerhub-username:
         type: string
         required: false
         description: |-
-          DockerHub username for authentication. Required if enable-apps-registry-dockerhub is true.
+          DockerHub username for authentication.
+          **Required:** When `enable-apps-registry-dockerhub` is enabled
+          **Example:** `myusername`
       registry-dockerhub-url:
         type: string
         required: false
         default: "docker.io"
         description: |-
-          DockerHub registry URL. Defaults to 'docker.io'.
+          DockerHub registry URL.
+          **Default:** `docker.io`
+          **Example:** `docker.io`, `registry.hub.docker.com`
       enable-apps-registry-gcpar:
         type: boolean
         required: false
         default: false
         description: |-
-          If set to 'true', Docker images are published to GCP Artifact Registry.
-          Requires registry-gcpar-url and gcp-auth inputs.
+          Enable publishing Docker images to GCP Artifact Registry.
+          **Default:** `false`
+          **Requires:** `registry-gcpar-url` and `gcp-auth` inputs
       registry-gcpar-url:
         type: string
         required: false
         description: |-
-          GCP Artifact Registry URL for Docker images (e.g., 'europe-west4-docker.pkg.dev/project-id/repository-name').
-          Required if enable-apps-registry-gcpar is true.
+          GCP Artifact Registry URL for Docker images.
+          **Required:** When `enable-apps-registry-gcpar` is enabled
+          **Example:** `europe-west4-docker.pkg.dev/project-id/repository-name`
       gcp-auth:
         type: string
         required: false
         description: |-
-          GCP authentication configuration (Workload Identity Federation). This is public configuration, not a secret.
-          Required if enable-apps-registry-gcpar is true. Can be reused for other GCP services in the workflow.
+          GCP authentication configuration (Workload Identity Federation).
+          This is public configuration, not a secret.
+          **Required:** When `enable-apps-registry-gcpar` is enabled
+          **Note:** Can be reused for other GCP services in the workflow
+          **Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`
       gitops-workflow-file:
         type: string
         required: false
         default: "update-tags.yaml"
         description: |-
-          GitOps workflow file to dispatch (e.g., 'update-tags.yaml').
-          Only used if gitops-app-config is provided.
+          GitOps workflow file to dispatch for deployment updates.
+          **Default:** `update-tags.yaml`
+          **Example:** `update-tags.yaml`, `deploy.yaml`
+          **Note:** Only used when `gitops-app-config` is provided
       gitops-app-config:
         type: string
         required: false
         description: |-
-          Per-app GitOps configuration in CSV format (one per line).
-          Format: app-name,target-repo,dev-application,release-application,registry,image-name
-          Example:
-          `my-api,my-gitops-repo,my-api-dev,my-api-prod,ghcr,app-my-api`
-          `my-worker,my-gitops-repo,worker-dev,worker-prod,gcpar,app-my-worker`
-
-          Registry options: ghcr, gcpar, dockerhub (defaults to ghcr)
-          Only first 5 commas are delimiters; remaining fields can contain commas.
-          Optional - if not provided, uses defaults: app name for all fields, ghcr for registry, app-{name} for image.
-          Dev deployments use sha-* tags, release deployments use semver (v*.*.*) tags.
+          Per-app GitOps configuration in **CSV format** (one per line).
+          **Format:** `app-name,target-repo,dev-application,release-application,registry,image-name`
+          **Example:**
+          ```
+          my-api,my-gitops-repo,my-api-dev,my-api-prod,ghcr,app-my-api
+          my-worker,my-gitops-repo,worker-dev,worker-prod,gcpar,app-my-worker
+          ```
+          **Registry options:** `ghcr`, `gcpar`, `dockerhub`
+          **Deployment tags:** Dev deployments use `sha-*` tags, release deployments use semver `v*.*.*` tags
+          **Note:** Only first 5 commas are delimiters; remaining fields can contain commas
+          **Important:** All fields are required. GitOps deployment will be skipped for apps with incomplete configuration
 
     outputs: {}
 
@@ -830,21 +859,15 @@ jobs:
             done <<< "$GITOPS_APP_CONFIG"
           fi
 
-          # Use defaults if not configured
-          if [[ -z "$target_repo" ]]; then
-            target_repo="${{ matrix.app }}"
-          fi
-          if [[ -z "$dev_app" ]]; then
-            dev_app="${{ matrix.app }}"
-          fi
-          if [[ -z "$release_app" ]]; then
-            release_app="${{ matrix.app }}"
-          fi
-          if [[ -z "$registry" ]]; then
-            registry="ghcr"
-          fi
-          if [[ -z "$image_name" ]]; then
-            image_name="app-${{ matrix.app }}"
+          # Validate that all required fields are present
+          if [[ -z "$target_repo" ]] || [[ -z "$dev_app" ]] || [[ -z "$release_app" ]] || [[ -z "$registry" ]] || [[ -z "$image_name" ]]; then
+            echo "::warning::GitOps configuration for app '${{ matrix.app }}' is incomplete or not provided. Skipping GitOps deployment."
+            echo "  target_repo: ${target_repo:-(empty)}"
+            echo "  dev_app: ${dev_app:-(empty)}"
+            echo "  release_app: ${release_app:-(empty)}"
+            echo "  registry: ${registry:-(empty)}"
+            echo "  image_name: ${image_name:-(empty)}"
+            exit 0
           fi
 
           # Determine the image base URL based on registry for filtering
@@ -901,7 +924,7 @@ jobs:
           echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
 
       - name: Update Release Deployment
-        if: inputs.gitops-app-config != '' && steps.release-check.outputs.IS_RELEASE == 'true'
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'true'
         uses: abinnovision/actions@run-workflow-dispatch-v1
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
@@ -911,7 +934,7 @@ jobs:
             {"application": "${{ steps.gitops-config.outputs.RELEASE_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
 
       - name: Update Dev Deployment
-        if: inputs.gitops-app-config != '' && steps.release-check.outputs.IS_RELEASE == 'false'
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'false'
         uses: abinnovision/actions@run-workflow-dispatch-v1
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
