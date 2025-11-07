@@ -782,9 +782,9 @@ jobs:
 
                 # Append to secrets mount string
                 if [[ -n "$secrets_mount_string" ]]; then
-                  secrets_mount_string="${secrets_mount_string}"$'\n'"id=${secret_name},src=${secret_file}"
+                  secrets_mount_string="${secrets_mount_string}"$'\n'"${secret_name}=${secret_file}"
                 else
-                  secrets_mount_string="id=${secret_name},src=${secret_file}"
+                  secrets_mount_string="${secret_name}=${secret_file}"
                 fi
 
                 secrets_found=true
@@ -808,7 +808,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: "."
           push: true
@@ -822,7 +822,7 @@ jobs:
             node_version=${{ steps.app-meta.outputs.NODE_VERSION }}
             build_version=${{ steps.build-version.outputs.BUILD_VERSION }}
             build_commit=${{ steps.build-version.outputs.BUILD_COMMIT }}
-          secrets: |
+          secret-files: |
             ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && steps.app-secrets.outputs.SECRETS_MOUNT_STRING || '' }}
 
       - name: Display built image references
