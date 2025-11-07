@@ -106,16 +106,22 @@ Packages are published based on their `publishConfig` in `package.json`. The wor
 
 **App-Specific Secrets:**
 
-- Each app can have its own secrets via GitHub secret named `APP_SECRETS_{app-name}`
-- Use standard `.env` format (KEY=VALUE pairs, one per line)
-- Example: For app in `apps/api/`, create secret `APP_SECRETS_api`:
+- Apps can have build-time secrets via the `APP_IMAGE_SECRETS` GitHub secret
+- Use CSV format with structure: `app-name,secret-name,secret-value` (one per line)
+- Example:
   ```
-  SENTRY_TOKEN=abc123
-  DATABASE_URL=postgres://...
-  API_KEY=secret-value
+  api,NPM_TOKEN,npm_abc123xyz
+  api,SENTRY_TOKEN,abc123
+  frontend,API_KEY,secret-value
   ```
-- Accessed in Dockerfile via BuildKit secret mount: `--mount=type=secret,id=app_secrets`
-- Secrets are not stored in image layers
+- Each secret is available as an individual BuildKit secret mount in your Dockerfile
+- Access secrets using: `--mount=type=secret,id=SECRET_NAME`
+- Secrets are mounted at `/run/secrets/SECRET_NAME` and are not stored in image layers
+- **Example Dockerfile usage:**
+  ```dockerfile
+  RUN --mount=type=secret,id=NPM_TOKEN \
+      npm config set //registry.npmjs.org/:_authToken $(cat /run/secrets/NPM_TOKEN)
+  ```
 
 ## Usage
 
@@ -164,12 +170,12 @@ This workflow can be used with different version ranges. The following ranges ar
 
 ## Secrets
 
-| Secret                           | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Required |
-| :------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
-| `GH_APP_IDENTIFICATION_RELEASER` | GitHub App identification for the release workflow.<br>**Required:** Always                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Yes      |
-| `REGISTRY_NPM_TOKEN`             | NPM registry authentication token for publishing packages.<br>**Required:** When `enable-packages-registry-npm` is enabled<br>**Example:** `npm_1a2b3c4d5e6f7g8h9i0j`                                                                                                                                                                                                                                                                                                                                                             | No       |
-| `REGISTRY_DOCKERHUB_TOKEN`       | DockerHub registry authentication token for publishing Docker images.<br>**Required:** When `enable-apps-registry-dockerhub` is enabled<br>**Example:** `dckr_pat_1a2b3c4d5e6f7g8h9i0j`                                                                                                                                                                                                                                                                                                                                           | No       |
-| `APP_IMAGE_SECRETS`              | App-specific build secrets for Docker image builds in **CSV format** (one per line).<br>**Format:** `app-name,secret-name,secret-value`<br>**Example:**<br>`<br>my-api,NPM_TOKEN,npm_abc123xyz<br>my-api,API_KEY,secret_key_here<br>my-frontend,BUILD_KEY,value,with,commas,is,ok<br>`<br>**Note:** Only the first two commas are delimiters; the secret value can contain commas.<br>Secrets are passed to Docker BuildKit via the `app_secrets` secret mount.<br>**Required:** Only when Dockerfiles require build-time secrets | No       |
-| `GITOPS_PROXY_URL`               | GitHub Workflow Dispatch Proxy URL for triggering GitOps workflows.<br>**Required:** When `gitops-app-config` is provided<br>**Example:** `https://gwdp.example.com`                                                                                                                                                                                                                                                                                                                                                              | No       |
+| Secret                           | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Required |
+| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
+| `GH_APP_IDENTIFICATION_RELEASER` | GitHub App identification for the release workflow.<br>**Required:** Always                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Yes      |
+| `REGISTRY_NPM_TOKEN`             | NPM registry authentication token for publishing packages.<br>**Required:** When `enable-packages-registry-npm` is enabled<br>**Example:** `npm_1a2b3c4d5e6f7g8h9i0j`                                                                                                                                                                                                                                                                                                                                                                                                                        | No       |
+| `REGISTRY_DOCKERHUB_TOKEN`       | DockerHub registry authentication token for publishing Docker images.<br>**Required:** When `enable-apps-registry-dockerhub` is enabled<br>**Example:** `dckr_pat_1a2b3c4d5e6f7g8h9i0j`                                                                                                                                                                                                                                                                                                                                                                                                      | No       |
+| `APP_IMAGE_SECRETS`              | App-specific build secrets for Docker image builds in **CSV format** (one per line).<br>**Format:** `app-name,secret-name,secret-value`<br>**Example:**<br>`<br>my-api,NPM_TOKEN,npm_abc123xyz<br>my-api,API_KEY,secret_key_here<br>my-frontend,BUILD_KEY,value,with,commas,is,ok<br>`<br>**Note:** Only the first two commas are delimiters; the secret value can contain commas.<br><br>Each secret is passed to Docker BuildKit as an individual secret mount with its own ID.<br><br>**Usage in Dockerfile:** `--mount=type=secret,id=NPM_TOKEN` (available at `/run/secrets/NPM_TOKEN`) | No       |
+| `GITOPS_PROXY_URL`               | GitHub Workflow Dispatch Proxy URL for triggering GitOps workflows.<br>**Required:** When `gitops-app-config` is provided<br>**Example:** `https://gwdp.example.com`                                                                                                                                                                                                                                                                                                                                                                                                                         | No       |
 
 ## Outputs

@@ -32,8 +32,10 @@ on:
           my-frontend,BUILD_KEY,value,with,commas,is,ok
           ```
           **Note:** Only the first two commas are delimiters; the secret value can contain commas.
-          Secrets are passed to Docker BuildKit via the `app_secrets` secret mount.
-          **Required:** Only when Dockerfiles require build-time secrets
+
+          Each secret is passed to Docker BuildKit as an individual secret mount with its own ID.
+
+          **Usage in Dockerfile:** `--mount=type=secret,id=NPM_TOKEN` (available at `/run/secrets/NPM_TOKEN`)
       GITOPS_PROXY_URL:
         required: false
         description: |-
@@ -751,11 +753,15 @@ jobs:
           APP_IMAGE_SECRETS: ${{ secrets.APP_IMAGE_SECRETS }}
         run: |
           if [[ -n "$APP_IMAGE_SECRETS" ]]; then
-            # Parse CSV and extract secrets for this specific app
+            # Parse CSV and create individual temp files for each secret
             # Format: app-name,secret-name,secret-value
             # Only first two commas are delimiters; value can contain commas
-            secrets_file=$(mktemp)
+
+            secrets_mount_string=""
             secrets_found=false
+
+            # Create a temp directory to hold all secret files
+            secrets_dir=$(mktemp -d)
 
             while IFS= read -r line; do
               # Skip empty lines
@@ -770,19 +776,31 @@ jobs:
                 secret_name="${rest%%,*}"
                 secret_value="${rest#*,}"
 
-                # Write to secrets file
-                echo "${secret_name}=${secret_value}" >> "$secrets_file"
+                # Create individual temp file for this secret
+                secret_file="$secrets_dir/secret_${secret_name}"
+                echo -n "$secret_value" > "$secret_file"
+
+                # Append to secrets mount string
+                if [[ -n "$secrets_mount_string" ]]; then
+                  secrets_mount_string="${secrets_mount_string}"$'\n'"id=${secret_name},src=${secret_file}"
+                else
+                  secrets_mount_string="id=${secret_name},src=${secret_file}"
+                fi
+
                 secrets_found=true
+                echo "Prepared secret: $secret_name"
               fi
             done <<< "$APP_IMAGE_SECRETS"
 
-            if [[ "$secrets_found" == "true" ]] && [[ -s "$secrets_file" ]]; then
+            if [[ "$secrets_found" == "true" ]] && [[ -n "$secrets_mount_string" ]]; then
               echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
-              echo "SECRETS_FILE=$secrets_file" >> $GITHUB_OUTPUT
+              echo "SECRETS_MOUNT_STRING<<EOF" >> $GITHUB_OUTPUT
+              echo "$secrets_mount_string" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
               echo "App-specific secrets prepared for ${{ matrix.app }}"
             else
               echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
-              rm -f "$secrets_file"
+              rm -rf "$secrets_dir"
             fi
           else
             echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
@@ -805,7 +823,7 @@ jobs:
             build_version=${{ steps.build-version.outputs.BUILD_VERSION }}
             build_commit=${{ steps.build-version.outputs.BUILD_COMMIT }}
           secrets: |
-            ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && format('id=app_secrets,src={0}', steps.app-secrets.outputs.SECRETS_FILE) || '' }}
+            ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && steps.app-secrets.outputs.SECRETS_MOUNT_STRING || '' }}
 
       - name: Display built image references
         run: |
