@@ -415,7 +415,7 @@ jobs:
         run: yarn install --immutable
 
       - name: Build
-        run: yarn turbo build --filter=packages/*
+        run: yarn turbo build --filter="./packages/*"
 
       - name: Publish Packages
         env:
