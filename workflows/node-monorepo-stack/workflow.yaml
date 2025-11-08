@@ -69,6 +69,15 @@ on:
           Recommended for smaller monorepos to reduce overall execution time.
           **Default:** `true`
           **Note:** You must include `unit` in the `test-types` input for this to have any effect.
+      run-build-before-check:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Run the build step before the check step in the check_build job.
+          Useful for monorepos where eslint/prettier/etc config packages must be built before linters can run.
+          **Default:** `false`
+          **Note:** When enabled, the build order becomes: Install → Dependencies Check → Build → Check → Unit Tests
       enable-package-publishing:
         type: boolean
         required: false
@@ -305,9 +314,9 @@ jobs:
           echo "All test types: $test_types_json"
           echo "Test types for matrix: $test_types_matrix_json"
 
-  # Build and checks are unified into one job. This is because the build
-  # needs to be done before the checks, as the checks will use the built
-  # packages.
+  # Build and checks are unified into one job. By default, checks run before
+  # the build. However, when run-build-before-check is enabled, the build runs
+  # first.
   check_build:
     name: Check & Build
     runs-on: ubuntu-latest
@@ -327,9 +336,13 @@ jobs:
         run: |
           yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
           yarn turbo boundaries || (echo "turbo boundaries failed" && exit 1)
+      - name: Build (before check)
+        if: ${{ inputs.run-build-before-check }}
+        run: yarn run build
       - name: Check
         run: yarn run check
-      - name: Build
+      - name: Build (after check)
+        if: ${{ !inputs.run-build-before-check }}
         run: yarn run build
       - name: Unit Tests
         if: ${{ inputs.run-unit-tests-in-build && contains(fromJSON(needs.configure.outputs.test-types), 'unit') }}
