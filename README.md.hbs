@@ -1,0 +1,32 @@
+# {{name}}
+
+{{description}}
+
+## Usage
+
+{{{usage-example type="action" name=name inputs=inputs version=version}}}
+
+### Example with custom inputs
+
+```yaml
+jobs:
+  <job>:
+    steps:
+      - uses: abinnovision/actions@run-workflow-dispatch-v1
+        with:
+          proxy: https://endpoint.com # The base URL of the proxy without a trailing slash.
+          target: owner/repo # or just repo
+          workflow: update.yaml # The workflow to dispatch.
+          workflow-ref: master # Optional, defaults to "master".
+          # Optional inputs for the workflow. Must be a valid JSON string.
+          workflow-inputs: |
+            {"env": "staging", "version": "..."}
+```
+
+## Latest versions
+
+{{{version-examples type="action" name=name version=version}}}
+
+## Inputs
+
+{{> inputs-table inputs}}
