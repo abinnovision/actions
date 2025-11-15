@@ -2628,6 +2628,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"gitops-deploy@workspace:workflows/gitops-deploy":
+  version: 0.0.0-use.local
+  resolution: "gitops-deploy@workspace:workflows/gitops-deploy"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.1.3"
+    prettier: "npm:^3.6.2"
+  languageName: unknown
+  linkType: soft
+
+"gitops-update-tags@workspace:workflows/gitops-update-tags":
+  version: 0.0.0-use.local
+  resolution: "gitops-update-tags@workspace:workflows/gitops-update-tags"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.1.3"
+    prettier: "npm:^3.6.2"
+  languageName: unknown
+  linkType: soft
+
 "glob-parent@npm:^5.1.2":
   version: 5.1.2
   resolution: "glob-parent@npm:5.1.2"
