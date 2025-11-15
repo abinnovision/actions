@@ -180,10 +180,8 @@ on:
           Per-app GitOps configuration in **CSV format** (one per line).
           **Format:** `app-name,target-repo,dev-application,release-application,registry,image-name`
           **Example:**
-          ```
-          my-api,my-gitops-repo,my-api-dev,my-api-prod,ghcr,app-my-api
-          my-worker,my-gitops-repo,worker-dev,worker-prod,gcpar,app-my-worker
-          ```
+          `my-api,my-gitops-repo,my-api-dev,my-api-prod,ghcr,app-my-api`
+          `my-worker,my-gitops-repo,worker-dev,worker-prod,gcpar,app-my-worker`
           **Registry options:** `ghcr`, `gcpar`, `dockerhub`
           **Deployment tags:** Dev deployments use `sha-*` tags, release deployments use semver `v*.*.*` tags
           **Note:** Only first 5 commas are delimiters; remaining fields can contain commas
