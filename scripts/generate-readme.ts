@@ -84,6 +84,47 @@ type VersionExamplesContext = Pick<
 >;
 
 /**
+ * General-purpose formatter for any value to markdown string.
+ * Handles various types and converts them appropriately for markdown output.
+ *
+ * @param value The value to format
+ * @param forReadable Whether to format for human readability
+ * @returns Formatted string suitable for markdown
+ */
+function formatForMarkdown(value: unknown, forReadable = false): string {
+	if (value === null || value === undefined) {
+		return "";
+	}
+
+	if (typeof value === "boolean") {
+		return forReadable ? (value ? "Yes" : "No") : String(value);
+	}
+
+	if (typeof value === "string") {
+		// Replace newlines with <br> for markdown tables
+		return value.replace(/\n/g, "<br>");
+	}
+
+	// For numbers and other types, convert to string
+	return String(value);
+}
+
+/**
+ * Formats a default value for markdown output.
+ *
+ * @param defaultValue The default value to format
+ * @param required Whether the field is required
+ * @returns Formatted default value with backticks, "_empty_" for optional without default, or "" for required
+ */
+function formatDefault(defaultValue?: string, required?: boolean): string {
+	if (defaultValue) {
+		return `\`${formatForMarkdown(defaultValue, false)}\``;
+	}
+
+	return required ? "" : "_empty_";
+}
+
+/**
  * Builds the base ref for an action or workflow.
  *
  * @param opts Options for building the base ref, based on the type of template.
@@ -184,13 +225,9 @@ Handlebars.registerPartial(
 
 			return {
 				Input: `\`${name}\``,
-				Description: (config.description ?? "").replace(/\n/g, "<br>"),
-				Required: config.required ? "Yes" : "No",
-				Default: config.default
-					? `\`${config.default}\``
-					: config.required
-						? ""
-						: "_empty_",
+				Description: formatForMarkdown(config.description),
+				Required: formatForMarkdown(config.required, true),
+				Default: formatDefault(config.default, config.required),
 			};
 		});
 
@@ -212,7 +249,7 @@ Handlebars.registerPartial(
 
 			return {
 				Output: `\`${name}\``,
-				Description: (config.description ?? "").replace(/\n/g, "<br>"),
+				Description: formatForMarkdown(config.description),
 			};
 		});
 
@@ -234,8 +271,8 @@ Handlebars.registerPartial(
 
 			return {
 				Secret: `\`${name}\``,
-				Description: (config.description ?? "").replace(/\n/g, "<br>"),
-				Required: config.required ? "Yes" : "No",
+				Description: formatForMarkdown(config.description),
+				Required: formatForMarkdown(config.required, true),
 			};
 		});
 
