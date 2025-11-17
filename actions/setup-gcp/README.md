@@ -33,6 +33,7 @@ This action can be used with different version ranges. The following ranges are 
 | `token_format`             | Output format for the generated authentication token. For OAuth 2.0 access<br>tokens, specify "access_token". For OIDC tokens, specify "id_token". To<br>skip token generation, leave this value empty.<br><br>See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L84-L90 | No       | _empty_ |
 | `delegates`                | List of additional service account emails or unique identities to use for<br>impersonation in the chain.<br><br>See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L91-L96                                                                                                | No       | _empty_ |
 | `override-service-account` | Overrides the default service account used for the GCP authentication which is provided through the<br>"auth" input. This is useful when the default service account is not the one you want to use.                                                                                             | No       | _empty_ |
+| `install-components`       | Whether to install additional [gcloud components](https://cloud.google.com/sdk/docs/components).<br>Provide a comma-separated list of components to install.<br><br>**Example**: "gke-gcloud-auth-plugin,kubectl".                                                                               | No       | _empty_ |
 
 ## Outputs
 

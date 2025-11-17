@@ -29,6 +29,14 @@ inputs:
     description: |-
       Overrides the default service account used for the GCP authentication which is provided through the
       "auth" input. This is useful when the default service account is not the one you want to use.
+  install-components:
+    required: false
+    default: ""
+    description: |-
+      Whether to install additional [gcloud components](https://cloud.google.com/sdk/docs/components).
+      Provide a comma-separated list of components to install.
+
+      **Example**: "gke-gcloud-auth-plugin,kubectl".
 outputs:
   access_token:
     value: ${{ steps.auth.outputs.access_token }}
@@ -63,10 +71,17 @@ runs:
         echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
     - id: auth
       name: "Authenticate"
-      uses: google-github-actions/auth@v2
+      uses: google-github-actions/auth@v3
       with:
         workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.override-service-account != '' && inputs.override-service-account || env.GCP_SERVICE_ACCOUNT }}
         token_format: ${{ inputs.token_format }}
         delegates: ${{ inputs.delegates }}
         export_environment_variables: true
+    # Only install the gcloud sdk if additional components are requested.
+    - id: install-components
+      name: "Install gcloud (with components)"
+      if: ${{ inputs.install-components != '' }}
+      uses: google-github-actions/setup-gcloud@v3
+      with:
+        install_components: ${{ inputs.install-components }}
