@@ -1,0 +1,231 @@
+name: Update Tags
+
+on:
+  workflow_call:
+    secrets:
+      GH_APP_IDENTIFICATION_RELEASER:
+        required: true
+        description: |-
+          GitHub App identification for creating PRs.
+          **Required:** Always
+      GCP_AUTH:
+        required: false
+        description: |-
+          GCP authentication configuration (if needed for accessing resources).
+          **Required:** When using GCP services
+    inputs:
+      application:
+        type: string
+        required: true
+        description: |-
+          Application directory name to update.
+          **Required:** Always
+          **Example:** `staging`, `production`, `my-app`
+
+      tag:
+        type: string
+        required: true
+        description: |-
+          The image tag to update to.
+          **Required:** Always
+          **Example:** `v1.2.3`, `sha-abc123`, `latest`
+
+      image:
+        type: string
+        required: false
+        default: "image"
+        description: |-
+          Name of the image to update (must exist in kustomization.yaml).
+          **Example:** `image`, `api-image`, `worker-image`
+
+      applications-directory:
+        type: string
+        required: false
+        default: "k8s/applications"
+        description: |-
+          Root directory containing application subdirectories.
+          **Default:** `k8s/applications`
+
+      default-branch:
+        type: string
+        required: false
+        default: "main"
+        description: |-
+          Default branch name for the repository.
+          **Default:** `main`
+
+      use-gcp-auth:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Whether to setup GCP authentication.
+          **Default:** `false`
+
+env:
+  BRANCH_MAIN: ${{ inputs.default-branch }}
+  BRANCH_TARGET: fix/tag-update/${{ inputs.application }}
+
+concurrency:
+  cancel-in-progress: false
+  group: ${{ github.workflow }}--${{ inputs.application }}
+
+jobs:
+  update-tags:
+    name: Update Image Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Setup GCP Authentication
+        if: inputs.use-gcp-auth
+        uses: abinnovision/actions@setup-gcp-v1
+        with:
+          auth: ${{ secrets.GCP_AUTH }}
+
+      - id: token
+        name: Generate GitHub App token
+        uses: abinnovision/actions@get-github-app-token-v1
+        with:
+          identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.token.outputs.token }}
+
+      - name: Setup Git config
+        run: |
+          git config --global user.name '${{ steps.token.outputs.app-commiter-name }}'
+          git config --global user.email '${{ steps.token.outputs.app-commiter-email }}'
+
+      # Cherry-pick existing commits from the target branch to group multiple updates
+      - name: Cherry-pick commits from existing branch
+        run: |
+          set -e
+
+          # Function to retrieve commit hashes unique to the target branch
+          get_unique_commits() {
+            git log "${BRANCH_MAIN}..origin/${1}" --reverse --pretty=format:"%H"
+          }
+
+          # Check if the target branch exists on the remote
+          if git ls-remote --heads origin "$BRANCH_TARGET" | grep -w "$BRANCH_TARGET" >/dev/null; then
+            echo "Branch '$BRANCH_TARGET' exists. Preparing to cherry-pick its commits."
+
+            # Fetch full history for cherry-picking
+            git fetch origin --unshallow "${BRANCH_MAIN}" || git fetch origin "${BRANCH_MAIN}"
+            git fetch origin "${BRANCH_TARGET}"
+
+            # Retrieve unique commits from the target branch
+            UNIQUE_COMMITS=$(get_unique_commits "$BRANCH_TARGET")
+
+            if [ -z "$UNIQUE_COMMITS" ]; then
+              echo "No unique commits found on $BRANCH_TARGET"
+            else
+              echo "Found commits to cherry-pick:"
+              echo "$UNIQUE_COMMITS"
+
+              # Cherry-pick each unique commit
+              for commit in $UNIQUE_COMMITS; do
+                echo "Cherry-picking commit $commit..."
+                if ! git cherry-pick "$commit"; then
+                  echo "::warning::Cherry-pick failed for commit $commit, attempting to continue"
+                  git cherry-pick --abort || true
+                  break
+                fi
+              done
+            fi
+          else
+            echo "Branch '$BRANCH_TARGET' does not exist. Starting fresh."
+          fi
+
+      - name: Setup Node
+        uses: abinnovision/actions@setup-node-v1
+
+      - name: Setup kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Validate application directory
+        run: |
+          app_dir="${{ inputs.applications-directory }}/${{ inputs.application }}"
+
+          if [[ ! -d "$app_dir" ]]; then
+            echo "::error::Application directory not found: $app_dir"
+            echo "::error::Available applications:"
+            ls -1 "${{ inputs.applications-directory }}" || echo "  (none)"
+            exit 1
+          fi
+
+          if [[ ! -f "$app_dir/kustomization.yaml" ]]; then
+            echo "::error::kustomization.yaml not found in $app_dir"
+            exit 1
+          fi
+
+          echo "Application directory validated: $app_dir"
+
+      - name: Validate image name
+        working-directory: ${{ inputs.applications-directory }}/${{ inputs.application }}
+        run: |
+          # Check if the image exists in kustomization.yaml
+          if ! yq eval '.images[] | select(.name == "${{ inputs.image }}")' kustomization.yaml | grep -q .; then
+            echo "::error::Image '${{ inputs.image }}' not found in kustomization.yaml"
+            echo "::error::Available images:"
+            yq eval '.images[].name' kustomization.yaml || echo "  (none)"
+            exit 1
+          fi
+
+          echo "Image name validated: ${{ inputs.image }}"
+
+      - name: Set image tag
+        working-directory: ${{ inputs.applications-directory }}/${{ inputs.application }}
+        run: |
+          kustomize edit set image ${{ inputs.image }}=*:${{ inputs.tag }}
+
+          echo "::group::Changes to kustomization.yaml"
+          git diff kustomization.yaml || true
+          echo "::endgroup::"
+
+      - name: Format files
+        run: |
+          yarn install --immutable
+          yarn format:fix
+
+      - name: Create Pull Request
+        id: create-pull-request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.token.outputs.token }}
+          commit-message: 'fix(${{ inputs.application }}/${{ inputs.image }}): update image tag to "${{ inputs.tag }}"'
+          branch: ${{ env.BRANCH_TARGET }}
+          base: ${{ env.BRANCH_MAIN }}
+          delete-branch: true
+          title: "fix(${{ inputs.application }}): update image tags"
+          body: |
+            ## 🔄 Image Tag Update
+
+            **Application:** `${{ inputs.application }}`
+            **Image:** `${{ inputs.image }}`
+            **New Tag:** `${{ inputs.tag }}`
+
+            This PR was automatically created to update the image tag for the specified application.
+
+            ### Changes
+            - Updated `${{ inputs.image }}` to tag `${{ inputs.tag }}`
+
+            ---
+            <sub>🤖 This PR was automatically generated by the update-tags workflow</sub>
+          labels: |
+            automated
+            gitops
+
+      - name: Display PR information
+        if: steps.create-pull-request.outputs.pull-request-number != ''
+        run: |
+          echo "::notice::Pull Request Created/Updated"
+          echo "PR Number: ${{ steps.create-pull-request.outputs.pull-request-number }}"
+          echo "PR URL: ${{ steps.create-pull-request.outputs.pull-request-url }}"
