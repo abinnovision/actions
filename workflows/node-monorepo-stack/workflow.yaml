@@ -8,12 +8,6 @@ on:
         description: |-
           GitHub App identification for the release workflow.
           **Required:** Always
-      REGISTRY_NPM_TOKEN:
-        required: false
-        description: |-
-          NPM registry authentication token for publishing packages.
-          **Required:** When `enable-packages-registry-npm` is enabled
-          **Example:** `npm_1a2b3c4d5e6f7g8h9i0j`
       REGISTRY_DOCKERHUB_TOKEN:
         required: false
         description: |-
@@ -90,9 +84,10 @@ on:
         required: false
         default: false
         description: |-
-          Enable publishing packages to NPM registry.
+          Enable publishing packages to NPM registry with provenance.
           **Default:** `false`
-          **Requires:** `REGISTRY_NPM_TOKEN` secret
+          **Authentication:** Uses GitHub OIDC (no token required).
+          **Requirements:** Package must be linked to this GitHub repository on npmjs.org.
       enable-packages-registry-ghpr:
         type: boolean
         required: false
@@ -418,7 +413,6 @@ jobs:
       - name: Publish Packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REGISTRY_NPM_TOKEN: ${{ secrets.REGISTRY_NPM_TOKEN }}
         run: |
           set -e
 
@@ -478,19 +472,16 @@ jobs:
             # Publish to NPM
             if [[ "${{ inputs.enable-packages-registry-npm }}" == "true" ]] && [[ "$publish_to_npm" == "true" ]]; then
               echo "Publishing to NPM..."
-              if [[ -n "$REGISTRY_NPM_TOKEN" ]]; then
-                if [[ -n "$scope" ]]; then
-                  yarn config set -H --json npmScopes "{\"$scope\": {\"npmPublishRegistry\": \"https://registry.npmjs.org\", \"npmRegistryServer\": \"https://registry.npmjs.org\", \"npmAuthToken\": \"$REGISTRY_NPM_TOKEN\"}}"
-                else
-                  # For unscoped packages, set the default registry
-                  yarn config set npmPublishRegistry "https://registry.npmjs.org"
-                  yarn config set npmRegistryServer "https://registry.npmjs.org"
-                  yarn config set npmAuthToken "$REGISTRY_NPM_TOKEN"
-                fi
-                yarn --cwd "$path" npm publish --access "$npm_access" || echo "::warning::Failed to publish $package_name to NPM"
+              if [[ -n "$scope" ]]; then
+                yarn config set -H --json npmScopes "{\"$scope\": {\"npmPublishRegistry\": \"https://registry.npmjs.org\", \"npmRegistryServer\": \"https://registry.npmjs.org\"}}"
               else
-                echo "::warning::REGISTRY_NPM_TOKEN not set, skipping NPM publish"
+                # For unscoped packages, set the default registry
+                yarn config set npmPublishRegistry "https://registry.npmjs.org"
+                yarn config set npmRegistryServer "https://registry.npmjs.org"
+                yarn config set npmAuthToken "$REGISTRY_NPM_TOKEN"
               fi
+
+              npm publish "$path" --access "$npm_access" --provenance || echo "::warning::Failed to publish $package_name to NPM"
             else
               echo "Skipping NPM publish for $package_name"
             fi
