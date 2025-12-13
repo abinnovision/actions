@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/setup-gcp-source-v1.1.0...setup-gcp-source-v1.1.1) (2025-12-13)
+
+
+### Bug Fixes
+
+* add option to install gcloud components ([#266](https://github.com/abinnovision/actions/issues/266)) ([b8ec46f](https://github.com/abinnovision/actions/commit/b8ec46fb122c64afcd4d5b02155ff8712c18a6cb))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/setup-gcp-source-v1.0.1...setup-gcp-source-v1.1.0) (2025-10-22)
 
 
