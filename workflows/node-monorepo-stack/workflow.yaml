@@ -478,7 +478,6 @@ jobs:
                 # For unscoped packages, set the default registry
                 yarn config set npmPublishRegistry "https://registry.npmjs.org"
                 yarn config set npmRegistryServer "https://registry.npmjs.org"
-                yarn config set npmAuthToken "$REGISTRY_NPM_TOKEN"
               fi
 
               npm publish "$path" --access "$npm_access" --provenance || echo "::warning::Failed to publish $package_name to NPM"
