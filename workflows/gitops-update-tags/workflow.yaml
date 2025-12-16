@@ -234,7 +234,8 @@ jobs:
 
             # Extract image and tag from commit message
             # Format: fix(<app>/<image>): update image tag to "<tag>"
-            if [[ "$msg" =~ fix\([^/]+/([^)]+)\):\ update\ image\ tag\ to\ \"([^\"]+)\" ]]; then
+            PATTERN='fix\([^/]+/([^)]+)\):\ update\ image\ tag\ to\ \"([^\"]+)\"'
+            if [[ "$msg" =~ $PATTERN ]]; then
               image="${BASH_REMATCH[1]}"
               tag="${BASH_REMATCH[2]}"
               CHANGES_LIST="${CHANGES_LIST}- \`${image}\` -> \`${tag}\`"$'\n'
