@@ -62,6 +62,20 @@ on:
           Whether to setup GCP authentication.
           **Default:** `false`
 
+      automerge-images:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Comma-separated list of image names that must ALL be updated to enable automerge.
+          Leave empty to disable automerge for this application.
+
+          **Scoping to applications:** Control automerge per-application by passing this
+          input only for applications that should automerge (e.g., staging) and omitting
+          it for applications that require manual review (e.g., production).
+
+          **Example:** `backend,tma,portal`
+
 env:
   BRANCH_MAIN: ${{ inputs.default-branch }}
   BRANCH_TARGET: fix/tag-update/${{ inputs.application }}
@@ -254,6 +268,42 @@ jobs:
           echo "$CHANGES_LIST"
           echo "::endgroup::"
 
+      - name: Check automerge conditions
+        run: |
+          # Skip if automerge-images is not configured
+          if [[ -z "${{ inputs.automerge-images }}" ]]; then
+            echo "Automerge not configured (automerge-images is empty)"
+            echo "AUTOMERGE_ENABLED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          # Extract updated image names from PR_CHANGES (format: - `image` -> `tag`)
+          UPDATED_IMAGES=$(echo "$PR_CHANGES" | sed -n 's/^- `\([^`]*\)`.*/\1/p' | sort -u)
+
+          echo "::group::Automerge check"
+          echo "Required images: ${{ inputs.automerge-images }}"
+          echo "Updated images:"
+          echo "$UPDATED_IMAGES"
+
+          # Check if all required images are present
+          IFS=',' read -ra REQUIRED <<< "${{ inputs.automerge-images }}"
+          ALL_PRESENT=true
+          for img in "${REQUIRED[@]}"; do
+            # Trim whitespace
+            img=$(echo "$img" | xargs)
+            if ! echo "$UPDATED_IMAGES" | grep -qx "$img"; then
+              echo "Missing required image: $img"
+              ALL_PRESENT=false
+            else
+              echo "Found required image: $img"
+            fi
+          done
+
+          echo "All required images present: $ALL_PRESENT"
+          echo "::endgroup::"
+
+          echo "AUTOMERGE_ENABLED=$ALL_PRESENT" >> "$GITHUB_ENV"
+
       - name: Create Pull Request
         id: create-pull-request
         uses: peter-evans/create-pull-request@v8
@@ -280,9 +330,20 @@ jobs:
             automated
             gitops
 
+      - name: Enable automerge
+        if: env.AUTOMERGE_ENABLED == 'true' && steps.create-pull-request.outputs.pull-request-number != ''
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ steps.token.outputs.token }}
+          pull-request-number: ${{ steps.create-pull-request.outputs.pull-request-number }}
+          merge-method: squash
+
       - name: Display PR information
         if: steps.create-pull-request.outputs.pull-request-number != ''
         run: |
           echo "::notice::Pull Request Created/Updated"
           echo "PR Number: ${{ steps.create-pull-request.outputs.pull-request-number }}"
           echo "PR URL: ${{ steps.create-pull-request.outputs.pull-request-url }}"
+          if [[ "$AUTOMERGE_ENABLED" == "true" ]]; then
+            echo "::notice::Automerge enabled (all required images updated)"
+          fi
