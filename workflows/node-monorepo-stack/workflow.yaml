@@ -480,7 +480,7 @@ jobs:
                 yarn config set npmRegistryServer "https://registry.npmjs.org"
               fi
 
-              npm publish "$path" --access "$npm_access" --provenance || echo "::warning::Failed to publish $package_name to NPM"
+              npm publish "$path" --access "$npm_access" || echo "::warning::Failed to publish $package_name to NPM"
             else
               echo "Skipping NPM publish for $package_name"
             fi
