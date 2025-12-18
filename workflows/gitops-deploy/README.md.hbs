@@ -1,208 +1,57 @@
 # {{name}}
 
-Automate ArgoCD application validation, diff previews, and deployments for GitOps repositories.
+Validates manifests and deploys ArgoCD applications.
 
-This workflow provides a complete CI/CD pipeline for ArgoCD-managed infrastructure repositories, handling:
+> For repository setup, see [GitOps Stack documentation](../../docs/gitops-stack/README.md).
 
-- **Application Discovery** - Automatically discovers applications using `.argocd-app` marker files
-- **Validation** - Validates Kubernetes manifests using kustomize, kubeconform, and kube-score
-- **PR Preview** - Shows diffs of ArgoCD applications in pull requests
-- **Automated Deployment** - Syncs ArgoCD applications when changes are merged to main
+## Behavior
 
-## Repository Requirements
+- **Pull requests:** Validates manifests, posts ArgoCD diff as PR comment
+- **Main branch:** Validates manifests, syncs to ArgoCD, waits for health
 
-Your repository must follow this structure:
+## Usage
 
-### Directory Structure
+{{{usage-example type="workflow" name=name inputs=inputs secrets=secrets version=version}}}
 
-```
-your-gitops-repo/
-├── k8s/
-│   └── applications/           # Applications directory (configurable)
-│       ├── default/
-│       │   ├── .argocd-app    # Marker file containing ArgoCD app name
-│       │   ├── kustomization.yaml
-│       │   └── apps/
-│       │       ├── app1.yaml
-│       │       └── app2.yaml
-│       └── staging/
-│           ├── .argocd-app
-│           ├── kustomization.yaml
-│           └── apps/
-│               └── staging-app.yaml
-```
+### Latest versions
 
-### Application Discovery
+{{{version-examples type="workflow" name=name version=version}}}
 
-Applications are discovered using the `.argocd-app` marker file:
+## Validation Tools
 
-**`.argocd-app` file format:**
-
-```
-infra-core-applications
-```
-
-This file should contain **one line** with the name of the ArgoCD Application that this directory maps to.
-
-**Example:**
-
-If your directory is `k8s/applications/default/` and contains a `.argocd-app` file with content `infra-core-applications`, then:
-
-- The workflow will run validation and deployment for this directory
-- It will use the ArgoCD application named `infra-core-applications`
-
-### Required Tools (installed automatically)
-
-The workflow automatically installs these tools:
-
-- **kustomize** - Builds Kubernetes manifests
-- **kubeconform** (optional) - Validates manifests against Kubernetes schemas
-- **kube-score** (optional) - Scores manifests for best practices
-- **argocd** - ArgoCD CLI for deployment operations
-
-## Authentication Methods
-
-### Method 1: DEX OIDC (Recommended)
-
-Uses GitHub OIDC provider with DEX token exchange for keyless authentication.
-
-**Required Configuration:**
-
-- DEX server configured with GitHub connector
-- ArgoCD AppProject roles mapping GitHub groups
-- GitHub Actions as OIDC audience: `core-argocd-github-actions`
-
-**Example ArgoCD AppProject RBAC:**
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: AppProject
-metadata:
-  name: my-project
-spec:
-  roles:
-    - name: github-actions-sync
-      groups:
-        - repo:my-org/my-gitops-repo:ref:refs/heads/main
-      policies:
-        - p, proj:my-project:github-actions-sync, applications, get, my-project/*, allow
-        - p, proj:my-project:github-actions-sync, applications, sync, my-project/*, allow
-
-    - name: github-actions-diff
-      groups:
-        - repo:my-org/my-gitops-repo:pull_request
-      policies:
-        - p, proj:my-project:github-actions-diff, applications, get, my-project/*, allow
-```
-
-### Method 2: Token-based
-
-Uses ArgoCD API tokens directly.
-
-**Configuration:**
-
-```yaml
-inputs:
-  auth-method: "token"
-secrets:
-  ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
-```
-
-## Validation Details
-
-### kustomize
-
-Builds Kubernetes manifests from Kustomize overlays.
-
-- `--load-restrictor LoadRestrictionsNone` - Allows loading from parent directories
-- `--enable-helm` - Supports Helm charts in Kustomize
-
-**Status:** Required (always runs)
-
-### kubeconform
-
-Validates Kubernetes resources against schemas.
-
-- Strict validation mode
-- Multiple schema sources (default K8s + custom CRDs)
-- Summary output
-
-**Status:** Critical - failures block deployment
-
-### kube-score
-
-Scores manifests for best practices.
-
-- Security checks
-- Resource limits validation
-- Best practice recommendations
-
-**Status:** Warning only - failures don't block deployment
-
-## Workflow Execution
-
-### Pull Request Flow
-
-1. **Configure** - Determine commit SHA and discover applications
-2. **Check** - Run code quality checks (formatting, linting)
-3. **Preview** (per application, in parallel):
-   - Validate manifests (kustomize, kubeconform, kube-score)
-   - Setup ArgoCD authentication
-   - Run `argocd app diff` against PR branch
-   - Post diff as PR comment
-
-### Main Branch Deployment Flow
-
-1. **Configure** - Determine commit SHA and discover applications
-2. **Check** - Run code quality checks
-3. **Deploy** (per application, in parallel):
-   - Validate manifests
-   - Setup ArgoCD authentication
-   - Check sync status (skip if already synced)
-   - Create GitHub deployment
-   - Sync ArgoCD application
-   - Wait for health check
-   - Update deployment status
+| Tool          | Purpose           | Impact            |
+|---------------|-------------------|-------------------|
+| `kustomize`   | Build manifests   | Required          |
+| `kubeconform` | Schema validation | Blocks deployment |
+| `kube-score`  | Best practices    | Warning only      |
 
 ## Advanced Configuration
 
 ### Custom Validation Schema Locations
 
-Add your own CRD schemas:
-
 ```yaml
 with:
-  kubeconform-schema-locations: |
-    default
-    https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/\{{.Group}}/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
-    https://storage.googleapis.com/my-company-crds/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
+kubeconform-schema-locations: |
+	default
+	https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/\{{.Group}}/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
+	https://storage.googleapis.com/my-company-crds/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
 ```
 
 ### Disable Specific Validations
 
 ```yaml
 with:
-  enable-kubeconform: false # Disable schema validation
-  enable-kube-score: false # Disable best practice checks
+	enable-kubeconform: false
+	enable-kube-score: false
 ```
 
 ### Adjust Timeouts
 
-For large or slow-deploying applications:
-
 ```yaml
 with:
-  sync-timeout: 1200 # 20 minutes
-  health-timeout: 1200 # 20 minutes
+	sync-timeout: 1200
+	health-timeout: 1200
 ```
-
-## Usage
-
-{{{usage-example type="workflow" name=name inputs=inputs secrets=secrets version=version}}}
-
-## Latest versions
-
-{{{version-examples type="workflow" name=name version=version}}}
 
 ## Inputs
 

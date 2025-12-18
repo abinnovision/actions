@@ -27,12 +27,16 @@ on:
           ArgoCD API token for direct authentication.
           **Required:** When using token authentication method
           **Example:** `argocd.token=eyJhbGc...`
-      GH_APP_IDENTIFICATION_RELEASER:
-        required: false
-        description: |-
-          GitHub App identification for creating PRs (used in update-tags workflow).
-          **Required:** When using update-tags workflow
     inputs:
+      # ArgoCD server configuration
+      argocd-server:
+        type: string
+        required: true
+        description: |-
+          ArgoCD server hostname (without https://).
+          **Required:** Always
+          **Example:** `argocd.example.com`
+
       # Repository and branch configuration
       default-branch:
         type: string
@@ -49,15 +53,6 @@ on:
         description: |-
           Root directory containing application subdirectories.
           **Example:** `k8s/applications`, `manifests/apps`
-
-      # ArgoCD server configuration
-      argocd-server:
-        type: string
-        required: true
-        description: |-
-          ArgoCD server hostname (without https://).
-          **Required:** Always
-          **Example:** `argocd.example.com`
 
       auth-method:
         type: string
