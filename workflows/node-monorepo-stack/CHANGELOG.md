@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.0.0...node-monorepo-stack-source-v1.0.1) (2025-12-18)
+
+
+### Bug Fixes
+
+* disable provenance option in npm publish command ([#272](https://github.com/abinnovision/actions/issues/272)) ([6972366](https://github.com/abinnovision/actions/commit/69723666c4c4fdabc39042c087650aac8c9d6378))
+* remove npmAuthToken set command ([#270](https://github.com/abinnovision/actions/issues/270)) ([0569fe0](https://github.com/abinnovision/actions/commit/0569fe055534234477ad7dbd26e9a12457d326ee))
+
 ## 1.0.0 (2025-12-13)
 
 
