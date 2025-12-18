@@ -238,8 +238,8 @@ jobs:
 This workflow can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1.0`: Targeting minor version <!-- x-release-please-minor -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1.1`: Targeting minor version <!-- x-release-please-minor -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1.1.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
