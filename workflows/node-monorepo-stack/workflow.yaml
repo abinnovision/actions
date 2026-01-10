@@ -461,7 +461,7 @@ jobs:
               echo "Publishing to GitHub Package Registry..."
               if [[ -n "$GITHUB_TOKEN" ]]; then
                 yarn config set -H --json npmScopes "{\"$scope\": {\"npmPublishRegistry\": \"https://npm.pkg.github.com\", \"npmRegistryServer\": \"https://npm.pkg.github.com\", \"npmAuthToken\": \"$GITHUB_TOKEN\"}}"
-                yarn --cwd "$path" npm publish || echo "::warning::Failed to publish $package_name to GitHub Package Registry"
+                cd "$path" && yarn npm publish || echo "::warning::Failed to publish $package_name to GitHub Package Registry"
               else
                 echo "::warning::GITHUB_TOKEN not set, skipping GitHub Package Registry publish"
               fi
@@ -480,7 +480,7 @@ jobs:
                 yarn config set npmRegistryServer "https://registry.npmjs.org"
               fi
 
-              yarn --cwd "$path" npm publish --access "$npm_access" || echo "::warning::Failed to publish $package_name to NPM"
+              cd "$path" && yarn npm publish --access "$npm_access" || echo "::warning::Failed to publish $package_name to NPM"
             else
               echo "Skipping NPM publish for $package_name"
             fi
