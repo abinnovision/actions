@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.0.1...node-monorepo-stack-source-v1.0.2) (2026-01-10)
+
+
+### Bug Fixes
+
+* change directory before publishing package ([#280](https://github.com/abinnovision/actions/issues/280)) ([64a70d7](https://github.com/abinnovision/actions/commit/64a70d7e6a52c7f79eeb24831b2c485a1e11be9e))
+* use yarn for publishing packages in workflow ([#278](https://github.com/abinnovision/actions/issues/278)) ([4c7ed5a](https://github.com/abinnovision/actions/commit/4c7ed5a19006ac3b87bf3c226b6bfa2e4203b2ac))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.0.0...node-monorepo-stack-source-v1.0.1) (2025-12-18)
 
 
