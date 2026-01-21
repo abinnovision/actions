@@ -316,6 +316,9 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
 
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v2
+
       # Validate application manifests
       - name: Validate application
         id: validate
@@ -333,10 +336,6 @@ jobs:
             echo "::error::Application directory not found: $app_path"
             exit 1
           fi
-
-          # Install kustomize
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
 
           # Install kubeconform
           if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
@@ -624,6 +623,9 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
 
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v2
+
       # Validate application (same as preview)
       - name: Validate application
         id: validate
@@ -640,10 +642,6 @@ jobs:
             echo "::error::Application directory not found: $app_path"
             exit 1
           fi
-
-          # Install kustomize
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
 
           # Install kubeconform
           if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
