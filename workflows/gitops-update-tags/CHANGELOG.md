@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.0...gitops-update-tags-source-v1.1.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* replace manual kustomize installation with setup action ([#281](https://github.com/abinnovision/actions/issues/281)) ([86e00d2](https://github.com/abinnovision/actions/commit/86e00d24d15e125790b65b29c911fcc227db58d1))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.0.0...gitops-update-tags-source-v1.1.0) (2025-12-18)
 
 
