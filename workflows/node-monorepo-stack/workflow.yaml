@@ -36,6 +36,12 @@ on:
           GitHub Workflow Dispatch Proxy URL for triggering GitOps workflows.
           **Required:** When `gitops-app-config` is provided
           **Example:** `https://gwdp.example.com`
+      CHECKOUT_TOKEN:
+        required: false
+        description: |-
+          Access token to use for checkout.
+          **Default:** `Github Token`
+          **Note:** PAT requires an expiration date.
     inputs:
       default-branch:
         type: string
@@ -190,14 +196,6 @@ on:
           **Default:** `false`
           **Example:** `true`, `false`, `recursive`
           **Note:** Use `recursive` to recursively checkout submodules
-      checkout-token:
-        type: string
-        required: false
-        default: ${{ github.token }}
-        description: |-
-          Access token to use for checkout.
-          **Default:** `Github Token`
-          **Note:** PAT requires an expiration date.
 
     outputs: {}
 
@@ -340,7 +338,7 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ inputs.checkout-token }}
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-v1
       - name: Install dependencies
@@ -381,7 +379,7 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ inputs.checkout-token }}
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-v1
       - name: Install dependencies
@@ -423,7 +421,7 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ inputs.checkout-token }}
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
 
       - name: Setup Node
         uses: abinnovision/actions@setup-node-v1
@@ -534,7 +532,7 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ inputs.checkout-token }}
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
 
       - name: Validate GitOps configuration
         if: inputs.gitops-app-config != ''
