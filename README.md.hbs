@@ -1,0 +1,66 @@
+# {{name}}
+
+Validates manifests and deploys ArgoCD applications.
+
+> For repository setup, see [GitOps Stack documentation](../../docs/gitops-stack/README.md).
+
+## Behavior
+
+- **Pull requests:** Validates manifests, posts ArgoCD diff as PR comment
+- **Main branch:** Validates manifests, syncs to ArgoCD, waits for health
+
+## Usage
+
+{{{usage-example type="workflow" name=name inputs=inputs secrets=secrets version=version}}}
+
+### Latest versions
+
+{{{version-examples type="workflow" name=name version=version}}}
+
+## Validation Tools
+
+| Tool          | Purpose           | Impact            |
+|---------------|-------------------|-------------------|
+| `kustomize`   | Build manifests   | Required          |
+| `kubeconform` | Schema validation | Blocks deployment |
+| `kube-score`  | Best practices    | Warning only      |
+
+## Advanced Configuration
+
+### Custom Validation Schema Locations
+
+```yaml
+with:
+kubeconform-schema-locations: |
+	default
+	https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/\{{.Group}}/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
+	https://storage.googleapis.com/my-company-crds/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
+```
+
+### Disable Specific Validations
+
+```yaml
+with:
+	enable-kubeconform: false
+	enable-kube-score: false
+```
+
+### Adjust Timeouts
+
+```yaml
+with:
+	sync-timeout: 1200
+	health-timeout: 1200
+```
+
+## Inputs
+
+{{> inputs-table inputs}}
+
+## Secrets
+
+{{> secrets-table secrets}}
+
+## Outputs
+
+{{> outputs-table outputs}}
