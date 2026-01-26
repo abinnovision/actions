@@ -181,6 +181,15 @@ on:
           **Deployment tags:** Dev deployments use `sha-*` tags, release deployments use semver `v*.*.*` tags
           **Note:** Only first 5 commas are delimiters; remaining fields can contain commas
           **Important:** All fields are required. GitOps deployment will be skipped for apps with incomplete configuration
+      checkout-submodules:
+        type: string
+        required: false
+        default: "false"
+        description: |-
+          Wether to checkout submodules.
+          **Default:** `false`
+          **Example:** `true`, `false`, `recursive`
+          **Reference:** https://github.com/actions/checkout#usage
 
     outputs: {}
 
@@ -241,6 +250,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ steps.commit.outputs.commit_sha }}
+          submodules: false
 
       # Evaluates a list of all available apps by checking directory existence dynamically.
       - name: Evaluate
@@ -321,6 +331,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: inputs.checkout-submodules
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-v1
       - name: Install dependencies
@@ -360,6 +371,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: inputs.checkout-submodules
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-v1
       - name: Install dependencies
@@ -400,6 +412,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: inputs.checkout-submodules
 
       - name: Setup Node
         uses: abinnovision/actions@setup-node-v1
@@ -509,6 +522,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: inputs.checkout-submodules
 
       - name: Validate GitOps configuration
         if: inputs.gitops-app-config != ''
