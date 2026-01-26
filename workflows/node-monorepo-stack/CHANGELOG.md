@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.2.0...node-monorepo-stack-source-v1.2.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* custom checkout token as secret ([#289](https://github.com/abinnovision/actions/issues/289)) ([2e18c59](https://github.com/abinnovision/actions/commit/2e18c59b1b3fdd3439925d5d65cb1f54f831bb34))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.1.1...node-monorepo-stack-source-v1.2.0) (2026-01-26)
 
 
