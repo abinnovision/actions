@@ -145,7 +145,7 @@ This workflow can be used with different version ranges. The following ranges ar
 
 - `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1`: Targeting major version <!-- x-release-please-major -->
 - `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1.2`: Targeting minor version <!-- x-release-please-minor -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1.2.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1.2.1`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
