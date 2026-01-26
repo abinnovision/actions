@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.0.2...node-monorepo-stack-source-v1.1.0) (2026-01-26)
+
+
+### Features
+
+* option to checkout with submodules ([#283](https://github.com/abinnovision/actions/issues/283)) ([a423787](https://github.com/abinnovision/actions/commit/a423787a00ebaabf6b4c3579a3354b97bf3297fc))
+
 ## [1.0.2](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.0.1...node-monorepo-stack-source-v1.0.2) (2026-01-10)
 
 
