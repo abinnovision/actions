@@ -189,7 +189,7 @@ on:
           Wether to checkout submodules.
           **Default:** `false`
           **Example:** `true`, `false`, `recursive`
-          **Reference:** https://github.com/actions/checkout#usage
+          **Note:** Use `recursive` to recursively checkout submodules
 
     outputs: {}
 
