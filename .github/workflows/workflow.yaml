@@ -1,0 +1,977 @@
+name: Node Monorepo Stack
+
+on:
+  workflow_call:
+    secrets:
+      GH_APP_IDENTIFICATION_RELEASER:
+        required: true
+        description: |-
+          GitHub App identification for the release workflow.
+          **Required:** Always
+      REGISTRY_DOCKERHUB_TOKEN:
+        required: false
+        description: |-
+          DockerHub registry authentication token for publishing Docker images.
+          **Required:** When `enable-apps-registry-dockerhub` is enabled
+          **Example:** `dckr_pat_1a2b3c4d5e6f7g8h9i0j`
+      APP_IMAGE_SECRETS:
+        required: false
+        description: |-
+          App-specific build secrets for Docker image builds in **CSV format** (one per line).
+          **Format:** `app-name,secret-name,secret-value`
+          **Example:**
+          ```
+          my-api,NPM_TOKEN,npm_abc123xyz
+          my-api,API_KEY,secret_key_here
+          my-frontend,BUILD_KEY,value,with,commas,is,ok
+          ```
+          **Note:** Only the first two commas are delimiters; the secret value can contain commas.
+
+          Each secret is passed to Docker BuildKit as an individual secret mount with its own ID.
+
+          **Usage in Dockerfile:** `--mount=type=secret,id=NPM_TOKEN` (available at `/run/secrets/NPM_TOKEN`)
+      GITOPS_PROXY_URL:
+        required: false
+        description: |-
+          GitHub Workflow Dispatch Proxy URL for triggering GitOps workflows.
+          **Required:** When `gitops-app-config` is provided
+          **Example:** `https://gwdp.example.com`
+    inputs:
+      default-branch:
+        type: string
+        required: false
+        default: "main"
+        description: |-
+          Default branch name for the repository.
+          **Default:** `main`
+          **Example:** `main`, `master`, `develop`
+      test-types:
+        type: string
+        required: false
+        default: "unit"
+        description: |-
+          Comma-separated list of test types to run.
+          **Valid values:** `unit`, `integration`, `e2e`
+          **Default:** `unit`
+          **Example:** `unit,integration,e2e`
+      run-unit-tests-in-build:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Run unit tests as part of the build step instead of a separate job.
+          Recommended for smaller monorepos to reduce overall execution time.
+          **Default:** `true`
+          **Note:** You must include `unit` in the `test-types` input for this to have any effect.
+      run-build-before-check:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Run the build step before the check step in the check_build job.
+          Useful for monorepos where eslint/prettier/etc config packages must be built before linters can run.
+          **Default:** `false`
+          **Note:** When enabled, the build order becomes: Install → Dependencies Check → Build → Check → Unit Tests
+      enable-package-publishing:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Enable publishing packages to configured registries.
+          **Default:** `false`
+      enable-packages-registry-npm:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Enable publishing packages to NPM registry with provenance.
+          **Default:** `false`
+          **Authentication:** Uses GitHub OIDC (no token required).
+          **Requirements:** Package must be linked to this GitHub repository on npmjs.org.
+      enable-packages-registry-ghpr:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Enable publishing packages to GitHub Package Registry.
+          **Default:** `false`
+          **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
+      enable-app-image-builds:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Enable building and publishing Docker images for apps.
+          **Default:** `false`
+          **Note:** At least one registry must be enabled (`ghcr`, `dockerhub`, or `gcpar`)
+      enable-apps-registry-ghcr:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Enable publishing Docker images to GitHub Container Registry (GHCR).
+          **Default:** `true` (automatically available in GitHub Actions)
+          **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
+      enable-apps-registry-dockerhub:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Enable publishing Docker images to DockerHub.
+          **Default:** `false`
+          **Requires:** `REGISTRY_DOCKERHUB_TOKEN` secret and `registry-dockerhub-username` input
+      registry-dockerhub-username:
+        type: string
+        required: false
+        description: |-
+          DockerHub username for authentication.
+          **Required:** When `enable-apps-registry-dockerhub` is enabled
+          **Example:** `myusername`
+      registry-dockerhub-url:
+        type: string
+        required: false
+        default: "docker.io"
+        description: |-
+          DockerHub registry URL.
+          **Default:** `docker.io`
+          **Example:** `docker.io`, `registry.hub.docker.com`
+      enable-apps-registry-gcpar:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Enable publishing Docker images to GCP Artifact Registry.
+          **Default:** `false`
+          **Requires:** `registry-gcpar-url` and `gcp-auth` inputs
+      registry-gcpar-url:
+        type: string
+        required: false
+        description: |-
+          GCP Artifact Registry URL for Docker images.
+          **Required:** When `enable-apps-registry-gcpar` is enabled
+          **Example:** `europe-west4-docker.pkg.dev/project-id/repository-name`
+      gcp-auth:
+        type: string
+        required: false
+        description: |-
+          GCP authentication configuration (Workload Identity Federation).
+          This is public configuration, not a secret.
+          **Required:** When `enable-apps-registry-gcpar` is enabled
+          **Note:** Can be reused for other GCP services in the workflow
+          **Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`
+      gitops-workflow-file:
+        type: string
+        required: false
+        default: "update-tags.yaml"
+        description: |-
+          GitOps workflow file to dispatch for deployment updates.
+          **Default:** `update-tags.yaml`
+          **Example:** `update-tags.yaml`, `deploy.yaml`
+          **Note:** Only used when `gitops-app-config` is provided
+      gitops-app-config:
+        type: string
+        required: false
+        description: |-
+          Per-app GitOps configuration in **CSV format** (one per line).
+          **Format:** `app-name,target-repo,dev-application,release-application,registry,image-name`
+          **Example:**
+          `my-api,my-gitops-repo,my-api-dev,my-api-prod,ghcr,app-my-api`
+          `my-worker,my-gitops-repo,worker-dev,worker-prod,gcpar,app-my-worker`
+          **Registry options:** `ghcr`, `gcpar`, `dockerhub`
+          **Deployment tags:** Dev deployments use `sha-*` tags, release deployments use semver `v*.*.*` tags
+          **Note:** Only first 5 commas are delimiters; remaining fields can contain commas
+          **Important:** All fields are required. GitOps deployment will be skipped for apps with incomplete configuration
+      checkout-submodules:
+        type: string
+        required: false
+        default: "false"
+        description: |-
+          Wether to checkout submodules.
+          **Default:** `false`
+          **Example:** `true`, `false`, `recursive`
+          **Note:** Use `recursive` to recursively checkout submodules
+
+    outputs: {}
+
+env:
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
+jobs:
+  # Configure the build environment.
+  configure:
+    name: Configure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      # -Commit SHA to check out.
+      commit-sha: ${{ steps.commit.outputs.commit_sha }}
+
+      # - Information about available apps and packages.
+      # JSON array of app names (only names, no paths).
+      # Apps are only valid if a Dockerfile is present.
+      apps: ${{ steps.evaluate.outputs.apps_available }}
+      # JSON array of package names (only names, no paths).
+      packages: ${{ steps.evaluate.outputs.packages_available }}
+
+      # - Boolean flags for existence checks.
+      has-apps: ${{ fromJSON(steps.evaluate.outputs.apps_available)[0] != null }}
+      has-packages: ${{ fromJSON(steps.evaluate.outputs.packages_available)[0] != null }}
+
+      # - Information about test types to run.
+      test-types: ${{ steps.evaluate.outputs.test_types }}
+      test-types-for-matrix: ${{ steps.evaluate.outputs.test_types_for_matrix }}
+    steps:
+      # We first need to evaluate the commit SHA to check out.
+      #
+      # - If the event is a pull request (target), we need to use the head of the PR.
+      #   The 'pull_request_target' event runs in the context of the base branch, but we need to check out the head of the PR.
+      #
+      # - If the event is a push, we can use the SHA of the commit that triggered the event.
+      #
+      # - If the event is a merge group, we need to use the head of the merge commit.
+      - name: Evaluate commit
+        id: commit
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+              echo "PR is #${{ github.event.number }}..."
+              echo "PR Head SHA is ${{ github.event.pull_request.head.sha }}..."
+              echo "commit_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+              echo "Merge group SHA is ${{ github.event.merge_group.head_sha }}..."
+              echo "commit_sha=${{ github.event.merge_group.head_sha }}" >> $GITHUB_OUTPUT
+          else
+              echo "Head SHA is ${{ github.sha }}..."
+              echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      # Check out the commit SHA to run other evaluations on.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.commit.outputs.commit_sha }}
+          submodules: false
+
+      # Evaluates a list of all available apps by checking directory existence dynamically.
+      - name: Evaluate
+        id: evaluate
+        run: |
+          # Collect apps
+          apps=()
+          for app_dir in apps/*/; do
+            if [ -d "$app_dir" ] && [ -f "$app_dir/package.json" ] && [ -f "$app_dir/Dockerfile" ]; then
+              apps+=("$(basename "$app_dir")")
+            fi
+          done
+
+          # Collect packages
+          packages=()
+          for pkg_dir in packages/*/; do
+            if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.json" ]; then
+              packages+=("$(basename "$pkg_dir")")
+            fi
+          done
+
+          # Parse and validate test types
+          test_types=()
+          test_types_for_matrix=()
+          valid_types=("unit" "integration" "e2e")
+
+          if [ -n "${{ inputs.test-types }}" ]; then
+            IFS=',' read -ra types <<< "${{ inputs.test-types }}"
+            for type in "${types[@]}"; do
+              # Trim whitespace
+              type=$(echo "$type" | xargs)
+
+              # Validate type
+              if [[ " ${valid_types[@]} " =~ " ${type} " ]]; then
+                test_types+=("$type")
+
+                # Exclude unit tests from matrix if they run in build
+                if [[ "$type" == "unit" && "${{ inputs.run-unit-tests-in-build }}" == "true" ]]; then
+                  echo "Unit tests will run in build step, excluding from test matrix"
+                else
+                  test_types_for_matrix+=("$type")
+                fi
+              else
+                echo "::warning::Invalid test type '$type' - skipping. Valid types: unit, integration, e2e"
+              fi
+            done
+          fi
+
+          # Convert to JSON using jq
+          apps_json=$(printf '%s\n' "${apps[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          packages_json=$(printf '%s\n' "${packages[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          test_types_json=$(printf '%s\n' "${test_types[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          test_types_matrix_json=$(printf '%s\n' "${test_types_for_matrix[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "apps_available=$apps_json" >> $GITHUB_OUTPUT
+          echo "packages_available=$packages_json" >> $GITHUB_OUTPUT
+          echo "test_types=$test_types_json" >> $GITHUB_OUTPUT
+          echo "test_types_for_matrix=$test_types_matrix_json" >> $GITHUB_OUTPUT
+
+          # Debug output
+          echo "Found ${#apps[@]} apps: $apps_json"
+          echo "Found ${#packages[@]} packages: $packages_json"
+          echo ""
+          echo "All test types: $test_types_json"
+          echo "Test types for matrix: $test_types_matrix_json"
+
+  # Build and checks are unified into one job. By default, checks run before
+  # the build. However, when run-build-before-check is enabled, the build runs
+  # first.
+  check_build:
+    name: Check & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - configure
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: inputs.checkout-submodules
+      - name: Setup Node.js
+        uses: abinnovision/actions@setup-node-v1
+      - name: Install dependencies
+        run: yarn install --immutable
+      - name: Check Dependencies
+        run: |
+          yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
+          yarn turbo boundaries || (echo "turbo boundaries failed" && exit 1)
+      - name: Build (before check)
+        if: ${{ inputs.run-build-before-check }}
+        run: yarn run build
+      - name: Check
+        run: yarn run check
+      - name: Build (after check)
+        if: ${{ !inputs.run-build-before-check }}
+        run: yarn run build
+      - name: Unit Tests
+        if: ${{ inputs.run-unit-tests-in-build && contains(fromJSON(needs.configure.outputs.test-types), 'unit') }}
+        run: yarn run test-unit
+
+  # Run tests in parallel for each test type (excluding unit tests if they run in build).
+  # HINT: Use testcontainers instead of local services.
+  test:
+    name: Test (${{ matrix.test-type }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - configure
+      - check_build
+    if: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix)[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: inputs.checkout-submodules
+      - name: Setup Node.js
+        uses: abinnovision/actions@setup-node-v1
+      - name: Install dependencies
+        run: yarn install --immutable
+      - name: Build
+        run: yarn run build
+
+      # We require all the test-* scripts to be defined in the root package.json.
+      - name: Run ${{ matrix.test-type }} tests
+        run: yarn run test-${{ matrix.test-type }}
+
+  # Utilizes the release workflow to create releases for all apps and packages where necessary.
+  release:
+    name: Release
+    needs:
+      - configure
+      - check_build
+      - test
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
+    secrets: inherit
+    # Only run on push to the default branch.
+    # Use always() to prevent skipping when test job is skipped (no tests configured)
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
+
+  packages_publish:
+    name: Publish Packages
+    runs-on: ubuntu-latest
+    needs:
+      - configure
+      - release
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.releases-created && inputs.enable-package-publishing
+    permissions:
+      contents: "write"
+      id-token: "write"
+      packages: "write"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: inputs.checkout-submodules
+
+      - name: Setup Node
+        uses: abinnovision/actions@setup-node-v1
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build
+        run: yarn turbo build --filter="./packages/*"
+
+      - name: Publish Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+
+          echo '${{ needs.release.outputs.paths-released }}' | jq -cr '.[]' | while read path; do
+            echo "Processing package at: $path"
+
+            # Skip if not a package directory
+            if [[ ! "$path" == packages/* ]]; then
+              echo "Skipping $path - not a package"
+              continue
+            fi
+
+            # Read package.json
+            package_json="$path/package.json"
+
+            if [[ ! -f "$package_json" ]]; then
+              echo "::warning::No package.json found at $path, skipping"
+              continue
+            fi
+
+            # Extract package info
+            package_name=$(jq -r '.name' "$package_json")
+            is_private=$(jq -r '.private // false' "$package_json")
+
+            if [[ "$is_private" == "true" ]]; then
+              echo "Skipping private package: $package_name"
+              continue
+            fi
+
+            # Extract scope from package name (e.g., @abinnovision/package -> abinnovision)
+            if [[ "$package_name" =~ ^@([^/]+)/ ]]; then
+              scope="${BASH_REMATCH[1]}"
+            else
+              scope=""
+            fi
+
+            echo "Publishing package: $package_name (scope: ${scope:-none})"
+
+            # Read publishConfig (with defaults)
+            publish_to_ghpr=$(jq -r '.publishConfig.ghpr // false' "$package_json")
+            publish_to_npm=$(jq -r '.publishConfig.npm // false' "$package_json")
+            npm_access=$(jq -r '.publishConfig.npmAccess // "public"' "$package_json")
+
+            # Publish to GitHub Package Registry (ghpr)
+            if [[ "${{ inputs.enable-packages-registry-ghpr }}" == "true" ]] && [[ "$publish_to_ghpr" == "true" ]] && [[ -n "$scope" ]]; then
+              echo "Publishing to GitHub Package Registry..."
+              if [[ -n "$GITHUB_TOKEN" ]]; then
+                yarn config set -H --json npmScopes "{\"$scope\": {\"npmPublishRegistry\": \"https://npm.pkg.github.com\", \"npmRegistryServer\": \"https://npm.pkg.github.com\", \"npmAuthToken\": \"$GITHUB_TOKEN\"}}"
+                cd "$path" && yarn npm publish || echo "::warning::Failed to publish $package_name to GitHub Package Registry"
+              else
+                echo "::warning::GITHUB_TOKEN not set, skipping GitHub Package Registry publish"
+              fi
+            else
+              echo "Skipping GitHub Package Registry publish for $package_name"
+            fi
+
+            # Publish to NPM
+            if [[ "${{ inputs.enable-packages-registry-npm }}" == "true" ]] && [[ "$publish_to_npm" == "true" ]]; then
+              echo "Publishing to NPM..."
+              if [[ -n "$scope" ]]; then
+                yarn config set -H --json npmScopes "{\"$scope\": {\"npmPublishRegistry\": \"https://registry.npmjs.org\", \"npmRegistryServer\": \"https://registry.npmjs.org\"}}"
+              else
+                # For unscoped packages, set the default registry
+                yarn config set npmPublishRegistry "https://registry.npmjs.org"
+                yarn config set npmRegistryServer "https://registry.npmjs.org"
+              fi
+
+              cd "$path" && yarn npm publish --access "$npm_access" || echo "::warning::Failed to publish $package_name to NPM"
+            else
+              echo "Skipping NPM publish for $package_name"
+            fi
+          done
+
+  # Build and publish Docker images for apps.
+  # Images are built on every push to default branch, with tags changing based on release status.
+  apps_build_images:
+    name: Build Image - ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - configure
+      - release
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.configure.outputs.apps) }}
+    permissions:
+      contents: "read"
+      id-token: "write"
+      packages: "write"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: inputs.checkout-submodules
+
+      - name: Validate GitOps configuration
+        if: inputs.gitops-app-config != ''
+        run: |
+          if [[ -z "${{ secrets.GITOPS_PROXY_URL }}" ]]; then
+            echo "::error::GITOPS_PROXY_URL secret is required when gitops-app-config is provided"
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: abinnovision/actions@setup-node-v1
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Prepare build and extract metadata
+        id: app-meta
+        run: |
+          # Validate that the app directory exists
+          if [ ! -d "apps/${{ matrix.app }}" ]; then
+            echo "::error::App directory apps/${{ matrix.app }} not found"
+            exit 1
+          fi
+
+          # Validate that Dockerfile exists
+          if [ ! -f "apps/${{ matrix.app }}/Dockerfile" ]; then
+            echo "::error::Dockerfile not found for app ${{ matrix.app }}"
+            exit 1
+          fi
+
+          # Extract package version
+          if [ -f "apps/${{ matrix.app }}/package.json" ]; then
+            version=$(jq -r '.version' "apps/${{ matrix.app }}/package.json")
+            echo "RELEASE_VERSION=$version" >> $GITHUB_OUTPUT
+            echo "App version: $version"
+          else
+            echo "::error::package.json not found for app ${{ matrix.app }}"
+            exit 1
+          fi
+
+          # Extract Node.js version from .tool-versions (required)
+          if [ ! -f ".tool-versions" ]; then
+            echo "::error::.tool-versions file not found"
+            exit 1
+          fi
+
+          node_version=$(grep "nodejs" .tool-versions | awk '{print $2}')
+          if [ -z "$node_version" ]; then
+            echo "::error::nodejs version not found in .tool-versions"
+            exit 1
+          fi
+
+          echo "NODE_VERSION=$node_version" >> $GITHUB_OUTPUT
+
+      - name: Prepare build with turbo prune
+        run: |
+          # Get turbo version from package.json (required)
+          TURBO_VERSION=$(jq -r '.devDependencies.turbo // .dependencies.turbo // empty' package.json)
+
+          if [ -z "$TURBO_VERSION" ]; then
+            echo "::error::Turbo not found in package.json devDependencies or dependencies"
+            exit 1
+          fi
+
+          echo "Turbo version: $TURBO_VERSION"
+
+          # Read the package name from the app's package.json
+          APP_PACKAGE_JSON="apps/${{ matrix.app }}/package.json"
+          if [ ! -f "$APP_PACKAGE_JSON" ]; then
+            echo "::error::package.json not found at $APP_PACKAGE_JSON"
+            exit 1
+          fi
+
+          SCOPE_NAME=$(jq -r '.name' "$APP_PACKAGE_JSON")
+          if [ -z "$SCOPE_NAME" ] || [ "$SCOPE_NAME" = "null" ]; then
+            echo "::error::Package name not found in $APP_PACKAGE_JSON"
+            exit 1
+          fi
+
+          echo "Package name (scope): $SCOPE_NAME"
+
+          # Create app-specific output directory
+          OUTPUT_DIR="out/${{ matrix.app }}"
+          echo "Creating output directory: $OUTPUT_DIR"
+
+          # Clean up existing output directory
+          if [ -d "$OUTPUT_DIR" ]; then
+            rm -rf "$OUTPUT_DIR"
+          fi
+
+          mkdir -p "$OUTPUT_DIR"
+
+          echo "Running turbo prune for scope: $SCOPE_NAME"
+
+          # Run turbo prune for Docker optimization
+          if ! yarn dlx turbo@"$TURBO_VERSION" prune --scope="$SCOPE_NAME" --docker --out-dir="$OUTPUT_DIR"; then
+            echo "::error::Turbo prune failed for $SCOPE_NAME"
+            exit 1
+          fi
+
+      - name: Determine if this is a release build
+        id: release-check
+        run: |
+          # Check if this app was released in the current push
+          released_paths='${{ needs.release.outputs.paths-released }}'
+
+          if echo "$released_paths" | jq -e --arg app "apps/${{ matrix.app }}" 'map(. == $app) | any' > /dev/null 2>&1; then
+            echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
+            echo "This is a release build for ${{ matrix.app }}"
+          else
+            echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
+            echo "This is a regular build for ${{ matrix.app }}"
+          fi
+
+      - name: Calculate build version
+        id: build-version
+        run: |
+          short_sha=$(git rev-parse --short HEAD)
+          full_sha=$(git rev-parse HEAD)
+
+          if [[ "${{ steps.release-check.outputs.IS_RELEASE }}" == "true" ]]; then
+            build_version="v${{ steps.app-meta.outputs.RELEASE_VERSION }}-${short_sha}"
+          else
+            build_version="v0.0.0-${short_sha}"
+          fi
+
+          echo "BUILD_VERSION=$build_version" >> $GITHUB_OUTPUT
+          echo "BUILD_COMMIT=$full_sha" >> $GITHUB_OUTPUT
+          echo "SHORT_SHA=$short_sha" >> $GITHUB_OUTPUT
+
+          echo "Build version: $build_version"
+          echo "Build commit: $full_sha"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Setup GCP Authentication
+        if: inputs.enable-apps-registry-gcpar && inputs.gcp-auth != ''
+        id: gcp-auth
+        uses: abinnovision/actions@setup-gcp-v1
+        with:
+          auth: ${{ inputs.gcp-auth }}
+          token_format: "access_token"
+
+      - name: Login to GCP Artifact Registry
+        if: inputs.enable-apps-registry-gcpar && inputs.registry-gcpar-url != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry-gcpar-url }}
+          username: "oauth2accesstoken"
+          password: "${{ steps.gcp-auth.outputs.access_token }}"
+
+      - name: Login to GitHub Container Registry
+        if: inputs.enable-apps-registry-ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: "ghcr.io"
+          username: "${{ github.actor }}"
+          password: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Login to DockerHub
+        if: inputs.enable-apps-registry-dockerhub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry-dockerhub-url }}
+          username: ${{ inputs.registry-dockerhub-username }}
+          password: ${{ secrets.REGISTRY_DOCKERHUB_TOKEN }}
+
+      - name: Prepare image names
+        id: image-names
+        run: |
+          images=""
+          cache_from=""
+          cache_to=""
+
+          # GCP Artifact Registry (gcpar) - with caching support
+          if [[ "${{ inputs.enable-apps-registry-gcpar }}" == "true" ]] && [[ -n "${{ inputs.registry-gcpar-url }}" ]]; then
+            gcpar_image="${{ inputs.registry-gcpar-url }}/app-${{ matrix.app }}"
+            gcpar_cache="${{ inputs.registry-gcpar-url }}/app-${{ matrix.app }}-cache"
+
+            echo "IMAGE_GCPAR=$gcpar_image" >> $GITHUB_OUTPUT
+            images="$gcpar_image"
+
+            # GCP AR supports registry caching
+            cache_from="type=registry,ref=$gcpar_cache:latest"
+            cache_to="type=registry,ref=$gcpar_cache:latest,mode=max"
+
+            echo "GCP AR image: $gcpar_image"
+            echo "GCP AR cache: $gcpar_cache"
+          fi
+
+          # GitHub Container Registry (ghcr)
+          if [[ "${{ inputs.enable-apps-registry-ghcr }}" == "true" ]]; then
+            ghcr_image="ghcr.io/${{ github.repository_owner }}/$(basename ${{ github.repository }})-${{ matrix.app }}"
+            echo "IMAGE_GHCR=$ghcr_image" >> $GITHUB_OUTPUT
+
+            if [[ -n "$images" ]]; then
+              images="$images"$'\n'"$ghcr_image"
+            else
+              images="$ghcr_image"
+            fi
+
+            echo "GHCR image: $ghcr_image"
+          fi
+
+          # DockerHub
+          if [[ "${{ inputs.enable-apps-registry-dockerhub }}" == "true" ]]; then
+            dockerhub_image="${{ inputs.registry-dockerhub-url }}/${{ inputs.registry-dockerhub-username }}/$(basename ${{ github.repository }})-${{ matrix.app }}"
+            echo "IMAGE_DOCKERHUB=$dockerhub_image" >> $GITHUB_OUTPUT
+
+            if [[ -n "$images" ]]; then
+              images="$images"$'\n'"$dockerhub_image"
+            else
+              images="$dockerhub_image"
+            fi
+
+            echo "DockerHub image: $dockerhub_image"
+          fi
+
+          # Save images list and cache config
+          echo "IMAGES<<EOF" >> $GITHUB_OUTPUT
+          echo "$images" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "CACHE_FROM=$cache_from" >> $GITHUB_OUTPUT
+          echo "CACHE_TO=$cache_to" >> $GITHUB_OUTPUT
+
+          echo "Configured registries: $(echo "$images" | wc -l | xargs)"
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-names.outputs.IMAGES }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}},value=v${{ steps.app-meta.outputs.RELEASE_VERSION }},enable=${{ steps.release-check.outputs.IS_RELEASE }}
+
+      - name: Prepare app-specific secrets
+        id: app-secrets
+        env:
+          # CSV format: app-name,secret-name,secret-value (one per line)
+          APP_IMAGE_SECRETS: ${{ secrets.APP_IMAGE_SECRETS }}
+        run: |
+          if [[ -n "$APP_IMAGE_SECRETS" ]]; then
+            # Parse CSV and create individual temp files for each secret
+            # Format: app-name,secret-name,secret-value
+            # Only first two commas are delimiters; value can contain commas
+
+            secrets_mount_string=""
+            secrets_found=false
+
+            # Create a temp directory to hold all secret files
+            secrets_dir=$(mktemp -d)
+
+            while IFS= read -r line; do
+              # Skip empty lines
+              [[ -z "$line" ]] && continue
+
+              # Check if line starts with our app name followed by comma
+              if [[ "$line" =~ ^${{ matrix.app }}, ]]; then
+                # Remove "app-name," prefix
+                rest="${line#${{ matrix.app }},}"
+
+                # Split on first comma only: secret-name,secret-value
+                secret_name="${rest%%,*}"
+                secret_value="${rest#*,}"
+
+                # Create individual temp file for this secret
+                secret_file="$secrets_dir/secret_${secret_name}"
+                echo -n "$secret_value" > "$secret_file"
+
+                # Append to secrets mount string
+                if [[ -n "$secrets_mount_string" ]]; then
+                  secrets_mount_string="${secrets_mount_string}"$'\n'"${secret_name}=${secret_file}"
+                else
+                  secrets_mount_string="${secret_name}=${secret_file}"
+                fi
+
+                secrets_found=true
+                echo "Prepared secret: $secret_name"
+              fi
+            done <<< "$APP_IMAGE_SECRETS"
+
+            if [[ "$secrets_found" == "true" ]] && [[ -n "$secrets_mount_string" ]]; then
+              echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
+              echo "SECRETS_MOUNT_STRING<<EOF" >> $GITHUB_OUTPUT
+              echo "$secrets_mount_string" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              echo "App-specific secrets prepared for ${{ matrix.app }}"
+            else
+              echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
+              rm -rf "$secrets_dir"
+            fi
+          else
+            echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: "."
+          push: true
+          file: apps/${{ matrix.app }}/Dockerfile
+          cache-from: ${{ steps.image-names.outputs.CACHE_FROM }}
+          cache-to: ${{ steps.image-names.outputs.CACHE_TO }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            app_name=${{ matrix.app }}
+            node_version=${{ steps.app-meta.outputs.NODE_VERSION }}
+            build_version=${{ steps.build-version.outputs.BUILD_VERSION }}
+            build_commit=${{ steps.build-version.outputs.BUILD_COMMIT }}
+          secret-files: |
+            ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && steps.app-secrets.outputs.SECRETS_MOUNT_STRING || '' }}
+
+      - name: Display built image references
+        run: |
+          echo "Successfully built and pushed the following images for ${{ matrix.app }}:"
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            echo "  - $tag"
+          done
+          echo ""
+          echo "Image digest: ${{ steps.build.outputs.digest }}"
+
+      - name: Parse GitOps configuration and extract deployment tag
+        if: inputs.gitops-app-config != ''
+        id: gitops-config
+        env:
+          GITOPS_APP_CONFIG: ${{ inputs.gitops-app-config }}
+        run: |
+          # Parse GitOps config for this app
+          # Format: app-name,target-repo,dev-application,release-application,registry,image-name
+          target_repo=""
+          dev_app=""
+          release_app=""
+          registry=""
+          image_name=""
+
+          if [[ -n "$GITOPS_APP_CONFIG" ]]; then
+            while IFS= read -r line; do
+              # Skip empty lines
+              [[ -z "$line" ]] && continue
+
+              # Check if line starts with our app name followed by comma
+              if [[ "$line" =~ ^${{ matrix.app }}, ]]; then
+                # Remove "app-name," prefix
+                rest="${line#${{ matrix.app }},}"
+
+                # Split on first 5 commas
+                target_repo="${rest%%,*}"
+                rest="${rest#*,}"
+
+                dev_app="${rest%%,*}"
+                rest="${rest#*,}"
+
+                release_app="${rest%%,*}"
+                rest="${rest#*,}"
+
+                registry="${rest%%,*}"
+                rest="${rest#*,}"
+
+                image_name="$rest"
+                break
+              fi
+            done <<< "$GITOPS_APP_CONFIG"
+          fi
+
+          # Validate that all required fields are present
+          if [[ -z "$target_repo" ]] || [[ -z "$dev_app" ]] || [[ -z "$release_app" ]] || [[ -z "$registry" ]] || [[ -z "$image_name" ]]; then
+            echo "::warning::GitOps configuration for app '${{ matrix.app }}' is incomplete or not provided. Skipping GitOps deployment."
+            echo "  target_repo: ${target_repo:-(empty)}"
+            echo "  dev_app: ${dev_app:-(empty)}"
+            echo "  release_app: ${release_app:-(empty)}"
+            echo "  registry: ${registry:-(empty)}"
+            echo "  image_name: ${image_name:-(empty)}"
+            exit 0
+          fi
+
+          # Determine the image base URL based on registry for filtering
+          case "$registry" in
+            ghcr)
+              registry_url="${{ steps.image-names.outputs.IMAGE_GHCR }}"
+              ;;
+            gcpar)
+              registry_url="${{ steps.image-names.outputs.IMAGE_GCPAR }}"
+              ;;
+            dockerhub)
+              registry_url="${{ steps.image-names.outputs.IMAGE_DOCKERHUB }}"
+              ;;
+            *)
+              echo "::error::Invalid registry '$registry' for app ${{ matrix.app }}. Valid options: ghcr, gcpar, dockerhub"
+              exit 1
+              ;;
+          esac
+
+          # Extract deployment tag from metadata-action generated tags
+          # Tags are newline-separated, e.g.:
+          #   ghcr.io/owner/repo-my-api:sha-abc123
+          #   ghcr.io/owner/repo-my-api:v1.2.3
+          tags="${{ steps.meta.outputs.tags }}"
+
+          # Filter tags for the selected registry
+          registry_tags=$(echo "$tags" | grep "$registry_url")
+
+          # Select appropriate tag based on release status
+          if [[ "${{ steps.release-check.outputs.IS_RELEASE }}" == "true" ]]; then
+            # For releases, prefer semver tag (contains :v)
+            deployment_image=$(echo "$registry_tags" | grep ":v" | head -1)
+            # Fallback to sha tag if no semver tag found
+            if [[ -z "$deployment_image" ]]; then
+              deployment_image=$(echo "$registry_tags" | grep ":sha-" | head -1)
+            fi
+          else
+            # For dev builds, use sha tag
+            deployment_image=$(echo "$registry_tags" | grep ":sha-" | head -1)
+          fi
+
+          if [[ -z "$deployment_image" ]]; then
+            echo "::error::No suitable deployment tag found for registry '$registry'"
+            exit 1
+          fi
+
+          # Extract just the tag portion (everything after the last colon)
+          deployment_tag="${deployment_image##*:}"
+
+          echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
+          echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
+          echo "RELEASE_APP=$release_app" >> $GITHUB_OUTPUT
+          echo "IMAGE_NAME=$image_name" >> $GITHUB_OUTPUT
+          echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
+
+      - name: Update Release Deployment
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'true'
+        uses: abinnovision/actions@run-workflow-dispatch-v1
+        with:
+          proxy: ${{ secrets.GITOPS_PROXY_URL }}
+          target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
+          workflow: ${{ inputs.gitops-workflow-file }}
+          workflow-inputs: |
+            {"application": "${{ steps.gitops-config.outputs.RELEASE_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
+
+      - name: Update Dev Deployment
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'false'
+        uses: abinnovision/actions@run-workflow-dispatch-v1
+        with:
+          proxy: ${{ secrets.GITOPS_PROXY_URL }}
+          target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
+          workflow: ${{ inputs.gitops-workflow-file }}
+          workflow-inputs: |
+            {"application": "${{ steps.gitops-config.outputs.DEV_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
