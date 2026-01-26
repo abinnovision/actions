@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.1.1...node-monorepo-stack-source-v1.2.0) (2026-01-26)
+
+
+### Features
+
+* option for custom checkout token ([#287](https://github.com/abinnovision/actions/issues/287)) ([ec93a0c](https://github.com/abinnovision/actions/commit/ec93a0cef91158a54fd29cf36655c2c1ce0d1047))
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.1.0...node-monorepo-stack-source-v1.1.1) (2026-01-26)
 
 
