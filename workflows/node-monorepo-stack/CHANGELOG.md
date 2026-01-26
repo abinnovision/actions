@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.1.0...node-monorepo-stack-source-v1.1.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* input with brackets ([28ef20d](https://github.com/abinnovision/actions/commit/28ef20d24f3c366c2bd08fc1832f852b43f17b48))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.0.2...node-monorepo-stack-source-v1.1.0) (2026-01-26)
 
 
