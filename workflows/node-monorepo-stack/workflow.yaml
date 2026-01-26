@@ -331,7 +331,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
-          submodules: inputs.checkout-submodules
+          submodules: ${{ inputs.checkout-submodules }}
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-v1
       - name: Install dependencies
@@ -371,7 +371,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
-          submodules: inputs.checkout-submodules
+          submodules: ${{ inputs.checkout-submodules }}
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-v1
       - name: Install dependencies
@@ -412,7 +412,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
-          submodules: inputs.checkout-submodules
+          submodules: ${{ inputs.checkout-submodules }}
 
       - name: Setup Node
         uses: abinnovision/actions@setup-node-v1
@@ -522,7 +522,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
-          submodules: inputs.checkout-submodules
+          submodules: ${{ inputs.checkout-submodules }}
 
       - name: Validate GitOps configuration
         if: inputs.gitops-app-config != ''
