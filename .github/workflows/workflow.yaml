@@ -1,0 +1,347 @@
+name: Update Tags
+
+on:
+  workflow_call:
+    secrets:
+      GH_APP_IDENTIFICATION_RELEASER:
+        required: true
+        description: |-
+          GitHub App identification for creating PRs.
+          **Required:** Always
+      GCP_AUTH:
+        required: false
+        description: |-
+          GCP authentication configuration (if needed for accessing resources).
+          **Required:** When using GCP services
+    inputs:
+      application:
+        type: string
+        required: true
+        description: |-
+          Application directory name to update.
+          **Required:** Always
+          **Example:** `staging`, `production`, `my-app`
+
+      tag:
+        type: string
+        required: true
+        description: |-
+          The image tag to update to.
+          **Required:** Always
+          **Example:** `v1.2.3`, `sha-abc123`, `latest`
+
+      image:
+        type: string
+        required: false
+        default: "image"
+        description: |-
+          Name of the image to update (must exist in kustomization.yaml).
+          **Example:** `image`, `api-image`, `worker-image`
+
+      applications-directory:
+        type: string
+        required: false
+        default: "k8s/applications"
+        description: |-
+          Root directory containing application subdirectories.
+          **Default:** `k8s/applications`
+
+      default-branch:
+        type: string
+        required: false
+        default: "main"
+        description: |-
+          Default branch name for the repository.
+          **Default:** `main`
+
+      use-gcp-auth:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Whether to setup GCP authentication.
+          **Default:** `false`
+
+      automerge-images:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Comma-separated list of image names that must ALL be updated to enable automerge.
+          Leave empty to disable automerge for this application.
+
+          **Scoping to applications:** Control automerge per-application by passing this
+          input only for applications that should automerge (e.g., staging) and omitting
+          it for applications that require manual review (e.g., production).
+
+          **Example:** `backend,tma,portal`
+
+env:
+  BRANCH_MAIN: ${{ inputs.default-branch }}
+  BRANCH_TARGET: fix/tag-update/${{ inputs.application }}
+
+concurrency:
+  cancel-in-progress: false
+  group: ${{ github.workflow }}--${{ inputs.application }}
+
+jobs:
+  update-tags:
+    name: Update Image Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Setup GCP Authentication
+        if: inputs.use-gcp-auth
+        uses: abinnovision/actions@setup-gcp-v1
+        with:
+          auth: ${{ secrets.GCP_AUTH }}
+
+      - id: token
+        name: Generate GitHub App token
+        uses: abinnovision/actions@get-github-app-token-v1
+        with:
+          identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.token.outputs.token }}
+
+      - name: Setup Git config
+        run: |
+          git config --global user.name '${{ steps.token.outputs.app-commiter-name }}'
+          git config --global user.email '${{ steps.token.outputs.app-commiter-email }}'
+
+      # Cherry-pick existing commits from the target branch to group multiple updates
+      - name: Sync existing changes
+        run: |
+          set -e
+
+          # Initialize commit messages collection
+          MESSAGES=""
+
+          # Function to retrieve commit hashes unique to the target branch
+          get_unique_commits() {
+            git log "${BRANCH_MAIN}..origin/${1}" --reverse --pretty=format:"%H"
+          }
+
+          # Check if the target branch exists on the remote
+          if git ls-remote --heads origin "$BRANCH_TARGET" | grep -w "$BRANCH_TARGET" >/dev/null; then
+            echo "Branch '$BRANCH_TARGET' exists. Preparing to cherry-pick its commits."
+
+            # Fetch full history for cherry-picking
+            git fetch origin --unshallow "${BRANCH_MAIN}" || git fetch origin "${BRANCH_MAIN}"
+            git fetch origin "${BRANCH_TARGET}"
+
+            # Retrieve unique commits from the target branch
+            UNIQUE_COMMITS=$(get_unique_commits "$BRANCH_TARGET")
+
+            if [ -z "$UNIQUE_COMMITS" ]; then
+              echo "No unique commits found on $BRANCH_TARGET"
+            else
+              echo "Found commits to cherry-pick:"
+              echo "$UNIQUE_COMMITS"
+
+              # Cherry-pick each unique commit and collect messages
+              for commit in $UNIQUE_COMMITS; do
+                echo "Cherry-picking commit $commit..."
+
+                # Collect commit message
+                msg=$(git log -1 --pretty=format:"%s" "$commit")
+                MESSAGES="${MESSAGES}${msg}"$'\n'
+
+                if ! git cherry-pick "$commit"; then
+                  echo "::warning::Cherry-pick failed for commit $commit, attempting to continue"
+                  git cherry-pick --abort || true
+                  break
+                fi
+              done
+            fi
+          else
+            echo "Branch '$BRANCH_TARGET' does not exist. Starting fresh."
+          fi
+
+          # Store collected commit messages for later steps
+          echo "COMMIT_MESSAGES<<EOF" >> "$GITHUB_ENV"
+          echo "$MESSAGES" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: Setup Node
+        uses: abinnovision/actions@setup-node-v1
+
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Validate application directory
+        run: |
+          app_dir="${{ inputs.applications-directory }}/${{ inputs.application }}"
+
+          if [[ ! -d "$app_dir" ]]; then
+            echo "::error::Application directory not found: $app_dir"
+            echo "::error::Available applications:"
+            ls -1 "${{ inputs.applications-directory }}" || echo "  (none)"
+            exit 1
+          fi
+
+          if [[ ! -f "$app_dir/kustomization.yaml" ]]; then
+            echo "::error::kustomization.yaml not found in $app_dir"
+            exit 1
+          fi
+
+          echo "Application directory validated: $app_dir"
+
+      - name: Validate image name
+        working-directory: ${{ inputs.applications-directory }}/${{ inputs.application }}
+        run: |
+          # Check if the image exists in kustomization.yaml
+          if ! yq eval '.images[] | select(.name == "${{ inputs.image }}")' kustomization.yaml | grep -q .; then
+            echo "::error::Image '${{ inputs.image }}' not found in kustomization.yaml"
+            echo "::error::Available images:"
+            yq eval '.images[].name' kustomization.yaml || echo "  (none)"
+            exit 1
+          fi
+
+          echo "Image name validated: ${{ inputs.image }}"
+
+      - name: Set image tag
+        working-directory: ${{ inputs.applications-directory }}/${{ inputs.application }}
+        run: |
+          kustomize edit set image ${{ inputs.image }}=*:${{ inputs.tag }}
+
+          echo "::group::Changes to kustomization.yaml"
+          git diff kustomization.yaml || true
+          echo "::endgroup::"
+
+      - name: Format files
+        run: |
+          yarn install --immutable
+          yarn format:fix
+
+      - name: Build commit message
+        run: |
+          # Build commit message for current change
+          COMMIT_MESSAGE='fix(${{ inputs.application }}/${{ inputs.image }}): update image tag to "${{ inputs.tag }}"'
+
+          echo "COMMIT_MESSAGE=${COMMIT_MESSAGE}" >> "$GITHUB_ENV"
+
+          # Append to collected commit messages
+          echo "COMMIT_MESSAGES<<EOF" >> "$GITHUB_ENV"
+          echo "${COMMIT_MESSAGES}${COMMIT_MESSAGE}" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: Build PR description
+        run: |
+          set -e
+
+          CHANGES_LIST=""
+
+          # Parse all commit messages (including current change)
+          while IFS= read -r msg; do
+            if [[ -z "$msg" ]]; then
+              continue
+            fi
+
+            # Extract image and tag from commit message
+            # Format: fix(<app>/<image>): update image tag to "<tag>"
+            PATTERN='fix\([^/]+/([^)]+)\):\ update\ image\ tag\ to\ \"([^\"]+)\"'
+            if [[ "$msg" =~ $PATTERN ]]; then
+              image="${BASH_REMATCH[1]}"
+              tag="${BASH_REMATCH[2]}"
+              CHANGES_LIST="${CHANGES_LIST}- \`${image}\` -> \`${tag}\`"$'\n'
+            fi
+          done <<< "$COMMIT_MESSAGES"
+
+          # Remove duplicate entries (keep last occurrence of each image)
+          CHANGES_LIST=$(echo "$CHANGES_LIST" | tac | awk -F'`' '!seen[$2]++' | tac)
+
+          # Store in environment variable for PR body
+          echo "PR_CHANGES<<EOF" >> "$GITHUB_ENV"
+          echo "$CHANGES_LIST" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+          echo "::group::PR Changes"
+          echo "$CHANGES_LIST"
+          echo "::endgroup::"
+
+      - name: Check automerge conditions
+        run: |
+          # Skip if automerge-images is not configured
+          if [[ -z "${{ inputs.automerge-images }}" ]]; then
+            echo "Automerge not configured (automerge-images is empty)"
+            echo "AUTOMERGE_ENABLED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          # Extract updated image names from PR_CHANGES (format: - `image` -> `tag`)
+          UPDATED_IMAGES=$(echo "$PR_CHANGES" | sed -n 's/^- `\([^`]*\)`.*/\1/p' | sort -u)
+
+          echo "::group::Automerge check"
+          echo "Required images: ${{ inputs.automerge-images }}"
+          echo "Updated images:"
+          echo "$UPDATED_IMAGES"
+
+          # Check if all required images are present
+          IFS=',' read -ra REQUIRED <<< "${{ inputs.automerge-images }}"
+          ALL_PRESENT=true
+          for img in "${REQUIRED[@]}"; do
+            # Trim whitespace
+            img=$(echo "$img" | xargs)
+            if ! echo "$UPDATED_IMAGES" | grep -qx "$img"; then
+              echo "Missing required image: $img"
+              ALL_PRESENT=false
+            else
+              echo "Found required image: $img"
+            fi
+          done
+
+          echo "All required images present: $ALL_PRESENT"
+          echo "::endgroup::"
+
+          echo "AUTOMERGE_ENABLED=$ALL_PRESENT" >> "$GITHUB_ENV"
+
+      - name: Create Pull Request
+        id: create-pull-request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.token.outputs.token }}
+          commit-message: ${{ env.COMMIT_MESSAGE }}
+          branch: ${{ env.BRANCH_TARGET }}
+          base: ${{ env.BRANCH_MAIN }}
+          delete-branch: true
+          title: "fix(${{ inputs.application }}): update image tags"
+          body: |
+            ## 🔄 Image Tag Updates
+
+            **Application:** `${{ inputs.application }}`
+
+            This PR was automatically created to update image tags for the specified application.
+
+            ### Changes
+            ${{ env.PR_CHANGES }}
+
+            ---
+            <sub>🤖 This PR was automatically generated by the _update-tags.yaml_ workflow</sub>
+          labels: |
+            automated
+            gitops
+
+      - name: Enable automerge
+        if: env.AUTOMERGE_ENABLED == 'true' && steps.create-pull-request.outputs.pull-request-number != ''
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ steps.token.outputs.token }}
+          pull-request-number: ${{ steps.create-pull-request.outputs.pull-request-number }}
+          merge-method: squash
+
+      - name: Display PR information
+        if: steps.create-pull-request.outputs.pull-request-number != ''
+        run: |
+          echo "::notice::Pull Request Created/Updated"
+          echo "PR Number: ${{ steps.create-pull-request.outputs.pull-request-number }}"
+          echo "PR URL: ${{ steps.create-pull-request.outputs.pull-request-url }}"
+          if [[ "$AUTOMERGE_ENABLED" == "true" ]]; then
+            echo "::notice::Automerge enabled (all required images updated)"
+          fi
