@@ -12,7 +12,7 @@ Supports Node.js (with corepack), Python (with uv), and Go.
 jobs:
   <job>:
     steps:
-      - uses: abinnovision/actions@setup-tools-v0
+      - uses: abinnovision/actions@setup-tools-v1
         with:
           tool-versions-file: .tool-versions
 ```
@@ -23,9 +23,9 @@ jobs:
 
 This action can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions@setup-tools-v0`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions@setup-tools-v1`: Targeting major version <!-- x-release-please-major -->
 - `abinnovision/actions@setup-tools-v0.0`: Targeting minor version <!-- x-release-please-minor -->
-- `abinnovision/actions@setup-tools-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@setup-tools-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
