@@ -8,5 +8,6 @@
 	"workflows/release": "1.0.0",
 	"workflows/node-monorepo-stack": "1.2.1",
 	"workflows/gitops-deploy": "1.0.1",
-	"workflows/gitops-update-tags": "1.1.1"
+	"workflows/gitops-update-tags": "1.1.1",
+	"workflows/polyglot-monorepo-stack": "1.0.0"
 }

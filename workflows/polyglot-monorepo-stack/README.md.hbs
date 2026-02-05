@@ -1,0 +1,300 @@
+# {{name}}
+
+Automate building, validation, and deployment for polyglot monorepos with an opinionated Yarn + Turborepo setup supporting multiple languages.
+
+This workflow provides a complete CI/CD pipeline for polyglot monorepos, handling:
+- Dependency validation and build checks
+- Package publishing (for Node.js packages)
+- Image builds for deployable apps
+
+## Makefile Requirements
+
+**This workflow requires a `Makefile`** with specific targets for dependency installation. This allows each repository to define its own installation strategy for multi-language setups.
+
+### Required Targets
+
+| Target | Purpose | CI Usage |
+|--------|---------|----------|
+| `install` | Install dependencies (dev) | Local development |
+| `install-immutable` | Install with lockfile validation | CI/CD |
+
+### Example: Node.js Only
+
+```makefile
+.PHONY: install install-immutable
+
+install:
+	yarn install
+
+install-immutable:
+	yarn install --immutable
+```
+
+### Example: Node.js + Python
+
+```makefile
+.PHONY: install install-immutable
+
+install:
+	yarn install
+	uv sync
+
+install-immutable:
+	yarn install --immutable
+	uv sync --frozen
+```
+
+### Example: Node.js + Python + Go
+
+```makefile
+.PHONY: install install-immutable
+
+install:
+	yarn install
+	uv sync
+	go mod download
+
+install-immutable:
+	yarn install --immutable
+	uv sync --frozen
+	go mod download && go mod verify
+```
+
+## Monorepo Requirements
+
+Your repository must follow this structure:
+
+### Package Manager & Build System
+- **Yarn (Berry)** - Package manager with workspaces support
+- **Turborepo** - Build system for monorepo orchestration and caching
+- **`.tool-versions`** - asdf version file (supports `nodejs`, `python`, `golang`, etc.)
+- **`Makefile`** - With `install` and `install-immutable` targets
+
+### Directory Structure
+
+```
+your-repo/
+├── Makefile              # Required: install and install-immutable targets
+├── .tool-versions        # Required: tool versions for setup-tools
+├── packages/             # Publishable packages (libraries, shared code)
+│   ├── package-a/        # Node.js package
+│   │   └── package.json
+│   ├── package-b/        # Python package (with package.json for monorepo integration)
+│   │   └── package.json
+│   └── package-c/        # Go package (with package.json for monorepo integration)
+│       └── package.json
+└── apps/                 # Deployable applications (Docker images)
+    ├── api/
+    │   ├── package.json
+    │   └── Dockerfile    # Required for Docker build
+    └── worker/
+        ├── package.json
+        └── Dockerfile
+```
+
+**Validation Rules:**
+- **Packages**: Must contain a `package.json` file
+- **Apps**: Must contain both a `package.json` AND a `Dockerfile` to be considered valid for deployment
+- **Private packages**: Packages with `"private": true` in package.json will not be published
+
+### Required Scripts
+
+Your root `package.json` must define these scripts:
+
+```json
+{
+"scripts": {
+"build": "turbo run build",
+"check": "turbo run lint:check format:check"
+}
+}
+```
+
+- **`build`** - Compiles all workspaces (packages and apps)
+- **`check`** - Runs linting and formatting validation across the monorepo
+
+## Package Language Tagging
+
+Packages declare their language in `package.json` under `publishConfig.language`. This determines whether the package is eligible for npm publishing.
+
+### Configuration
+
+```json
+{
+  "name": "@your-org/my-package",
+  "version": "1.0.0",
+  "publishConfig": {
+    "language": "nodejs",
+    "npm": true,
+    "ghpr": true
+  }
+}
+```
+
+### Supported Languages
+
+| Language | Value | npm Publishing |
+|----------|-------|----------------|
+| Node.js | `"nodejs"` | Yes (if configured) |
+| Python | `"python"` | No (package.json for monorepo only) |
+| Go | `"golang"` | No (package.json for monorepo only) |
+| Other | Any string | No |
+| Not specified | (missing) | Yes (defaults to `"nodejs"`) |
+
+### Why package.json for non-Node packages?
+
+Even Python/Go packages have a `package.json` to:
+- Integrate with Yarn/Turbo monorepo tooling
+- Define scripts (`build`, `test`, etc.)
+- Track version for release-please
+- Participate in workspace dependency graph
+
+### Example: Python Package
+
+```json
+{
+  "name": "@your-org/python-lib",
+  "version": "1.0.0",
+  "private": false,
+  "publishConfig": {
+    "language": "python"
+  },
+  "scripts": {
+    "build": "uv build",
+    "test": "pytest"
+  }
+}
+```
+
+### Example: Go Package
+
+```json
+{
+  "name": "@your-org/go-service",
+  "version": "1.0.0",
+  "private": false,
+  "publishConfig": {
+    "language": "golang"
+  },
+  "scripts": {
+    "build": "go build ./...",
+    "test": "go test ./..."
+  }
+}
+```
+
+## Package Publishing Configuration
+
+Node.js packages are published based on their `publishConfig` in `package.json`. The workflow reads these flags to determine which registries to publish to.
+
+### publishConfig Options
+
+```json
+{
+  "name": "@your-org/package-name",
+  "version": "1.0.0",
+  "private": false,
+  "publishConfig": {
+    "language": "nodejs",
+    "npm": true,
+    "ghpr": true,
+    "npmAccess": "public"
+  }
+}
+```
+
+**Available fields:**
+- **`language`** (string) - Package language: `"nodejs"`, `"python"`, `"golang"`, etc. (default: `"nodejs"`)
+- **`npm`** (boolean) - Publish to NPM registry (requires `enable-packages-registry-npm`)
+- **`ghpr`** (boolean) - Publish to GitHub Package Registry (requires `enable-packages-registry-ghpr`, uses `GITHUB_TOKEN`)
+- **`npmAccess`** (string) - Access level for NPM: `"public"` or `"restricted"` (default: `"public"`)
+
+**Important:**
+- Packages with `"private": true` are never published, regardless of `publishConfig`
+- Only packages with `"language": "nodejs"` (or no language specified) are eligible for npm publishing
+- GitHub Package Registry (ghpr) requires a scoped package name (e.g., `@your-org/package-name`)
+- Both workflow-level inputs AND package-level `publishConfig` must be enabled for publishing to occur
+
+## Docker Build Details
+
+**Automatic Turbo Prune:**
+- The workflow runs `turbo prune --docker` before building images
+- Creates optimized structure in `out/{app-name}/` with `json/` (package files) and `full/` (source)
+- Requires Turbo in root `package.json` and package `name` field in each app's `package.json`
+
+**Available Build Arguments:**
+- `app_name` - Application name from directory
+- `node_version` - From `.tool-versions` file
+- `build_version` - Semantic version with commit (e.g., `v1.2.3-abc1234`)
+- `build_commit` - Full commit SHA
+
+**App-Specific Secrets:**
+- Apps can have build-time secrets via the `APP_IMAGE_SECRETS` GitHub secret
+- Use CSV format with structure: `app-name,secret-name,secret-value` (one per line)
+- Example:
+  ```
+  api,NPM_TOKEN,npm_abc123xyz
+  api,SENTRY_TOKEN,abc123
+  frontend,API_KEY,secret-value
+  ```
+- Each secret is available as an individual BuildKit secret mount in your Dockerfile
+- Access secrets using: `--mount=type=secret,id=SECRET_NAME`
+- Secrets are mounted at `/run/secrets/SECRET_NAME` and are not stored in image layers
+- **Example Dockerfile usage:**
+  ```dockerfile
+  RUN --mount=type=secret,id=NPM_TOKEN \
+      npm config set //registry.npmjs.org/:_authToken $(cat /run/secrets/NPM_TOKEN)
+  ```
+
+## Migration from node-monorepo-stack
+
+To migrate from `node-monorepo-stack` to `polyglot-monorepo-stack`:
+
+1. **Create a Makefile** in your repository root:
+   ```makefile
+   .PHONY: install install-immutable
+
+   install:
+   	yarn install
+
+   install-immutable:
+   	yarn install --immutable
+   ```
+
+2. **Update your workflow reference**:
+   ```yaml
+   # Before
+   uses: abinnovision/actions/.github/workflows/workflow.yaml@node-monorepo-stack-v1
+
+   # After
+   uses: abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v1
+   ```
+
+3. **(Optional) Tag packages with languages** if you have non-Node.js packages:
+   ```json
+   {
+     "publishConfig": {
+       "language": "python"
+     }
+   }
+   ```
+
+## Usage
+
+{{{usage-example type="workflow" name=name inputs=inputs secrets=secrets version=version}}}
+
+## Latest versions
+
+{{{version-examples type="workflow" name=name version=version}}}
+
+## Inputs
+
+{{> inputs-table inputs}}
+
+## Secrets
+
+{{> secrets-table secrets}}
+
+## Outputs
+
+{{> outputs-table outputs}}

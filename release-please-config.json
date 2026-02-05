@@ -33,6 +33,9 @@
 		},
 		"workflows/gitops-update-tags": {
 			"extra-files": ["README.md"]
+		},
+		"workflows/polyglot-monorepo-stack": {
+			"extra-files": ["README.md"]
 		}
 	}
 }
