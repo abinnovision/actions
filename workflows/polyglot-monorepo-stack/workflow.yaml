@@ -633,13 +633,32 @@ jobs:
             exit 1
           fi
 
-          node_version=$(grep "nodejs" .tool-versions | awk '{print $2}')
+          node_version=$(grep "^nodejs" .tool-versions | awk '{print $2}')
           if [ -z "$node_version" ]; then
             echo "::error::nodejs version not found in .tool-versions"
             exit 1
           fi
-
           echo "NODE_VERSION=$node_version" >> $GITHUB_OUTPUT
+          echo "Node.js version: $node_version"
+
+          # Extract optional tool versions from .tool-versions
+          python_version=$(grep "^python" .tool-versions | awk '{print $2}' || true)
+          if [ -n "$python_version" ]; then
+            echo "PYTHON_VERSION=$python_version" >> $GITHUB_OUTPUT
+            echo "Python version: $python_version"
+          fi
+
+          golang_version=$(grep "^golang" .tool-versions | awk '{print $2}' || true)
+          if [ -n "$golang_version" ]; then
+            echo "GOLANG_VERSION=$golang_version" >> $GITHUB_OUTPUT
+            echo "Go version: $golang_version"
+          fi
+
+          uv_version=$(grep "^uv" .tool-versions | awk '{print $2}' || true)
+          if [ -n "$uv_version" ]; then
+            echo "UV_VERSION=$uv_version" >> $GITHUB_OUTPUT
+            echo "UV version: $uv_version"
+          fi
 
       - name: Prepare build with turbo prune
         run: |
@@ -899,6 +918,9 @@ jobs:
           build-args: |
             app_name=${{ matrix.app }}
             node_version=${{ steps.app-meta.outputs.NODE_VERSION }}
+            python_version=${{ steps.app-meta.outputs.PYTHON_VERSION }}
+            golang_version=${{ steps.app-meta.outputs.GOLANG_VERSION }}
+            uv_version=${{ steps.app-meta.outputs.UV_VERSION }}
             build_version=${{ steps.build-version.outputs.BUILD_VERSION }}
             build_commit=${{ steps.build-version.outputs.BUILD_COMMIT }}
           secret-files: |

@@ -224,9 +224,28 @@ Node.js packages are published based on their `publishConfig` in `package.json`.
 
 **Available Build Arguments:**
 - `app_name` - Application name from directory
-- `node_version` - From `.tool-versions` file
+- `node_version` - Node.js version from `.tool-versions` (required)
+- `python_version` - Python version from `.tool-versions` (optional)
+- `golang_version` - Go version from `.tool-versions` (optional)
+- `uv_version` - UV version from `.tool-versions` (optional)
 - `build_version` - Semantic version with commit (e.g., `v1.2.3-abc1234`)
 - `build_commit` - Full commit SHA
+
+**Example Dockerfile using multiple language versions:**
+```dockerfile
+ARG node_version
+ARG python_version
+ARG uv_version
+
+FROM node:${node_version}-alpine AS node-builder
+# ... Node.js build steps
+
+FROM python:${python_version}-slim AS python-builder
+# Install UV if version provided
+ARG uv_version
+RUN if [ -n "$uv_version" ]; then pip install uv==${uv_version}; fi
+# ... Python build steps
+```
 
 **App-Specific Secrets:**
 - Apps can have build-time secrets via the `APP_IMAGE_SECRETS` GitHub secret
