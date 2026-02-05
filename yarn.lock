@@ -4039,6 +4039,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"polyglot-monorepo-stack@workspace:workflows/polyglot-monorepo-stack":
+  version: 0.0.0-use.local
+  resolution: "polyglot-monorepo-stack@workspace:workflows/polyglot-monorepo-stack"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.1.3"
+    prettier: "npm:^3.6.2"
+  languageName: unknown
+  linkType: soft
+
 "possible-typed-array-names@npm:^1.0.0":
   version: 1.1.0
   resolution: "possible-typed-array-names@npm:1.1.0"
