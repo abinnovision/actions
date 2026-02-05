@@ -4427,6 +4427,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"setup-tools@workspace:actions/setup-tools":
+  version: 0.0.0-use.local
+  resolution: "setup-tools@workspace:actions/setup-tools"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.1.3"
+    prettier: "npm:^3.6.2"
+  languageName: unknown
+  linkType: soft
+
 "shebang-command@npm:^2.0.0":
   version: 2.0.0
   resolution: "shebang-command@npm:2.0.0"
