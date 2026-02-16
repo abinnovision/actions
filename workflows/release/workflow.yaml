@@ -80,8 +80,18 @@ jobs:
           RELEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
         shell: bash
         run: |
+          echo "::group::Release-please outputs"
+          echo "$RELEASE_OUTPUTS" | jq .
+          echo "::endgroup::"
+
+          echo "releases_created=${{ steps.release.outputs.releases_created }}"
+          echo "prs_created=${{ steps.release.outputs.prs_created }}"
+          echo "prerelease-channel=${CHANNEL:-<none>}"
+
           # Case 1: Stable release — extract versions from release-please outputs.
           if [[ "${{ steps.release.outputs.releases_created }}" == "true" ]]; then
+            echo "→ Case: stable release"
+
             VERSIONS=$(echo "$RELEASE_OUTPUTS" | jq -c '
               [to_entries[] | select(.key | endswith("--version"))] |
               map({
@@ -90,18 +100,27 @@ jobs:
               }) |
               from_entries
             ')
+
+            echo "::group::Computed versions"
+            echo "$VERSIONS" | jq .
+            echo "::endgroup::"
+
             echo "versions=${VERSIONS}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # Case 2: Prerelease — compute versions from manifest diff.
           if [[ -n "$CHANNEL" && "${{ steps.release.outputs.prs_created }}" == "true" ]]; then
+            echo "→ Case: prerelease (channel=${CHANNEL})"
+
             # Determine the release-please PR branch name.
             TARGET_BRANCH="${{ inputs.target-branch }}"
             if [[ -z "$TARGET_BRANCH" ]]; then
               TARGET_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name')
             fi
             PR_BRANCH="release-please--branches--${TARGET_BRANCH}"
+            echo "target-branch=${TARGET_BRANCH}"
+            echo "pr-branch=${PR_BRANCH}"
 
             # Fetch the manifest from the PR branch via GitHub API.
             PR_MANIFEST=$(gh api "repos/${{ github.repository }}/contents/.release-please-manifest.json?ref=${PR_BRANCH}" \
@@ -110,11 +129,20 @@ jobs:
             # Read the current manifest from the checked-out code.
             CURRENT_MANIFEST=$(cat .release-please-manifest.json)
 
+            echo "::group::Manifest comparison"
+            echo "Current manifest:"
+            echo "$CURRENT_MANIFEST" | jq .
+            echo "PR manifest:"
+            echo "$PR_MANIFEST" | jq .
+            echo "::endgroup::"
+
             # Read release-please config for tag-separator and component overrides.
             CONFIG=$(cat release-please-config.json)
             TAG_SEPARATOR=$(echo "$CONFIG" | jq -r '.["tag-separator"] // "-"')
 
             SHORT_SHA=$(git rev-parse --short HEAD)
+            echo "tag-separator=${TAG_SEPARATOR}"
+            echo "short-sha=${SHORT_SHA}"
 
             # Diff the two manifests and compute prerelease versions for changed packages.
             RESULT=$(jq -n \
@@ -128,6 +156,10 @@ jobs:
                 else . end
               )
             ')
+
+            echo "::group::Changed packages"
+            echo "$RESULT" | jq .
+            echo "::endgroup::"
 
             # Build the final versions map.
             VERSIONS="{}"
@@ -157,13 +189,21 @@ jobs:
 
               VERSION="${NEXT_VERSION}-${CHANNEL}.${COMMIT_COUNT}+${SHORT_SHA}"
               TAG=$(echo "$VERSION" | tr '+' '-')
+
+              echo "  ${PATH_KEY}: ${CURRENT_VERSION} → ${VERSION} (component=${COMPONENT}, tag=${LAST_TAG}, commits=${COMMIT_COUNT})"
+
               VERSIONS=$(echo "$VERSIONS" | jq --arg p "$PATH_KEY" --arg v "$VERSION" --arg t "$TAG" \
                 '. + {($p): {version: $v, tag: $t}}')
             done
+
+            echo "::group::Computed versions"
+            echo "$VERSIONS" | jq .
+            echo "::endgroup::"
 
             echo "versions=$(echo "$VERSIONS" | jq -c '.')" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # Case 3: Nothing released or computed.
+          echo "→ Case: no release (no stable releases created, no prerelease channel or no PRs created)"
           echo "versions={}" >> "$GITHUB_OUTPUT"
