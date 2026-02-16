@@ -196,8 +196,24 @@ on:
           **Default:** `false`
           **Example:** `true`, `false`, `recursive`
           **Note:** Use `recursive` to recursively checkout submodules
+      prerelease-channel:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Prerelease channel name (e.g., "beta", "canary", "rc").
+          When set, computes prerelease versions and publishes with corresponding dist-tags.
 
-    outputs: {}
+    outputs:
+      releases-created:
+        value: ${{ jobs.release.outputs.releases-created }}
+        description: Whether any stable releases were created ("true"/"false").
+      versions:
+        value: ${{ jobs.release.outputs.versions }}
+        description: |-
+          JSON object mapping released/prerelease package paths to version info.
+          Each entry: {version: "semver", tag: "docker-compatible"}.
+          Empty object {} when nothing was released.
 
 env:
   NODE_OPTIONS: "--max-old-space-size=4096"
@@ -422,6 +438,8 @@ jobs:
       - test
     uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
     secrets: inherit
+    with:
+      prerelease-channel: ${{ inputs.prerelease-channel }}
     # Only run on push to the default branch.
     # Use always() to prevent skipping when test job is skipped (no tests configured)
     if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
@@ -432,7 +450,10 @@ jobs:
     needs:
       - configure
       - release
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.releases-created && inputs.enable-package-publishing
+    if: >-
+      always() && !cancelled() && !contains(needs.*.result, 'failure')
+      && needs.release.outputs.versions != '{}'
+      && inputs.enable-package-publishing
     permissions:
       contents: "write"
       id-token: "write"
@@ -472,7 +493,7 @@ jobs:
         run: |
           set -e
 
-          echo '${{ needs.release.outputs.paths-released }}' | jq -cr '.[]' | while read path; do
+          echo '${{ needs.release.outputs.versions }}' | jq -cr 'keys[]' | while read path; do
             echo "Processing package at: $path"
 
             # Skip if not a package directory
@@ -506,6 +527,18 @@ jobs:
               continue
             fi
 
+            # Get version from release output and update package.json
+            RELEASE_VERSION=$(echo '${{ needs.release.outputs.versions }}' | jq -r --arg p "$path" '.[$p].version // empty')
+            if [[ -n "$RELEASE_VERSION" ]]; then
+              jq --arg v "$RELEASE_VERSION" '.version = $v' "$package_json" > "${package_json}.tmp" && mv "${package_json}.tmp" "$package_json"
+            fi
+
+            # Determine npm dist-tag
+            NPM_TAG=""
+            if [[ -n "${{ inputs.prerelease-channel }}" && "${{ needs.release.outputs.releases-created }}" != "true" ]]; then
+              NPM_TAG="--tag ${{ inputs.prerelease-channel }}"
+            fi
+
             # Extract scope from package name (e.g., @abinnovision/package -> abinnovision)
             if [[ "$package_name" =~ ^@([^/]+)/ ]]; then
               scope="${BASH_REMATCH[1]}"
@@ -525,7 +558,7 @@ jobs:
               echo "Publishing to GitHub Package Registry..."
               if [[ -n "$GITHUB_TOKEN" ]]; then
                 yarn config set -H --json npmScopes "{\"$scope\": {\"npmPublishRegistry\": \"https://npm.pkg.github.com\", \"npmRegistryServer\": \"https://npm.pkg.github.com\", \"npmAuthToken\": \"$GITHUB_TOKEN\"}}"
-                cd "$path" && yarn npm publish || echo "::warning::Failed to publish $package_name to GitHub Package Registry"
+                cd "$path" && yarn npm publish $NPM_TAG || echo "::warning::Failed to publish $package_name to GitHub Package Registry"
               else
                 echo "::warning::GITHUB_TOKEN not set, skipping GitHub Package Registry publish"
               fi
@@ -544,7 +577,7 @@ jobs:
                 yarn config set npmRegistryServer "https://registry.npmjs.org"
               fi
 
-              cd "$path" && yarn npm publish --access "$npm_access" || echo "::warning::Failed to publish $package_name to NPM"
+              cd "$path" && yarn npm publish --access "$npm_access" $NPM_TAG || echo "::warning::Failed to publish $package_name to NPM"
             else
               echo "Skipping NPM publish for $package_name"
             fi
@@ -709,15 +742,20 @@ jobs:
       - name: Determine if this is a release build
         id: release-check
         run: |
-          # Check if this app was released in the current push
-          released_paths='${{ needs.release.outputs.paths-released }}'
+          VERSIONS='${{ needs.release.outputs.versions }}'
+          APP_VERSION=$(echo "$VERSIONS" | jq -r --arg app "apps/${{ matrix.app }}" '.[$app].version // empty')
+          APP_TAG=$(echo "$VERSIONS" | jq -r --arg app "apps/${{ matrix.app }}" '.[$app].tag // empty')
 
-          if echo "$released_paths" | jq -e --arg app "apps/${{ matrix.app }}" 'map(. == $app) | any' > /dev/null 2>&1; then
-            echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
-            echo "This is a release build for ${{ matrix.app }}"
+          if [[ -n "$APP_VERSION" ]]; then
+            if [[ "${{ needs.release.outputs.releases-created }}" == "true" ]]; then
+              echo "RELEASE_TYPE=release" >> $GITHUB_OUTPUT
+            else
+              echo "RELEASE_TYPE=prerelease" >> $GITHUB_OUTPUT
+            fi
+            echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
+            echo "APP_TAG=$APP_TAG" >> $GITHUB_OUTPUT
           else
-            echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
-            echo "This is a regular build for ${{ matrix.app }}"
+            echo "RELEASE_TYPE=none" >> $GITHUB_OUTPUT
           fi
 
       - name: Calculate build version
@@ -726,8 +764,11 @@ jobs:
           short_sha=$(git rev-parse --short HEAD)
           full_sha=$(git rev-parse HEAD)
 
-          if [[ "${{ steps.release-check.outputs.IS_RELEASE }}" == "true" ]]; then
-            build_version="v${{ steps.app-meta.outputs.RELEASE_VERSION }}-${short_sha}"
+          if [[ "${{ steps.release-check.outputs.RELEASE_TYPE }}" == "release" ]]; then
+            build_version="v${{ steps.release-check.outputs.APP_TAG }}-${short_sha}"
+          elif [[ "${{ steps.release-check.outputs.RELEASE_TYPE }}" == "prerelease" ]]; then
+            # Prerelease tag already contains sha, no need to append
+            build_version="v${{ steps.release-check.outputs.APP_TAG }}"
           else
             build_version="v0.0.0-${short_sha}"
           fi
@@ -842,7 +883,7 @@ jobs:
           images: ${{ steps.image-names.outputs.IMAGES }}
           tags: |
             type=sha,prefix=sha-,format=short
-            type=semver,pattern={{version}},value=v${{ steps.app-meta.outputs.RELEASE_VERSION }},enable=${{ steps.release-check.outputs.IS_RELEASE }}
+            type=semver,pattern={{version}},value=v${{ steps.release-check.outputs.APP_TAG }},enable=${{ steps.release-check.outputs.RELEASE_TYPE != 'none' }}
 
       - name: Prepare app-specific secrets
         id: app-secrets
@@ -1006,35 +1047,23 @@ jobs:
               ;;
           esac
 
-          # Extract deployment tag from metadata-action generated tags
-          # Tags are newline-separated, e.g.:
-          #   ghcr.io/owner/repo-my-api:sha-abc123
-          #   ghcr.io/owner/repo-my-api:v1.2.3
-          tags="${{ steps.meta.outputs.tags }}"
-
-          # Filter tags for the selected registry
-          registry_tags=$(echo "$tags" | grep "$registry_url")
-
-          # Select appropriate tag based on release status
-          if [[ "${{ steps.release-check.outputs.IS_RELEASE }}" == "true" ]]; then
-            # For releases, prefer semver tag (contains :v)
-            deployment_image=$(echo "$registry_tags" | grep ":v" | head -1)
-            # Fallback to sha tag if no semver tag found
-            if [[ -z "$deployment_image" ]]; then
-              deployment_image=$(echo "$registry_tags" | grep ":sha-" | head -1)
-            fi
+          # Determine deployment tag based on release status
+          if [[ "${{ steps.release-check.outputs.RELEASE_TYPE }}" != "none" ]]; then
+            # Use version tag from release output directly
+            deployment_tag="v${{ steps.release-check.outputs.APP_TAG }}"
           else
-            # For dev builds, use sha tag
+            # For dev builds, extract sha tag from metadata-action generated tags
+            tags="${{ steps.meta.outputs.tags }}"
+            registry_tags=$(echo "$tags" | grep "$registry_url")
             deployment_image=$(echo "$registry_tags" | grep ":sha-" | head -1)
-          fi
 
-          if [[ -z "$deployment_image" ]]; then
-            echo "::error::No suitable deployment tag found for registry '$registry'"
-            exit 1
-          fi
+            if [[ -z "$deployment_image" ]]; then
+              echo "::error::No suitable deployment tag found for registry '$registry'"
+              exit 1
+            fi
 
-          # Extract just the tag portion (everything after the last colon)
-          deployment_tag="${deployment_image##*:}"
+            deployment_tag="${deployment_image##*:}"
+          fi
 
           echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
           echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
@@ -1043,7 +1072,7 @@ jobs:
           echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
 
       - name: Update Release Deployment
-        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'true'
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.RELEASE_TYPE == 'release'
         uses: abinnovision/actions@run-workflow-dispatch-v1
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
@@ -1053,7 +1082,7 @@ jobs:
             {"application": "${{ steps.gitops-config.outputs.RELEASE_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
 
       - name: Update Dev Deployment
-        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'false'
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.RELEASE_TYPE != 'release'
         uses: abinnovision/actions@run-workflow-dispatch-v1
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
