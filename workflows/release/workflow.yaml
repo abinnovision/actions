@@ -18,17 +18,29 @@ on:
         default: ""
         description: |-
           Branch to release from. Defaults to the repository default branch.
+      prerelease-channel:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Prerelease channel name (e.g., "beta", "canary", "rc").
+          When set, computes prerelease versions for packages with pending changes.
+          Format: {next-version}-{channel}.{commit-count}+{short-sha}
+          Example: 1.4.0-beta.5+a3f2c1d
     outputs:
       releases-created:
         value: ${{ jobs.release.outputs.releases_created }}
         description: |-
           If any releases have been created. This is a boolean value, either "true" or "false".
-      paths-released:
-        value: ${{ jobs.release.outputs.paths_released }}
+      versions:
+        value: ${{ jobs.release.outputs.versions }}
         description: |-
-          All paths which have been released, represented as a JSON array. The output is always encoded as a string.
-
-          Example: `["packages/package-a", "packages/package-b"]`
+          JSON object mapping released package paths to version info.
+          Each entry contains "version" (semver) and "tag" (docker-compatible).
+          Populated for both stable releases and prereleases.
+          Empty object {} when nothing was released or computed.
+          Stable example: {"actions/setup-node": {"version": "1.2.0", "tag": "1.2.0"}}
+          Prerelease example: {"actions/setup-node": {"version": "1.3.0-beta.5+a3f2c1d", "tag": "1.3.0-beta.5-a3f2c1d"}}
 
 jobs:
   release:
@@ -39,10 +51,12 @@ jobs:
       contents: read
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
-      paths_released: ${{ steps.release.outputs.paths_released }}
+      versions: ${{ steps.versions.outputs.versions }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Setup GCP Authentication
         uses: abinnovision/actions@setup-gcp-v1
         with:
@@ -58,3 +72,98 @@ jobs:
         with:
           token: ${{ steps.token.outputs.token }}
           target-branch: ${{ inputs.target-branch }}
+      - id: versions
+        name: Compute versions
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          CHANNEL: ${{ inputs.prerelease-channel }}
+          RELEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
+        shell: bash
+        run: |
+          # Case 1: Stable release — extract versions from release-please outputs.
+          if [[ "${{ steps.release.outputs.releases_created }}" == "true" ]]; then
+            VERSIONS=$(echo "$RELEASE_OUTPUTS" | jq -c '
+              [to_entries[] | select(.key | endswith("--version"))] |
+              map({
+                key: (.key | rtrimstr("--version")),
+                value: {version: .value, tag: .value}
+              }) |
+              from_entries
+            ')
+            echo "versions=${VERSIONS}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Case 2: Prerelease — compute versions from manifest diff.
+          if [[ -n "$CHANNEL" && "${{ steps.release.outputs.prs_created }}" == "true" ]]; then
+            # Determine the release-please PR branch name.
+            TARGET_BRANCH="${{ inputs.target-branch }}"
+            if [[ -z "$TARGET_BRANCH" ]]; then
+              TARGET_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name')
+            fi
+            PR_BRANCH="release-please--branches--${TARGET_BRANCH}"
+
+            # Fetch the manifest from the PR branch via GitHub API.
+            PR_MANIFEST=$(gh api "repos/${{ github.repository }}/contents/.release-please-manifest.json?ref=${PR_BRANCH}" \
+              -q '.content' | base64 -d)
+
+            # Read the current manifest from the checked-out code.
+            CURRENT_MANIFEST=$(cat .release-please-manifest.json)
+
+            # Read release-please config for tag-separator and component overrides.
+            CONFIG=$(cat release-please-config.json)
+            TAG_SEPARATOR=$(echo "$CONFIG" | jq -r '.["tag-separator"] // "-"')
+
+            SHORT_SHA=$(git rev-parse --short HEAD)
+
+            # Diff the two manifests and compute prerelease versions for changed packages.
+            RESULT=$(jq -n \
+              --argjson current "$CURRENT_MANIFEST" \
+              --argjson pr "$PR_MANIFEST" \
+              '
+              reduce ($pr | to_entries[]) as {$key, $value} (
+                {};
+                if $current[$key] != $value then
+                  . + {($key): {current: $current[$key], next: $value}}
+                else . end
+              )
+            ')
+
+            # Build the final versions map.
+            VERSIONS="{}"
+            for PATH_KEY in $(echo "$RESULT" | jq -r 'keys[]'); do
+              CURRENT_VERSION=$(echo "$RESULT" | jq -r --arg p "$PATH_KEY" '.[$p].current')
+              NEXT_VERSION=$(echo "$RESULT" | jq -r --arg p "$PATH_KEY" '.[$p].next')
+
+              # Determine component name: check config for component override, then package.json name.
+              COMPONENT=$(echo "$CONFIG" | jq -r --arg p "$PATH_KEY" '.packages[$p].component // empty')
+              if [[ -z "$COMPONENT" ]]; then
+                if [[ -f "${PATH_KEY}/package.json" ]]; then
+                  COMPONENT=$(jq -r '.name' "${PATH_KEY}/package.json")
+                else
+                  # Use the last segment of the path as fallback.
+                  COMPONENT=$(basename "$PATH_KEY")
+                fi
+              fi
+
+              # Construct the last release tag and count commits since it.
+              LAST_TAG="${COMPONENT}${TAG_SEPARATOR}v${CURRENT_VERSION}"
+              if git rev-parse "$LAST_TAG" >/dev/null 2>&1; then
+                COMMIT_COUNT=$(git rev-list --count "${LAST_TAG}..HEAD")
+              else
+                # If the tag doesn't exist, count all commits.
+                COMMIT_COUNT=$(git rev-list --count HEAD)
+              fi
+
+              VERSION="${NEXT_VERSION}-${CHANNEL}.${COMMIT_COUNT}+${SHORT_SHA}"
+              TAG=$(echo "$VERSION" | tr '+' '-')
+              VERSIONS=$(echo "$VERSIONS" | jq --arg p "$PATH_KEY" --arg v "$VERSION" --arg t "$TAG" \
+                '. + {($p): {version: $v, tag: $t}}')
+            done
+
+            echo "versions=$(echo "$VERSIONS" | jq -c '.')" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Case 3: Nothing released or computed.
+          echo "versions={}" >> "$GITHUB_OUTPUT"
