@@ -36,11 +36,11 @@ on:
         value: ${{ jobs.release.outputs.versions }}
         description: |-
           JSON object mapping released package paths to version info.
-          Each entry contains "version" (semver) and "tag" (docker-compatible).
+          Each entry contains "version" (semver), "tag" (docker-compatible), and "type" ("release" or "prerelease").
           Populated for both stable releases and prereleases.
           Empty object {} when nothing was released or computed.
-          Stable example: {"actions/setup-node": {"version": "1.2.0", "tag": "1.2.0"}}
-          Prerelease example: {"actions/setup-node": {"version": "1.3.0-beta.5+a3f2c1d", "tag": "1.3.0-beta.5-a3f2c1d"}}
+          Stable example: {"actions/setup-node": {"version": "1.2.0", "tag": "1.2.0", "type": "release"}}
+          Prerelease example: {"actions/setup-node": {"version": "1.3.0-beta.5+a3f2c1d", "tag": "1.3.0-beta.5-a3f2c1d", "type": "prerelease"}}
 
 jobs:
   release:
@@ -85,10 +85,9 @@ jobs:
           echo "::endgroup::"
 
           echo "releases_created=${{ steps.release.outputs.releases_created }}"
-          echo "prs_created=${{ steps.release.outputs.prs_created }}"
           echo "prerelease-channel=${CHANNEL:-<none>}"
 
-          # Case 1: Stable release — extract versions from release-please outputs.
+          # Stable release: extract versions from release-please outputs.
           if [[ "${{ steps.release.outputs.releases_created }}" == "true" ]]; then
             echo "→ Case: stable release"
 
@@ -96,114 +95,125 @@ jobs:
               [to_entries[] | select(.key | endswith("--version"))] |
               map({
                 key: (.key | rtrimstr("--version")),
-                value: {version: .value, tag: .value}
+                value: {version: .value, tag: .value, type: "release"}
               }) |
               from_entries
             ')
 
-            echo "::group::Computed versions"
+            echo "::group::Computed stable versions"
             echo "$VERSIONS" | jq .
             echo "::endgroup::"
+          fi
 
-            echo "versions=${VERSIONS}" >> "$GITHUB_OUTPUT"
+          # No prerelease channel configured, output whatever we have and exit.
+          if [[ -z "$CHANNEL" ]]; then
+            echo "→ No prerelease channel configured"
+            echo "versions=${VERSIONS:-"{}"}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Case 2: Prerelease — compute versions from manifest diff.
-          if [[ -n "$CHANNEL" && "${{ steps.release.outputs.prs_created }}" == "true" ]]; then
-            echo "→ Case: prerelease (channel=${CHANNEL})"
+          # Determine the release-please PR branch name.
+          TARGET_BRANCH="${{ inputs.target-branch }}"
+          if [[ -z "$TARGET_BRANCH" ]]; then
+            TARGET_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name')
+          fi
 
-            # Determine the release-please PR branch name.
-            TARGET_BRANCH="${{ inputs.target-branch }}"
-            if [[ -z "$TARGET_BRANCH" ]]; then
-              TARGET_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name')
+          PR_BRANCH="release-please--branches--${TARGET_BRANCH}"
+          echo "target-branch=${TARGET_BRANCH}"
+          echo "pr-branch=${PR_BRANCH}"
+
+          # Check if the release-please PR branch exists.
+          if ! gh api "repos/${{ github.repository }}/branches/${PR_BRANCH}" --silent 2>/dev/null; then
+            echo "→ Release-please PR branch '${PR_BRANCH}' does not exist"
+            echo "versions=${VERSIONS:-"{}"}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Prerelease: compute versions from manifest diff.
+          echo "→ Case: prerelease (channel=${CHANNEL})"
+
+          # Fetch the manifest from the PR branch via GitHub API.
+          PR_MANIFEST=$(gh api "repos/${{ github.repository }}/contents/.release-please-manifest.json?ref=${PR_BRANCH}" \
+            -q '.content' | base64 -d)
+
+          # Read the current manifest from the checked-out code.
+          CURRENT_MANIFEST=$(cat .release-please-manifest.json)
+
+          echo "::group::Manifest comparison"
+          echo "Current manifest:"
+          echo "$CURRENT_MANIFEST" | jq .
+          echo "PR manifest:"
+          echo "$PR_MANIFEST" | jq .
+          echo "::endgroup::"
+
+          # Read release-please config for tag-separator and component overrides.
+          CONFIG=$(cat release-please-config.json)
+          TAG_SEPARATOR=$(echo "$CONFIG" | jq -r '.["tag-separator"] // "-"')
+
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "tag-separator=${TAG_SEPARATOR}"
+          echo "short-sha=${SHORT_SHA}"
+
+          # Diff the two manifests and compute prerelease versions for changed packages.
+          RESULT=$(jq -n \
+            --argjson current "$CURRENT_MANIFEST" \
+            --argjson pr "$PR_MANIFEST" \
+            '
+            reduce ($pr | to_entries[]) as {$key, $value} (
+              {};
+              if $current[$key] != $value then
+                . + {($key): {current: $current[$key], next: $value}}
+              else . end
+            )
+          ')
+
+          echo "::group::Changed packages"
+          echo "$RESULT" | jq .
+          echo "::endgroup::"
+
+          # Build the final versions map, starting from any stable versions.
+          VERSIONS="${VERSIONS:-"{}"}"
+          for PATH_KEY in $(echo "$RESULT" | jq -r 'keys[]'); do
+            # Skip packages already covered by a stable release.
+            if echo "$VERSIONS" | jq -e --arg p "$PATH_KEY" 'has($p)' >/dev/null 2>&1; then
+              echo "  ${PATH_KEY}: skipped (stable release already computed)"
+              continue
             fi
-            PR_BRANCH="release-please--branches--${TARGET_BRANCH}"
-            echo "target-branch=${TARGET_BRANCH}"
-            echo "pr-branch=${PR_BRANCH}"
 
-            # Fetch the manifest from the PR branch via GitHub API.
-            PR_MANIFEST=$(gh api "repos/${{ github.repository }}/contents/.release-please-manifest.json?ref=${PR_BRANCH}" \
-              -q '.content' | base64 -d)
+            CURRENT_VERSION=$(echo "$RESULT" | jq -r --arg p "$PATH_KEY" '.[$p].current')
+            NEXT_VERSION=$(echo "$RESULT" | jq -r --arg p "$PATH_KEY" '.[$p].next')
 
-            # Read the current manifest from the checked-out code.
-            CURRENT_MANIFEST=$(cat .release-please-manifest.json)
-
-            echo "::group::Manifest comparison"
-            echo "Current manifest:"
-            echo "$CURRENT_MANIFEST" | jq .
-            echo "PR manifest:"
-            echo "$PR_MANIFEST" | jq .
-            echo "::endgroup::"
-
-            # Read release-please config for tag-separator and component overrides.
-            CONFIG=$(cat release-please-config.json)
-            TAG_SEPARATOR=$(echo "$CONFIG" | jq -r '.["tag-separator"] // "-"')
-
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            echo "tag-separator=${TAG_SEPARATOR}"
-            echo "short-sha=${SHORT_SHA}"
-
-            # Diff the two manifests and compute prerelease versions for changed packages.
-            RESULT=$(jq -n \
-              --argjson current "$CURRENT_MANIFEST" \
-              --argjson pr "$PR_MANIFEST" \
-              '
-              reduce ($pr | to_entries[]) as {$key, $value} (
-                {};
-                if $current[$key] != $value then
-                  . + {($key): {current: $current[$key], next: $value}}
-                else . end
-              )
-            ')
-
-            echo "::group::Changed packages"
-            echo "$RESULT" | jq .
-            echo "::endgroup::"
-
-            # Build the final versions map.
-            VERSIONS="{}"
-            for PATH_KEY in $(echo "$RESULT" | jq -r 'keys[]'); do
-              CURRENT_VERSION=$(echo "$RESULT" | jq -r --arg p "$PATH_KEY" '.[$p].current')
-              NEXT_VERSION=$(echo "$RESULT" | jq -r --arg p "$PATH_KEY" '.[$p].next')
-
-              # Determine component name: check config for component override, then package.json name.
-              COMPONENT=$(echo "$CONFIG" | jq -r --arg p "$PATH_KEY" '.packages[$p].component // empty')
-              if [[ -z "$COMPONENT" ]]; then
-                if [[ -f "${PATH_KEY}/package.json" ]]; then
-                  COMPONENT=$(jq -r '.name' "${PATH_KEY}/package.json")
-                else
-                  # Use the last segment of the path as fallback.
-                  COMPONENT=$(basename "$PATH_KEY")
-                fi
-              fi
-
-              # Construct the last release tag and count commits since it.
-              LAST_TAG="${COMPONENT}${TAG_SEPARATOR}v${CURRENT_VERSION}"
-              if git rev-parse "$LAST_TAG" >/dev/null 2>&1; then
-                COMMIT_COUNT=$(git rev-list --count "${LAST_TAG}..HEAD")
+            # Determine component name: check config for component override, then package.json name.
+            COMPONENT=$(echo "$CONFIG" | jq -r --arg p "$PATH_KEY" '.packages[$p].component // empty')
+            if [[ -z "$COMPONENT" ]]; then
+              if [[ -f "${PATH_KEY}/package.json" ]]; then
+                COMPONENT=$(jq -r '.name' "${PATH_KEY}/package.json")
               else
-                # If the tag doesn't exist, count all commits.
-                COMMIT_COUNT=$(git rev-list --count HEAD)
+                # Use the last segment of the path as fallback.
+                COMPONENT=$(basename "$PATH_KEY")
               fi
+            fi
 
-              VERSION="${NEXT_VERSION}-${CHANNEL}.${COMMIT_COUNT}+${SHORT_SHA}"
-              TAG=$(echo "$VERSION" | tr '+' '-')
+            # Construct the last release tag and count commits since it.
+            LAST_TAG="${COMPONENT}${TAG_SEPARATOR}v${CURRENT_VERSION}"
+            if git rev-parse "$LAST_TAG" >/dev/null 2>&1; then
+              COMMIT_COUNT=$(git rev-list --count "${LAST_TAG}..HEAD")
+            else
+              # If the tag doesn't exist, count all commits.
+              COMMIT_COUNT=$(git rev-list --count HEAD)
+            fi
 
-              echo "  ${PATH_KEY}: ${CURRENT_VERSION} → ${VERSION} (component=${COMPONENT}, tag=${LAST_TAG}, commits=${COMMIT_COUNT})"
+            VERSION="${NEXT_VERSION}-${CHANNEL}.${COMMIT_COUNT}+${SHORT_SHA}"
+            TAG=$(echo "$VERSION" | tr '+' '-')
 
-              VERSIONS=$(echo "$VERSIONS" | jq --arg p "$PATH_KEY" --arg v "$VERSION" --arg t "$TAG" \
-                '. + {($p): {version: $v, tag: $t}}')
-            done
+            echo "  ${PATH_KEY}: ${CURRENT_VERSION} → ${VERSION} (component=${COMPONENT}, tag=${LAST_TAG}, commits=${COMMIT_COUNT})"
 
-            echo "::group::Computed versions"
-            echo "$VERSIONS" | jq .
-            echo "::endgroup::"
+            VERSIONS=$(echo "$VERSIONS" | jq --arg p "$PATH_KEY" --arg v "$VERSION" --arg t "$TAG" \
+              '. + {($p): {version: $v, tag: $t, type: "prerelease"}}')
+          done
 
-            echo "versions=$(echo "$VERSIONS" | jq -c '.')" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          echo "::group::Computed prerelease versions"
+          echo "$VERSIONS" | jq .
+          echo "::endgroup::"
 
-          # Case 3: Nothing released or computed.
-          echo "→ Case: no release (no stable releases created, no prerelease channel or no PRs created)"
-          echo "versions={}" >> "$GITHUB_OUTPUT"
+          echo "versions=$(echo "$VERSIONS" | jq -c '.')" >> "$GITHUB_OUTPUT"
