@@ -436,7 +436,7 @@ jobs:
       - configure
       - check_build
       - test
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-dev
     secrets: inherit
     with:
       prerelease-channel: ${{ inputs.prerelease-channel }}
