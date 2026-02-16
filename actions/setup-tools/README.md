@@ -24,7 +24,6 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@setup-tools-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@setup-tools-v1.0`: Targeting minor version <!-- x-release-please-minor -->
 - `abinnovision/actions@setup-tools-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
