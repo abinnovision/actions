@@ -203,7 +203,6 @@ Handlebars.registerHelper(
 		const text = `This ${type} can be used with different version ranges. The following ranges are available:
 
 - ${forVersion(version.major)}: Targeting major version <!-- x-release-please-major -->
-- ${forVersion(version.minor)}: Targeting minor version <!-- x-release-please-minor -->
 - ${forVersion(version.full)}: Targeting a patch version <!-- x-release-please-version -->`;
 
 		return new Handlebars.SafeString(text);
