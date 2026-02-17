@@ -63,7 +63,7 @@ jobs:
           identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
       - id: release
         name: Run release-please
-        uses: ./actions/run-release-please
+        uses: abinnovision/actions@run-release-please-dev
         with:
           token: ${{ steps.token.outputs.token }}
           prerelease-channel: ${{ inputs.prerelease-channel }}
