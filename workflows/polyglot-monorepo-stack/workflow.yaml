@@ -433,15 +433,40 @@ jobs:
     # Only on push to default branch. always() prevents skipping when test job is skipped.
     if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
 
+  # Extract released apps from versions output into a matrix-compatible format.
+  prepare_release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [release]
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.versions != '{}'
+    outputs:
+      released-apps: ${{ steps.extract.outputs.released_apps }}
+      has-released-apps: ${{ steps.extract.outputs.has_released_apps }}
+      released-packages: ${{ steps.extract.outputs.released_packages }}
+      has-released-packages: ${{ steps.extract.outputs.has_released_packages }}
+    steps:
+      - name: Extract released apps and packages
+        id: extract
+        run: |
+          VERSIONS='${{ needs.release.outputs.versions }}'
+          released_apps=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("apps/")) | {app: (.key | ltrimstr("apps/")), version: .value.version, tag: .value.tag, type: .value.type}]')
+          echo "released_apps=$released_apps" >> $GITHUB_OUTPUT
+          echo "has_released_apps=$(echo "$released_apps" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
+
+          released_packages=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("packages/")) | {package: (.key | ltrimstr("packages/")), version: .value.version, tag: .value.tag, type: .value.type}]')
+          echo "released_packages=$released_packages" >> $GITHUB_OUTPUT
+          echo "has_released_packages=$(echo "$released_packages" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
+
   packages_publish:
     name: Publish Packages
     runs-on: ubuntu-latest
     needs:
       - configure
-      - release
+      - prepare_release
     if: >-
       always() && !cancelled() && !contains(needs.*.result, 'failure')
-      && needs.release.outputs.versions != '{}'
+      && needs.prepare_release.outputs.has-released-packages == 'true'
       && inputs.enable-package-publishing
     permissions:
       contents: "write"
@@ -482,14 +507,13 @@ jobs:
         run: |
           set -e
 
-          echo '${{ needs.release.outputs.versions }}' | jq -cr 'keys[]' | while read path; do
-            echo "Processing package at: $path"
+          echo '${{ needs.prepare_release.outputs.released-packages }}' | jq -c '.[]' | while read -r entry; do
+            package=$(echo "$entry" | jq -r '.package')
+            RELEASE_VERSION=$(echo "$entry" | jq -r '.version')
+            RELEASE_TYPE=$(echo "$entry" | jq -r '.type')
+            path="packages/$package"
 
-            # Skip if not a package directory
-            if [[ ! "$path" == packages/* ]]; then
-              echo "Skipping $path - not a package"
-              continue
-            fi
+            echo "Processing package at: $path"
 
             # Read package.json
             package_json="$path/package.json"
@@ -516,15 +540,13 @@ jobs:
               continue
             fi
 
-            # Get version from release output and update package.json
-            RELEASE_VERSION=$(echo '${{ needs.release.outputs.versions }}' | jq -r --arg p "$path" '.[$p].version // empty')
+            # Update package.json with release version
             if [[ -n "$RELEASE_VERSION" ]]; then
               jq --arg v "$RELEASE_VERSION" '.version = $v' "$package_json" > "${package_json}.tmp" && mv "${package_json}.tmp" "$package_json"
             fi
 
             # Determine npm dist-tag
             NPM_TAG=""
-            RELEASE_TYPE=$(echo '${{ needs.release.outputs.versions }}' | jq -r --arg p "$path" '.[$p].type // empty')
             if [[ -n "${{ inputs.prerelease-channel }}" ]] && [[ "$RELEASE_TYPE" == "prerelease" ]]; then
               NPM_TAG="--tag ${{ inputs.prerelease-channel }}"
             fi
@@ -573,43 +595,26 @@ jobs:
             fi
           done
 
-  # Build and publish Docker images for apps.
-  # Images are only built when a version exists (stable release or prerelease).
+  # Build and publish Docker images for released apps.
+  # Matrix is driven by prepare_release, which filters to only released apps.
   apps_build_images:
-    name: Build Image - ${{ matrix.app }}
+    name: Build Image - ${{ matrix.entry.app }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
       - configure
-      - release
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && needs.release.outputs.versions != '{}'
+      - prepare_release
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && needs.prepare_release.outputs.has-released-apps == 'true'
     strategy:
       fail-fast: false
       matrix:
-        app: ${{ fromJSON(needs.configure.outputs.apps) }}
+        entry: ${{ fromJSON(needs.prepare_release.outputs.released-apps) }}
     permissions:
       contents: "read"
       id-token: "write"
       packages: "write"
     steps:
-      - name: Determine if this is a release build
-        id: release-check
-        run: |
-          VERSIONS='${{ needs.release.outputs.versions }}'
-          APP_VERSION=$(echo "$VERSIONS" | jq -r --arg app "apps/${{ matrix.app }}" '.[$app].version // empty')
-          APP_TAG=$(echo "$VERSIONS" | jq -r --arg app "apps/${{ matrix.app }}" '.[$app].tag // empty')
-          APP_TYPE=$(echo "$VERSIONS" | jq -r --arg app "apps/${{ matrix.app }}" '.[$app].type // empty')
-
-          if [[ -n "$APP_VERSION" ]]; then
-            echo "RELEASE_TYPE=${APP_TYPE}" >> $GITHUB_OUTPUT
-            echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
-            echo "APP_TAG=$APP_TAG" >> $GITHUB_OUTPUT
-          else
-            echo "RELEASE_TYPE=none" >> $GITHUB_OUTPUT
-          fi
-
       - name: Checkout
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
@@ -617,7 +622,6 @@ jobs:
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
 
       - name: Validate Makefile
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         run: |
           if [ ! -f "Makefile" ]; then
             echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
@@ -630,7 +634,7 @@ jobs:
           fi
 
       - name: Validate GitOps configuration
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none' && inputs.gitops-app-config != ''
+        if: inputs.gitops-app-config != ''
         run: |
           if [[ -z "${{ secrets.GITOPS_PROXY_URL }}" ]]; then
             echo "::error::GITOPS_PROXY_URL secret is required when gitops-app-config is provided"
@@ -638,36 +642,33 @@ jobs:
           fi
 
       - name: Setup Tools
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         uses: abinnovision/actions@setup-tools-v1
 
       - name: Install dependencies
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         run: make install-immutable
 
       - name: Prepare build and extract metadata
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         id: app-meta
         run: |
           # Validate that the app directory exists
-          if [ ! -d "apps/${{ matrix.app }}" ]; then
-            echo "::error::App directory apps/${{ matrix.app }} not found"
+          if [ ! -d "apps/${{ matrix.entry.app }}" ]; then
+            echo "::error::App directory apps/${{ matrix.entry.app }} not found"
             exit 1
           fi
 
           # Validate that Dockerfile exists
-          if [ ! -f "apps/${{ matrix.app }}/Dockerfile" ]; then
-            echo "::error::Dockerfile not found for app ${{ matrix.app }}"
+          if [ ! -f "apps/${{ matrix.entry.app }}/Dockerfile" ]; then
+            echo "::error::Dockerfile not found for app ${{ matrix.entry.app }}"
             exit 1
           fi
 
           # Extract package version
-          if [ -f "apps/${{ matrix.app }}/package.json" ]; then
-            version=$(jq -r '.version' "apps/${{ matrix.app }}/package.json")
+          if [ -f "apps/${{ matrix.entry.app }}/package.json" ]; then
+            version=$(jq -r '.version' "apps/${{ matrix.entry.app }}/package.json")
             echo "RELEASE_VERSION=$version" >> $GITHUB_OUTPUT
             echo "App version: $version"
           else
-            echo "::error::package.json not found for app ${{ matrix.app }}"
+            echo "::error::package.json not found for app ${{ matrix.entry.app }}"
             exit 1
           fi
 
@@ -705,7 +706,6 @@ jobs:
           fi
 
       - name: Prepare build with turbo prune
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         run: |
           # Get turbo version from package.json (required)
           TURBO_VERSION=$(jq -r '.devDependencies.turbo // .dependencies.turbo // empty' package.json)
@@ -718,7 +718,7 @@ jobs:
           echo "Turbo version: $TURBO_VERSION"
 
           # Read the package name from the app's package.json
-          APP_PACKAGE_JSON="apps/${{ matrix.app }}/package.json"
+          APP_PACKAGE_JSON="apps/${{ matrix.entry.app }}/package.json"
           if [ ! -f "$APP_PACKAGE_JSON" ]; then
             echo "::error::package.json not found at $APP_PACKAGE_JSON"
             exit 1
@@ -733,7 +733,7 @@ jobs:
           echo "Package name (scope): $SCOPE_NAME"
 
           # Create app-specific output directory
-          OUTPUT_DIR="out/${{ matrix.app }}"
+          OUTPUT_DIR="out/${{ matrix.entry.app }}"
           echo "Creating output directory: $OUTPUT_DIR"
 
           # Clean up existing output directory
@@ -752,17 +752,16 @@ jobs:
           fi
 
       - name: Calculate build version
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         id: build-version
         run: |
           short_sha=$(git rev-parse --short HEAD)
           full_sha=$(git rev-parse HEAD)
 
-          if [[ "${{ steps.release-check.outputs.RELEASE_TYPE }}" == "release" ]]; then
-            build_version="v${{ steps.release-check.outputs.APP_TAG }}-${short_sha}"
+          if [[ "${{ matrix.entry.type }}" == "release" ]]; then
+            build_version="v${{ matrix.entry.tag }}-${short_sha}"
           else
             # Prerelease tag already contains sha
-            build_version="v${{ steps.release-check.outputs.APP_TAG }}"
+            build_version="v${{ matrix.entry.tag }}"
           fi
 
           echo "BUILD_VERSION=$build_version" >> $GITHUB_OUTPUT
@@ -773,11 +772,10 @@ jobs:
           echo "Build commit: $full_sha"
 
       - name: Setup Docker Buildx
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         uses: docker/setup-buildx-action@v3
 
       - name: Setup GCP Authentication
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none' && inputs.enable-apps-registry-gcpar && inputs.gcp-auth != ''
+        if: inputs.enable-apps-registry-gcpar && inputs.gcp-auth != ''
         id: gcp-auth
         uses: abinnovision/actions@setup-gcp-v1
         with:
@@ -785,7 +783,7 @@ jobs:
           token_format: "access_token"
 
       - name: Login to GCP Artifact Registry
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none' && inputs.enable-apps-registry-gcpar && inputs.registry-gcpar-url != ''
+        if: inputs.enable-apps-registry-gcpar && inputs.registry-gcpar-url != ''
         uses: docker/login-action@v3
         with:
           registry: ${{ inputs.registry-gcpar-url }}
@@ -793,7 +791,7 @@ jobs:
           password: "${{ steps.gcp-auth.outputs.access_token }}"
 
       - name: Login to GitHub Container Registry
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none' && inputs.enable-apps-registry-ghcr
+        if: inputs.enable-apps-registry-ghcr
         uses: docker/login-action@v3
         with:
           registry: "ghcr.io"
@@ -801,7 +799,7 @@ jobs:
           password: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Login to DockerHub
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none' && inputs.enable-apps-registry-dockerhub
+        if: inputs.enable-apps-registry-dockerhub
         uses: docker/login-action@v3
         with:
           registry: ${{ inputs.registry-dockerhub-url }}
@@ -809,7 +807,6 @@ jobs:
           password: ${{ secrets.REGISTRY_DOCKERHUB_TOKEN }}
 
       - name: Prepare image names
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         id: image-names
         run: |
           images=""
@@ -818,8 +815,8 @@ jobs:
 
           # GCP Artifact Registry (gcpar), with registry caching
           if [[ "${{ inputs.enable-apps-registry-gcpar }}" == "true" ]] && [[ -n "${{ inputs.registry-gcpar-url }}" ]]; then
-            gcpar_image="${{ inputs.registry-gcpar-url }}/app-${{ matrix.app }}"
-            gcpar_cache="${{ inputs.registry-gcpar-url }}/app-${{ matrix.app }}-cache"
+            gcpar_image="${{ inputs.registry-gcpar-url }}/app-${{ matrix.entry.app }}"
+            gcpar_cache="${{ inputs.registry-gcpar-url }}/app-${{ matrix.entry.app }}-cache"
 
             echo "IMAGE_GCPAR=$gcpar_image" >> $GITHUB_OUTPUT
             images="$gcpar_image"
@@ -834,7 +831,7 @@ jobs:
 
           # GitHub Container Registry (ghcr)
           if [[ "${{ inputs.enable-apps-registry-ghcr }}" == "true" ]]; then
-            ghcr_image="ghcr.io/${{ github.repository_owner }}/$(basename ${{ github.repository }})-${{ matrix.app }}"
+            ghcr_image="ghcr.io/${{ github.repository_owner }}/$(basename ${{ github.repository }})-${{ matrix.entry.app }}"
             echo "IMAGE_GHCR=$ghcr_image" >> $GITHUB_OUTPUT
 
             if [[ -n "$images" ]]; then
@@ -848,7 +845,7 @@ jobs:
 
           # DockerHub
           if [[ "${{ inputs.enable-apps-registry-dockerhub }}" == "true" ]]; then
-            dockerhub_image="${{ inputs.registry-dockerhub-url }}/${{ inputs.registry-dockerhub-username }}/$(basename ${{ github.repository }})-${{ matrix.app }}"
+            dockerhub_image="${{ inputs.registry-dockerhub-url }}/${{ inputs.registry-dockerhub-username }}/$(basename ${{ github.repository }})-${{ matrix.entry.app }}"
             echo "IMAGE_DOCKERHUB=$dockerhub_image" >> $GITHUB_OUTPUT
 
             if [[ -n "$images" ]]; then
@@ -871,17 +868,15 @@ jobs:
           echo "Configured registries: $(echo "$images" | wc -l | xargs)"
 
       - name: Extract Docker metadata
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.image-names.outputs.IMAGES }}
           tags: |
             type=sha,prefix=sha-,format=short
-            type=semver,pattern={{version}},value=v${{ steps.release-check.outputs.APP_TAG }}
+            type=semver,pattern={{version}},value=v${{ matrix.entry.tag }}
 
       - name: Prepare app-specific secrets
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         id: app-secrets
         env:
           # CSV format: app-name,secret-name,secret-value (one per line)
@@ -903,9 +898,9 @@ jobs:
               [[ -z "$line" ]] && continue
 
               # Check if line starts with our app name followed by comma
-              if [[ "$line" =~ ^${{ matrix.app }}, ]]; then
+              if [[ "$line" =~ ^${{ matrix.entry.app }}, ]]; then
                 # Remove "app-name," prefix
-                rest="${line#${{ matrix.app }},}"
+                rest="${line#${{ matrix.entry.app }},}"
 
                 # Split on first comma only: secret-name,secret-value
                 secret_name="${rest%%,*}"
@@ -932,7 +927,7 @@ jobs:
               echo "SECRETS_MOUNT_STRING<<EOF" >> $GITHUB_OUTPUT
               echo "$secrets_mount_string" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
-              echo "App-specific secrets prepared for ${{ matrix.app }}"
+              echo "App-specific secrets prepared for ${{ matrix.entry.app }}"
             else
               echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
               rm -rf "$secrets_dir"
@@ -942,19 +937,18 @@ jobs:
           fi
 
       - name: Build and push Docker image
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         id: build
         uses: docker/build-push-action@v6
         with:
           context: "."
           push: true
-          file: apps/${{ matrix.app }}/Dockerfile
+          file: apps/${{ matrix.entry.app }}/Dockerfile
           cache-from: ${{ steps.image-names.outputs.CACHE_FROM }}
           cache-to: ${{ steps.image-names.outputs.CACHE_TO }}
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
-            app_name=${{ matrix.app }}
+            app_name=${{ matrix.entry.app }}
             node_version=${{ steps.app-meta.outputs.NODE_VERSION }}
             python_version=${{ steps.app-meta.outputs.PYTHON_VERSION }}
             golang_version=${{ steps.app-meta.outputs.GOLANG_VERSION }}
@@ -965,9 +959,8 @@ jobs:
             ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && steps.app-secrets.outputs.SECRETS_MOUNT_STRING || '' }}
 
       - name: Display built image references
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none'
         run: |
-          echo "Successfully built and pushed the following images for ${{ matrix.app }}:"
+          echo "Successfully built and pushed the following images for ${{ matrix.entry.app }}:"
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
             echo "  - $tag"
           done
@@ -975,7 +968,7 @@ jobs:
           echo "Image digest: ${{ steps.build.outputs.digest }}"
 
       - name: Parse GitOps configuration and extract deployment tag
-        if: steps.release-check.outputs.RELEASE_TYPE != 'none' && inputs.gitops-app-config != ''
+        if: inputs.gitops-app-config != ''
         id: gitops-config
         env:
           GITOPS_APP_CONFIG: ${{ inputs.gitops-app-config }}
@@ -994,9 +987,9 @@ jobs:
               [[ -z "$line" ]] && continue
 
               # Check if line starts with our app name followed by comma
-              if [[ "$line" =~ ^${{ matrix.app }}, ]]; then
+              if [[ "$line" =~ ^${{ matrix.entry.app }}, ]]; then
                 # Remove "app-name," prefix
-                rest="${line#${{ matrix.app }},}"
+                rest="${line#${{ matrix.entry.app }},}"
 
                 # Split on first 5 commas
                 target_repo="${rest%%,*}"
@@ -1019,7 +1012,7 @@ jobs:
 
           # Validate that all required fields are present
           if [[ -z "$target_repo" ]] || [[ -z "$dev_app" ]] || [[ -z "$release_app" ]] || [[ -z "$registry" ]] || [[ -z "$image_name" ]]; then
-            echo "::warning::GitOps configuration for app '${{ matrix.app }}' is incomplete or not provided. Skipping GitOps deployment."
+            echo "::warning::GitOps configuration for app '${{ matrix.entry.app }}' is incomplete or not provided. Skipping GitOps deployment."
             echo "  target_repo: ${target_repo:-(empty)}"
             echo "  dev_app: ${dev_app:-(empty)}"
             echo "  release_app: ${release_app:-(empty)}"
@@ -1040,13 +1033,13 @@ jobs:
               registry_url="${{ steps.image-names.outputs.IMAGE_DOCKERHUB }}"
               ;;
             *)
-              echo "::error::Invalid registry '$registry' for app ${{ matrix.app }}. Valid options: ghcr, gcpar, dockerhub"
+              echo "::error::Invalid registry '$registry' for app ${{ matrix.entry.app }}. Valid options: ghcr, gcpar, dockerhub"
               exit 1
               ;;
           esac
 
           # Use version tag from release output directly
-          deployment_tag="v${{ steps.release-check.outputs.APP_TAG }}"
+          deployment_tag="v${{ matrix.entry.tag }}"
 
           echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
           echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
@@ -1055,7 +1048,7 @@ jobs:
           echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
 
       - name: Update Release Deployment
-        if: steps.release-check.outputs.RELEASE_TYPE == 'release' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
+        if: matrix.entry.type == 'release' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
         uses: abinnovision/actions@run-workflow-dispatch-v1
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
@@ -1065,7 +1058,7 @@ jobs:
             {"application": "${{ steps.gitops-config.outputs.RELEASE_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
 
       - name: Update Dev Deployment
-        if: steps.release-check.outputs.RELEASE_TYPE == 'prerelease' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
+        if: matrix.entry.type == 'prerelease' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
         uses: abinnovision/actions@run-workflow-dispatch-v1
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
