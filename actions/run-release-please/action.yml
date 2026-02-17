@@ -23,5 +23,5 @@ outputs:
       Each entry: {version: "semver", tag: "docker-compatible", type: "release"|"prerelease"}.
       Empty object {} when nothing was released or computed.
 runs:
-  using: node16
+  using: node20
   main: dist/index.js
