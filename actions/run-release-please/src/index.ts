@@ -90,7 +90,7 @@ function extractStableVersions(releases: CreatedRelease[]): VersionsMap {
 	const versions: VersionsMap = {};
 	for (const release of releases) {
 		const path = release.path || ".";
-		const version = release.version || release.tagName.version.toString();
+		const version = release.version;
 		versions[path] = { version, tag: version, type: "release" };
 	}
 	return versions;
