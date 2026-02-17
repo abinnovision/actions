@@ -148,6 +148,7 @@ const computePrereleaseVersions = async (
 	const { owner, repo } = context.repo;
 	const versions = { ...existingVersions };
 
+	// Get strategies by path for component/tag construction.
 	const strategiesByPath = await getStrategiesByPath(manifest);
 
 	// Determine the release-please PR branch using release-please's own BranchName.
@@ -195,10 +196,7 @@ const computePrereleaseVersions = async (
 	for (const [path, nextVersion] of Object.entries(prManifest)) {
 		const currentVersion = currentVersions[path]?.toString();
 		if (currentVersion !== nextVersion) {
-			changedPackages[path] = {
-				current: currentVersion,
-				next: nextVersion,
-			};
+			changedPackages[path] = { current: currentVersion, next: nextVersion };
 		}
 	}
 
@@ -208,9 +206,6 @@ const computePrereleaseVersions = async (
 
 	const octokit = getOctokit(token);
 	const shortSha = context.sha.substring(0, 7);
-
-	// Lazily resolved genesis commit SHA — used as fallback base when a release tag doesn't exist.
-	let genesisCommitSha: string | undefined;
 
 	// Compute prerelease version for each changed package.
 	for (const [
@@ -258,40 +253,15 @@ const computePrereleaseVersions = async (
 
 			commitCount = data.ahead_by;
 		} catch {
-			// Tag doesn't exist... resolve genesis commit and compare from there.
-			if (!genesisCommitSha) {
-				const { headers, data } = await octokit.rest.repos.listCommits({
-					owner,
-					repo,
-					sha: context.sha,
-					per_page: 1,
-				});
-
-				const lastPageMatch = headers.link?.match(/page=(\d+)>; rel="last"/);
-
-				if (lastPageMatch) {
-					const lastPage = parseInt(lastPageMatch[1], 10);
-					const { data: lastPageData } = await octokit.rest.repos.listCommits({
-						owner,
-						repo,
-						sha: context.sha,
-						per_page: 1,
-						page: lastPage,
-					});
-					genesisCommitSha = lastPageData[0].sha;
-				} else {
-					// Only one page — the first commit is the genesis commit.
-					genesisCommitSha = data[0].sha;
-				}
-			}
-
-			const { data } = await octokit.rest.repos.compareCommitsWithBasehead({
+			// Tag doesn't exist (e.g., first release). Get total commit count via Link header.
+			const { headers } = await octokit.rest.repos.listCommits({
 				owner,
 				repo,
-				basehead: `${genesisCommitSha}...${context.sha}`,
+				sha: context.sha,
+				per_page: 1,
 			});
-			// ahead_by doesn't include the base commit itself, so add 1.
-			commitCount = data.ahead_by + 1;
+			const match = headers.link?.match(/page=(\d+)>; rel="last"/);
+			commitCount = match ? parseInt(match[1], 10) : 1;
 		}
 
 		// Build prerelease version and docker-compatible tag.
