@@ -10,6 +10,9 @@
 		"actions/run-commitlint": {
 			"extra-files": ["README.md"]
 		},
+		"actions/run-release-please": {
+			"extra-files": ["README.md"]
+		},
 		"actions/setup-gcp": {
 			"extra-files": ["README.md"]
 		},
