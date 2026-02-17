@@ -1039,7 +1039,7 @@ jobs:
           esac
 
           # Use version tag from release output directly
-          deployment_tag="v${{ matrix.entry.tag }}"
+          deployment_tag="${{ matrix.entry.tag }}"
 
           echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
           echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
