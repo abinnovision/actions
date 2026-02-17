@@ -205,9 +205,6 @@ on:
           When set, computes prerelease versions and publishes with corresponding dist-tags.
 
     outputs:
-      releases-created:
-        value: ${{ jobs.release.outputs.releases-created }}
-        description: Whether any stable releases were created ("true"/"false").
       versions:
         value: ${{ jobs.release.outputs.versions }}
         description: |-

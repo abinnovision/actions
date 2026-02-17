@@ -410,7 +410,7 @@ jobs:
     needs:
       - configure
       - release
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.releases-created && inputs.enable-package-publishing
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.versions != '{}' && inputs.enable-package-publishing
     permissions:
       contents: "write"
       id-token: "write"

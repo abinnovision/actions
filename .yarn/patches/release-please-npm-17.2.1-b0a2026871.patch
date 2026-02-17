@@ -1,0 +1,31 @@
+diff --git a/package.json b/package.json
+index 5785aaaf94842ec5f6ba66086acf3abd7d8ebcf6..917c755c34be662fded17191e15484e1ce07a2ec 100644
+--- a/package.json
++++ b/package.json
+@@ -2,8 +2,24 @@
+   "name": "release-please",
+   "version": "17.2.1",
+   "description": "generate release PRs based on the conventionalcommits.org spec",
+-  "main": "./build/src/index.js",
+-  "bin": "./build/src/bin/release-please.js",
++  "exports": {
++    ".": {
++      "types": "./build/src/index.d.ts",
++      "default": "./build/src/index.js"
++    },
++    "./util/tag-name": {
++      "types": "./build/src/util/tag-name.d.ts",
++      "default": "./build/src/util/tag-name.js"
++    },
++    "./util/branch-name": {
++      "types": "./build/src/util/branch-name.d.ts",
++      "default": "./build/src/util/branch-name.js"
++    },
++    "./version": {
++      "types": "./build/src/version.d.ts",
++      "default": "./build/src/version.js"
++    }
++  },
+   "scripts": {
+     "test": "cross-env ENVIRONMENT=test LC_ALL=en c8 mocha --node-option no-experimental-fetch --recursive --timeout=5000 build/test",
+     "docs": "echo add docs tests",
