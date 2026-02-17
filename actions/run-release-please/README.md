@@ -6,7 +6,7 @@ with sane defaults (repo-based configuration via release-please-config.json).
 
 ## How it works
 
-This action wraps [release-please](https://github.com/googleapis/release-please) and extends it with prerelease channel support.
+This action wraps [release-please](https://github.com/googleapis/release-please) and extends it with prerelease channel support. It replaces both `googleapis/release-please-action@v4` and the companion bash script that was previously needed to compute version metadata.
 
 ### Stable releases
 
