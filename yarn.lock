@@ -1932,12 +1932,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"conventional-changelog-angular@npm:^8.1.0":
+"conventional-changelog-angular@npm:8.1.0, conventional-changelog-angular@npm:^8.1.0":
   version: 8.1.0
   resolution: "conventional-changelog-angular@npm:8.1.0"
   dependencies:
     compare-func: "npm:^2.0.0"
   checksum: 10/2211efa2bebbb00c3976d7b860979d3c04c2bcbb661cfc0c61445986dd3efa391f6e56636482cda83dfb3da3e2327a05c80f647a9147072627046bcbe0de7d39
+  languageName: node
+  linkType: hard
+
+"conventional-changelog-angular@patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch":
+  version: 8.1.0
+  resolution: "conventional-changelog-angular@patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch::version=8.1.0&hash=88c1ec"
+  dependencies:
+    compare-func: "npm:^2.0.0"
+  checksum: 10/9946858c38ae95b94ea77d90901bae3bf19e1e5abee2edefecc83e41d9210002774ad02ec074d1991536fa5b97a177688ce56b0dba2fbd61339ac3d0cbd7eb91
   languageName: node
   linkType: hard
 
@@ -5057,6 +5066,7 @@ __metadata:
     "@commitlint/types": "npm:^20.4.0"
     "@vercel/ncc": "npm:^0.38.4"
     chalk: "npm:^5.3.0"
+    conventional-changelog-angular: "patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch"
     conventional-changelog-conventionalcommits: "patch:conventional-changelog-conventionalcommits@npm%3A9.1.0#~/.yarn/patches/conventional-changelog-conventionalcommits-npm-9.1.0-d8dfa4c13e.patch"
     eslint: "npm:^9.39.2"
     prettier: "npm:^3.8.1"
