@@ -63,7 +63,7 @@ jobs:
           yarn readme:generate
           git diff --exit-code || (echo "README files are not up to date, run 'yarn readme:generate'" && exit 1)
       - name: Check Action References
-        run: tsx scripts/check-action-refs.ts
+        run: yarn tsx scripts/check-action-refs.ts
       - name: Check Dependencies
         run: |
           yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
