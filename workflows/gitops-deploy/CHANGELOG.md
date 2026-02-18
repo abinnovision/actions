@@ -1,12 +1,5 @@
 # Changelog
 
-## [1.1.0](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.1...gitops-deploy-source-v1.1.0) (2026-02-18)
-
-
-### Features
-
-* implement inter-repo version linking for GitHub Actions ([#310](https://github.com/abinnovision/actions/issues/310)) ([3dd24bf](https://github.com/abinnovision/actions/commit/3dd24bf028df5fc5494a6226976a4c57383a8c7f))
-
 ## [1.0.1](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.0...gitops-deploy-source-v1.0.1) (2026-01-21)
 
 

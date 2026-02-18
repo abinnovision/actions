@@ -9,7 +9,7 @@ Automate releases using release-please with GitHub App authentication and option
 ```yaml
 jobs:
   release:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v2
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
     secrets:
       GH_APP_IDENTIFICATION_RELEASER: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
     # Or to inherit the secrets from the caller:
@@ -22,8 +22,8 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@release-v2`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@release-v2.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@release-v1`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@release-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 

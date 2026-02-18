@@ -38,7 +38,7 @@ The `versions` output is a JSON object mapping package paths to version info, wh
 jobs:
   <job>:
     steps:
-      - uses: abinnovision/actions@run-release-please-v1
+      - uses: abinnovision/actions@run-release-please-v0
         with:
           token: ${{ <token> }}
 ```
@@ -49,8 +49,8 @@ jobs:
 
 This action can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions@run-release-please-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@run-release-please-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@run-release-please-v0`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions@run-release-please-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
