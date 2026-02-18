@@ -1941,6 +1941,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"conventional-changelog-conventionalcommits@npm:9.1.0, conventional-changelog-conventionalcommits@npm:^9.1.0":
+  version: 9.1.0
+  resolution: "conventional-changelog-conventionalcommits@npm:9.1.0"
+  dependencies:
+    compare-func: "npm:^2.0.0"
+  checksum: 10/932522a9eb2f19f8b6efc05f1de0b8d4775842e2156c2c58358d25069bfc43ca1a6198fb07666d7abc83695a10591787c23b7ff2e1e2d73ac484cfb2f57f5f7f
+  languageName: node
+  linkType: hard
+
 "conventional-changelog-conventionalcommits@npm:^6.0.0":
   version: 6.1.0
   resolution: "conventional-changelog-conventionalcommits@npm:6.1.0"
@@ -1950,12 +1959,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"conventional-changelog-conventionalcommits@npm:^9.1.0":
+"conventional-changelog-conventionalcommits@patch:conventional-changelog-conventionalcommits@npm%3A9.1.0#~/.yarn/patches/conventional-changelog-conventionalcommits-npm-9.1.0-d8dfa4c13e.patch":
   version: 9.1.0
-  resolution: "conventional-changelog-conventionalcommits@npm:9.1.0"
+  resolution: "conventional-changelog-conventionalcommits@patch:conventional-changelog-conventionalcommits@npm%3A9.1.0#~/.yarn/patches/conventional-changelog-conventionalcommits-npm-9.1.0-d8dfa4c13e.patch::version=9.1.0&hash=9a2895"
   dependencies:
     compare-func: "npm:^2.0.0"
-  checksum: 10/932522a9eb2f19f8b6efc05f1de0b8d4775842e2156c2c58358d25069bfc43ca1a6198fb07666d7abc83695a10591787c23b7ff2e1e2d73ac484cfb2f57f5f7f
+  checksum: 10/78d530ad5b158edd87e5ba05265e6be66f34cbff6e060435c29ace124e8c44798d7cc08e30a5cb3fa07eeff1352c3f8536a26a15f4344826246e6b43dfce9258
   languageName: node
   linkType: hard
 
@@ -5048,7 +5057,7 @@ __metadata:
     "@commitlint/types": "npm:^20.4.0"
     "@vercel/ncc": "npm:^0.38.4"
     chalk: "npm:^5.3.0"
-    conventional-changelog-conventionalcommits: "npm:^9.1.0"
+    conventional-changelog-conventionalcommits: "patch:conventional-changelog-conventionalcommits@npm%3A9.1.0#~/.yarn/patches/conventional-changelog-conventionalcommits-npm-9.1.0-d8dfa4c13e.patch"
     eslint: "npm:^9.39.2"
     prettier: "npm:^3.8.1"
     typescript: "npm:^5.9.3"
