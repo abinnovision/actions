@@ -29,11 +29,11 @@ interface PrereleaseOptions {
 const parseInputs = () => {
 	const token = core.getInput("token", { required: true });
 
-	const prereleaseChannel =
-		core.getInput("prerelease-channel", { trimWhitespace: true }) ?? "";
+	const prereleaseChannel = core.getInput("prerelease-channel", {
+		trimWhitespace: true,
+	});
 
-	const targetBranch =
-		core.getInput("target-branch", { trimWhitespace: true }) ?? "";
+	const targetBranch = core.getInput("target-branch", { trimWhitespace: true });
 
 	return { token, prereleaseChannel, targetBranch };
 };
@@ -94,7 +94,7 @@ const runReleasePlease = async (
 	core.startGroup("Pull requests");
 	for (const pr of pullRequests) {
 		if (pr) {
-			core.info(`  PR #${pr.number}: ${pr.title}`);
+			core.info(`  PR #${String(pr.number)}: ${pr.title}`);
 		}
 	}
 
@@ -170,6 +170,7 @@ const computePrereleaseVersions = async (
 			return versions;
 		}
 
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		prManifest = JSON.parse(
 			Buffer.from(response.data.content, "base64").toString("utf-8"),
 		);
@@ -194,6 +195,7 @@ const computePrereleaseVersions = async (
 	// Diff manifests to find changed packages.
 	const changedPackages: Record<string, { current: string; next: string }> = {};
 	for (const [path, nextVersion] of Object.entries(prManifest)) {
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		const currentVersion = currentVersions[path]?.toString();
 		if (currentVersion !== nextVersion) {
 			changedPackages[path] = { current: currentVersion, next: nextVersion };
@@ -213,12 +215,14 @@ const computePrereleaseVersions = async (
 		{ current: currentVersion, next: nextVersion },
 	] of Object.entries(changedPackages)) {
 		// Skip packages already covered by a stable release.
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (versions[path]) {
 			core.info(`  ${path}: skipped (stable release already computed)`);
 			continue;
 		}
 
 		const strategy = strategiesByPath[path];
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (!strategy) {
 			core.warning(`  ${path}: no strategy found, skipping`);
 			continue;
@@ -235,7 +239,7 @@ const computePrereleaseVersions = async (
 
 		const lastTag = new TagName(
 			lastVersion,
-			component || undefined,
+			component ?? undefined,
 			config.tagSeparator,
 			config.includeVInTag,
 		);
@@ -265,11 +269,11 @@ const computePrereleaseVersions = async (
 		}
 
 		// Build prerelease version and docker-compatible tag.
-		const version = `${nextVersion}-${channel}.${commitCount}+${shortSha}`;
+		const version = `${nextVersion}-${channel}.${String(commitCount)}+${shortSha}`;
 		const tag = version.replace(/\+/g, "-");
 
 		core.info(
-			`  ${path}: ${currentVersion} -> ${version} (component=${component}, lastTag=${lastTagStr}, commits=${commitCount})`,
+			`  ${path}: ${currentVersion} -> ${version} (component=${String(component)}, lastTag=${lastTagStr}, commits=${String(commitCount)})`,
 		);
 
 		versions[path] = { version, tag, type: "prerelease" };
@@ -337,7 +341,7 @@ const computePrereleaseVersions = async (
 	core.endGroup();
 
 	core.setOutput("versions", JSON.stringify(versions));
-})().catch((error) => {
-	core.error(error);
+})().catch((error: unknown) => {
+	core.error(error instanceof Error ? error : String(error));
 	core.setFailed("Error while running release-please");
 });
