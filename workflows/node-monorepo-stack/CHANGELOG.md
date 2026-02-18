@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.3.0...node-monorepo-stack-source-v1.3.1) (2026-02-18)
+
+
+### Bug Fixes
+
+* run npm publish with switching directories in a subshell ([#318](https://github.com/abinnovision/actions/issues/318)) ([6c747be](https://github.com/abinnovision/actions/commit/6c747be8bdf8324365aaba51cad09a9ee752226f))
+
 ## [1.3.0](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.2.1...node-monorepo-stack-source-v1.3.0) (2026-02-18)
 
 
