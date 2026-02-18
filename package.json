@@ -38,6 +38,10 @@
 		]
 	},
 	"prettier": "@abinnovision/prettier-config",
+	"resolutions": {
+		"conventional-changelog-angular@npm:^8.1.0": "patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch",
+		"conventional-changelog-conventionalcommits@npm:9.1.0": "patch:conventional-changelog-conventionalcommits@npm%3A9.1.0#~/.yarn/patches/conventional-changelog-conventionalcommits-npm-9.1.0-d8dfa4c13e.patch"
+	},
 	"devDependencies": {
 		"@abinnovision/commitlint-config": "^2.2.3",
 		"@abinnovision/prettier-config": "^2.1.5",

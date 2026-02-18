@@ -248,14 +248,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/execute-rule@npm:^20.0.0":
+"@commitlint/execute-rule@npm:20.0.0, @commitlint/execute-rule@npm:^20.0.0":
   version: 20.0.0
   resolution: "@commitlint/execute-rule@npm:20.0.0"
   checksum: 10/6e05580d9dafd362281747795de22e582ce7af36daeee638dd3f84b792d6b921dad20cb258603fb6ebb08f0b490906b2cfd72255b0d7e6ab2cfb96441a553159
   languageName: node
   linkType: hard
 
-"@commitlint/format@npm:^20.4.0":
+"@commitlint/format@npm:20.4.0, @commitlint/format@npm:^20.4.0":
   version: 20.4.0
   resolution: "@commitlint/format@npm:20.4.0"
   dependencies:
@@ -275,7 +275,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/lint@npm:^20.4.1":
+"@commitlint/lint@npm:20.4.1, @commitlint/lint@npm:^20.4.1":
   version: 20.4.1
   resolution: "@commitlint/lint@npm:20.4.1"
   dependencies:
@@ -1932,7 +1932,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"conventional-changelog-angular@npm:8.1.0, conventional-changelog-angular@npm:^8.1.0":
+"conventional-changelog-angular@npm:8.1.0":
   version: 8.1.0
   resolution: "conventional-changelog-angular@npm:8.1.0"
   dependencies:
@@ -1943,10 +1943,10 @@ __metadata:
 
 "conventional-changelog-angular@patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch":
   version: 8.1.0
-  resolution: "conventional-changelog-angular@patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch::version=8.1.0&hash=88c1ec"
+  resolution: "conventional-changelog-angular@patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch::version=8.1.0&hash=051af7"
   dependencies:
     compare-func: "npm:^2.0.0"
-  checksum: 10/9946858c38ae95b94ea77d90901bae3bf19e1e5abee2edefecc83e41d9210002774ad02ec074d1991536fa5b97a177688ce56b0dba2fbd61339ac3d0cbd7eb91
+  checksum: 10/9d70536d7df86a6aa4ad5f7dc799d66cf83122bb03d1550676487dcda8eced2b6c6ea783ddf2c95856dab6d0f4b0819bde9ec20468307e5d2dcd0c0c7a78fa50
   languageName: node
   linkType: hard
 
@@ -5060,14 +5060,13 @@ __metadata:
     "@abinnovision/prettier-config": "npm:^2.1.5"
     "@actions/core": "npm:^1.11.1"
     "@actions/github": "npm:^6.0.0"
-    "@commitlint/execute-rule": "npm:^20.0.0"
-    "@commitlint/format": "npm:^20.4.0"
-    "@commitlint/lint": "npm:^20.4.1"
+    "@commitlint/execute-rule": "npm:20.0.0"
+    "@commitlint/format": "npm:20.4.0"
+    "@commitlint/lint": "npm:20.4.1"
     "@commitlint/types": "npm:^20.4.0"
     "@vercel/ncc": "npm:^0.38.4"
     chalk: "npm:^5.3.0"
-    conventional-changelog-angular: "patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch"
-    conventional-changelog-conventionalcommits: "patch:conventional-changelog-conventionalcommits@npm%3A9.1.0#~/.yarn/patches/conventional-changelog-conventionalcommits-npm-9.1.0-d8dfa4c13e.patch"
+    conventional-changelog-conventionalcommits: "npm:9.1.0"
     eslint: "npm:^9.39.2"
     prettier: "npm:^3.8.1"
     typescript: "npm:^5.9.3"
