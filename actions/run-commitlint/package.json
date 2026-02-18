@@ -41,6 +41,7 @@
 		"@commitlint/format": "^20.4.0",
 		"@commitlint/lint": "^20.4.1",
 		"chalk": "^5.3.0",
+		"conventional-changelog-angular": "patch:conventional-changelog-angular@npm%3A8.1.0#~/.yarn/patches/conventional-changelog-angular-npm-8.1.0-5d11bed92a.patch",
 		"conventional-changelog-conventionalcommits": "patch:conventional-changelog-conventionalcommits@npm%3A9.1.0#~/.yarn/patches/conventional-changelog-conventionalcommits-npm-9.1.0-d8dfa4c13e.patch"
 	},
 	"devDependencies": {
