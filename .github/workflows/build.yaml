@@ -62,6 +62,8 @@ jobs:
         run: |
           yarn readme:generate
           git diff --exit-code || (echo "README files are not up to date, run 'yarn readme:generate'" && exit 1)
+      - name: Check Action References
+        run: tsx scripts/check-action-refs.ts
       - name: Check Dependencies
         run: |
           yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
@@ -191,6 +193,14 @@ jobs:
             if [[ "$item_type" == "workflow" ]]; then
               mkdir -p .github/workflows
               mv workflow.yaml .github/workflows/workflow.yaml
+            fi
+
+            # Resolve internal action references (replace -dev with exact versions)
+            if [[ "$mode" == "release" ]]; then
+              echo "Resolving internal action references..."
+              cd ${{ github.workspace }}
+              tsx scripts/resolve-action-refs.ts --staging-dir "$staging_dir" --workspace-root "${{ github.workspace }}"
+              cd "$staging_dir"
             fi
 
             # Determine branch name and version based on mode
