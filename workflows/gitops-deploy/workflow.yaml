@@ -277,7 +277,7 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
       - name: Setup Node.js
-        uses: abinnovision/actions@setup-node-v1
+        uses: abinnovision/actions@setup-node-dev
       - name: Install dependencies
         run: |
           yarn install --immutable

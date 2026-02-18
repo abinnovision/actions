@@ -2,12 +2,12 @@
 	"name": "run-release-please",
 	"version": "0.0.0",
 	"license": "Apache-2.0",
-	"type": "module",
 	"author": {
 		"name": "abi group GmbH",
 		"email": "info@abigroup.io",
 		"url": "https://abigroup.io/"
 	},
+	"type": "module",
 	"files": [
 		"dist",
 		"README.md",

@@ -340,7 +340,7 @@ jobs:
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
       - name: Setup Node.js
-        uses: abinnovision/actions@setup-node-v1
+        uses: abinnovision/actions@setup-node-dev
       - name: Install dependencies
         run: yarn install --immutable
       - name: Check Dependencies
@@ -381,7 +381,7 @@ jobs:
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
       - name: Setup Node.js
-        uses: abinnovision/actions@setup-node-v1
+        uses: abinnovision/actions@setup-node-dev
       - name: Install dependencies
         run: yarn install --immutable
       - name: Build
@@ -398,7 +398,7 @@ jobs:
       - configure
       - check_build
       - test
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-dev
     secrets: inherit
     # Only run on push to the default branch.
     # Use always() to prevent skipping when test job is skipped (no tests configured)
@@ -424,7 +424,7 @@ jobs:
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
 
       - name: Setup Node
-        uses: abinnovision/actions@setup-node-v1
+        uses: abinnovision/actions@setup-node-dev
 
       - name: Install dependencies
         run: yarn install --immutable
@@ -543,7 +543,7 @@ jobs:
           fi
 
       - name: Setup Node.js
-        uses: abinnovision/actions@setup-node-v1
+        uses: abinnovision/actions@setup-node-dev
 
       - name: Install dependencies
         run: yarn install --immutable
@@ -672,7 +672,7 @@ jobs:
       - name: Setup GCP Authentication
         if: inputs.enable-apps-registry-gcpar && inputs.gcp-auth != ''
         id: gcp-auth
-        uses: abinnovision/actions@setup-gcp-v1
+        uses: abinnovision/actions@setup-gcp-dev
         with:
           auth: ${{ inputs.gcp-auth }}
           token_format: "access_token"
@@ -968,7 +968,7 @@ jobs:
 
       - name: Update Release Deployment
         if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'true'
-        uses: abinnovision/actions@run-workflow-dispatch-v1
+        uses: abinnovision/actions@run-workflow-dispatch-dev
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
           target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
@@ -978,7 +978,7 @@ jobs:
 
       - name: Update Dev Deployment
         if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'false'
-        uses: abinnovision/actions@run-workflow-dispatch-v1
+        uses: abinnovision/actions@run-workflow-dispatch-dev
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
           target: ${{ steps.gitops-config.outputs.TARGET_REPO }}

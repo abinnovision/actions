@@ -95,13 +95,13 @@ jobs:
     steps:
       - name: Setup GCP Authentication
         if: inputs.use-gcp-auth
-        uses: abinnovision/actions@setup-gcp-v1
+        uses: abinnovision/actions@setup-gcp-dev
         with:
           auth: ${{ secrets.GCP_AUTH }}
 
       - id: token
         name: Generate GitHub App token
-        uses: abinnovision/actions@get-github-app-token-v1
+        uses: abinnovision/actions@get-github-app-token-dev
         with:
           identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
 
@@ -170,7 +170,7 @@ jobs:
           echo "EOF" >> "$GITHUB_ENV"
 
       - name: Setup Node
-        uses: abinnovision/actions@setup-node-v1
+        uses: abinnovision/actions@setup-node-dev
 
       - name: Setup kustomize
         uses: imranismail/setup-kustomize@v2

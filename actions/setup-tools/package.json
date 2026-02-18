@@ -26,5 +26,8 @@
 	"devDependencies": {
 		"@abinnovision/prettier-config": "^2.1.5",
 		"prettier": "^3.8.1"
+	},
+	"actionDependencies": {
+		"setup-node": "*"
 	}
 }

@@ -358,7 +358,7 @@ jobs:
             exit 1
           fi
       - name: Setup Tools
-        uses: abinnovision/actions@setup-tools-v1
+        uses: abinnovision/actions@setup-tools-dev
       - name: Install dependencies
         run: make install-immutable
       - name: Check Dependencies
@@ -409,7 +409,7 @@ jobs:
             exit 1
           fi
       - name: Setup Tools
-        uses: abinnovision/actions@setup-tools-v1
+        uses: abinnovision/actions@setup-tools-dev
       - name: Install dependencies
         run: make install-immutable
       - name: Build
@@ -493,7 +493,7 @@ jobs:
           fi
 
       - name: Setup Tools
-        uses: abinnovision/actions@setup-tools-v1
+        uses: abinnovision/actions@setup-tools-dev
 
       - name: Install dependencies
         run: make install-immutable
@@ -642,7 +642,7 @@ jobs:
           fi
 
       - name: Setup Tools
-        uses: abinnovision/actions@setup-tools-v1
+        uses: abinnovision/actions@setup-tools-dev
 
       - name: Install dependencies
         run: make install-immutable
@@ -777,7 +777,7 @@ jobs:
       - name: Setup GCP Authentication
         if: inputs.enable-apps-registry-gcpar && inputs.gcp-auth != ''
         id: gcp-auth
-        uses: abinnovision/actions@setup-gcp-v1
+        uses: abinnovision/actions@setup-gcp-dev
         with:
           auth: ${{ inputs.gcp-auth }}
           token_format: "access_token"
@@ -1049,7 +1049,7 @@ jobs:
 
       - name: Update Release Deployment
         if: matrix.entry.type == 'release' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
-        uses: abinnovision/actions@run-workflow-dispatch-v1
+        uses: abinnovision/actions@run-workflow-dispatch-dev
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
           target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
@@ -1059,7 +1059,7 @@ jobs:
 
       - name: Update Dev Deployment
         if: matrix.entry.type == 'prerelease' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
-        uses: abinnovision/actions@run-workflow-dispatch-v1
+        uses: abinnovision/actions@run-workflow-dispatch-dev
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
           target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
