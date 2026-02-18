@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.1.0...setup-tools-source-v1.1.1) (2026-02-18)
+
+
+### Reverts
+
+* "chore: release main ([#298](https://github.com/abinnovision/actions/issues/298))" ([6d14d52](https://github.com/abinnovision/actions/commit/6d14d52d18e0896f0366bd986bb75647395e6efe))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.0.0...setup-tools-source-v1.1.0) (2026-02-18)
 
 

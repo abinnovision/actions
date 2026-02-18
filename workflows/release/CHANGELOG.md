@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/abinnovision/actions/compare/release-source-v2.0.0...release-source-v2.0.1) (2026-02-18)
+
+
+### Reverts
+
+* "chore: release main ([#298](https://github.com/abinnovision/actions/issues/298))" ([6d14d52](https://github.com/abinnovision/actions/commit/6d14d52d18e0896f0366bd986bb75647395e6efe))
+
 ## [2.0.0](https://github.com/abinnovision/actions/compare/release-source-v1.0.0...release-source-v2.0.0) (2026-02-18)
 
 

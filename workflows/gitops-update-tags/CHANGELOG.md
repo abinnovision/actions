@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.0...gitops-update-tags-source-v1.2.1) (2026-02-18)
+
+
+### Reverts
+
+* "chore: release main ([#298](https://github.com/abinnovision/actions/issues/298))" ([6d14d52](https://github.com/abinnovision/actions/commit/6d14d52d18e0896f0366bd986bb75647395e6efe))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.1...gitops-update-tags-source-v1.2.0) (2026-02-18)
 
 
