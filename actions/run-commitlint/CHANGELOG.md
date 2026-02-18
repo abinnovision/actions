@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.1.0...run-commitlint-source-v1.2.0) (2026-02-18)
+
+
+### Features
+
+* implement inter-repo version linking for GitHub Actions ([#310](https://github.com/abinnovision/actions/issues/310)) ([3dd24bf](https://github.com/abinnovision/actions/commit/3dd24bf028df5fc5494a6226976a4c57383a8c7f))
+* upgrade commitlint dependencies to latest versions ([#308](https://github.com/abinnovision/actions/issues/308)) ([d796e73](https://github.com/abinnovision/actions/commit/d796e73e1bdfaabaef33f9cddc63891f1e568d62))
+
+
+### Bug Fixes
+
+* add patch for commitlint dependency with legacy file resolution ([#312](https://github.com/abinnovision/actions/issues/312)) ([b3bc58b](https://github.com/abinnovision/actions/commit/b3bc58b73a26e3927d3688540234535ea1c52279))
+* align dependency resolution for conventional-changelog-angular ([#313](https://github.com/abinnovision/actions/issues/313)) ([5a61180](https://github.com/abinnovision/actions/commit/5a611808f8403dcb5144a8418ee189d90156bc10))
+* patch commitlint dependency for compatibility ([#311](https://github.com/abinnovision/actions/issues/311)) ([7d28098](https://github.com/abinnovision/actions/commit/7d28098f57aa8f4dc92842fb6038e447b987679c))
+
+
+### Reverts
+
+* "chore: release main ([#298](https://github.com/abinnovision/actions/issues/298))" ([6d14d52](https://github.com/abinnovision/actions/commit/6d14d52d18e0896f0366bd986bb75647395e6efe))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.5...run-commitlint-source-v1.1.0) (2025-10-22)
 
 
