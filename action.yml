@@ -1,0 +1,11 @@
+name: Run Commitlint
+author: "abi group GmbH"
+description: |
+  Runs commitlint based on the '@abinnovision/commitlint-config' config.
+inputs:
+  token:
+    description: "'GITHUB_TOKEN' or a repo scoped Personal Access Token (PAT)."
+    default: ${{ github.token }}
+runs:
+  using: node16
+  main: dist/index.js
