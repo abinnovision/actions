@@ -199,7 +199,7 @@ jobs:
             if [[ "$mode" == "release" ]]; then
               echo "Resolving internal action references..."
               cd ${{ github.workspace }}
-              tsx scripts/resolve-action-refs.ts --staging-dir "$staging_dir" --workspace-root "${{ github.workspace }}"
+              yarn tsx scripts/resolve-action-refs.ts --staging-dir "$staging_dir" --workspace-root "${{ github.workspace }}"
               cd "$staging_dir"
             fi
 
