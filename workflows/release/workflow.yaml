@@ -40,7 +40,7 @@ on:
 
 jobs:
   release:
-    name: release-please
+    name: Release
     runs-on: ubuntu-latest
     permissions:
       id-token: write
