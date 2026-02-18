@@ -3174,7 +3174,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"globals@npm:^16.4.0, globals@npm:^16.5.0":
+"globals@npm:^16.5.0":
   version: 16.5.0
   resolution: "globals@npm:16.5.0"
   checksum: 10/f9e8a2a13f50222c127030a619e283e7bbfe32966316bdde0715af1d15a7e40cb9c24ff52cad59671f97762ed8b515353c2f8674f560c63d9385f19ee26735a6
@@ -5050,7 +5050,6 @@ __metadata:
     chalk: "npm:^5.3.0"
     conventional-changelog-conventionalcommits: "npm:^9.1.0"
     eslint: "npm:^9.39.2"
-    globals: "npm:^16.4.0"
     prettier: "npm:^3.8.1"
     typescript: "npm:^5.9.3"
   languageName: unknown
@@ -5067,7 +5066,6 @@ __metadata:
     "@actions/github": "npm:^9.0.0"
     "@vercel/ncc": "npm:^0.38.4"
     eslint: "npm:^9.39.2"
-    globals: "npm:^16.4.0"
     prettier: "npm:^3.8.1"
     release-please: "patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch"
     typescript: "npm:^5.9.3"
