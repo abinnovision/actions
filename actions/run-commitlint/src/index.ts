@@ -1,7 +1,7 @@
 // Chalk does not work by default on GitHub Actions (https://github.com/chalk/supports-color/issues/106).
 import commitlintConfig from "@abinnovision/commitlint-config";
 import * as core from "@actions/core";
-import { getOctokit, context } from "@actions/github";
+import { context, getOctokit } from "@actions/github";
 import { execute as executeRule } from "@commitlint/execute-rule";
 import format from "@commitlint/format";
 import lint from "@commitlint/lint";
@@ -9,9 +9,9 @@ import chalk from "chalk";
 import createParserOpts from "conventional-changelog-conventionalcommits";
 
 import type {
+	LintOutcome,
 	QualifiedConfig,
 	QualifiedRules,
-	LintOutcome,
 } from "@commitlint/types";
 
 process.env["FORCE_COLOR"] = "2";
@@ -77,7 +77,7 @@ async function getCommitRange(octokit: OctokitType): Promise<CommitRange> {
 
 		// The range is based on the base and head of the PullRequest.
 		return {
-			from: pullRequest.data.base?.sha,
+			from: pullRequest.data.base.sha,
 			to: pullRequest.data.head.sha,
 		};
 	} else {
@@ -89,8 +89,8 @@ async function getCommitRange(octokit: OctokitType): Promise<CommitRange> {
 
 		// Check if the event payload has a 'before' field.
 		// Usually the 'before' contains a commit sha.
-		if (context.payload?.before) {
-			const beforeSha = context.payload?.before;
+		if (context.payload.before && typeof context.payload.before === "string") {
+			const beforeSha = context.payload.before;
 
 			// Check if before is an empty commit.
 			if (beforeSha !== GIT_EMPTY_SHA) {
@@ -133,7 +133,9 @@ async function fetchCommits(
 			head: range.to,
 		});
 
-		core.debug(`Fetched ${response.data.commits} commits from the given range`);
+		core.debug(
+			`Fetched ${String(response.data.total_commits)} commits from the given range`,
+		);
 
 		return response.data.commits.map((commit) => ({
 			sha: commit.sha,
@@ -148,12 +150,7 @@ async function fetchCommits(
 			ref: range.to,
 		});
 
-		return [
-			{
-				sha: response.data.sha,
-				message: response.data.commit.message,
-			},
-		];
+		return [{ sha: response.data.sha, message: response.data.commit.message }];
 	}
 }
 
@@ -170,6 +167,7 @@ async function lintCommits(
 		commits.map(async (commit) => ({
 			...commit,
 			result: await lint(commit.message, rules, {
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
 				parserOpts: (await createParserOpts())["parser"],
 			}),
 		})),
@@ -178,6 +176,7 @@ async function lintCommits(
 
 function hasLintWarnings(results: CommitLintResult[]): boolean {
 	return results.some(
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		(it) => it.result.warnings && it.result.warnings.length > 0,
 	);
 }
@@ -197,6 +196,7 @@ function hasLintErrors(results: CommitLintResult[]): boolean {
 	// Fetch all commits from the previously calculate range.
 	const commits = await fetchCommits(octokit, range);
 
+	// eslint-disable-next-line @typescript-eslint/require-await
 	await core.group("Commits to lint:", async () => {
 		core.info(
 			commits
@@ -223,7 +223,7 @@ function hasLintErrors(results: CommitLintResult[]): boolean {
 	} else {
 		core.info(chalk.green(`All commit messages are valid!`));
 	}
-})().catch((error) => {
-	core.error(error);
-	return core.setFailed("Error while running action");
+})().catch((error: unknown) => {
+	core.error(error instanceof Error ? error : String(error));
+	core.setFailed("Error while running action");
 });
