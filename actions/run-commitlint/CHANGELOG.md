@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.1.0...run-commitlint-source-v1.2.0) (2026-02-18)
+
+
+### Features
+
+* upgrade commitlint dependencies to latest versions ([#308](https://github.com/abinnovision/actions/issues/308)) ([d796e73](https://github.com/abinnovision/actions/commit/d796e73e1bdfaabaef33f9cddc63891f1e568d62))
+
+
+### Bug Fixes
+
+* add patch for commitlint dependency with legacy file resolution ([#312](https://github.com/abinnovision/actions/issues/312)) ([b3bc58b](https://github.com/abinnovision/actions/commit/b3bc58b73a26e3927d3688540234535ea1c52279))
+* align dependency resolution for conventional-changelog-angular ([#313](https://github.com/abinnovision/actions/issues/313)) ([5a61180](https://github.com/abinnovision/actions/commit/5a611808f8403dcb5144a8418ee189d90156bc10))
+* patch commitlint dependency for compatibility ([#311](https://github.com/abinnovision/actions/issues/311)) ([7d28098](https://github.com/abinnovision/actions/commit/7d28098f57aa8f4dc92842fb6038e447b987679c))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.5...run-commitlint-source-v1.1.0) (2025-10-22)
 
 
