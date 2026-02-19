@@ -32,11 +32,11 @@ on:
         value: ${{ jobs.release.outputs.versions }}
         description: |-
           JSON object mapping released package paths to version info.
-          Each entry contains "version" (semver), "tag" (docker-compatible), and "type" ("release" or "prerelease").
+          Each entry contains "version" (semver+sha), "packageVersion" (clean semver), and "type" ("release" or "prerelease").
           Populated for both stable releases and prereleases.
           Empty object {} when nothing was released or computed.
-          Stable example: {"actions/setup-node": {"version": "1.2.0", "tag": "1.2.0", "type": "release"}}
-          Prerelease example: {"actions/setup-node": {"version": "1.3.0-beta.5+a3f2c1d", "tag": "1.3.0-beta.5-a3f2c1d", "type": "prerelease"}}
+          Stable example: {"actions/setup-node": {"version": "1.2.0+a3f2c1d", "packageVersion": "1.2.0", "type": "release"}}
+          Prerelease example: {"actions/setup-node": {"version": "1.3.0-beta.5+a3f2c1d", "packageVersion": "1.3.0-beta.5", "type": "prerelease"}}
 
 jobs:
   release:

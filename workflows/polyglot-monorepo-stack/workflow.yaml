@@ -209,7 +209,7 @@ on:
         value: ${{ jobs.release.outputs.versions }}
         description: |-
           JSON object mapping released/prerelease package paths to version info.
-          Each entry: {version: "semver", tag: "docker-compatible", type: "release"|"prerelease"}.
+          Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease"}.
           Empty object {} when nothing was released.
 
 env:
@@ -450,11 +450,11 @@ jobs:
         id: extract
         run: |
           VERSIONS='${{ needs.release.outputs.versions }}'
-          released_apps=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("apps/")) | {app: (.key | ltrimstr("apps/")), version: .value.version, tag: .value.tag, type: .value.type}]')
+          released_apps=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("apps/")) | {app: (.key | ltrimstr("apps/")), version: .value.version, packageVersion: .value.packageVersion, type: .value.type}]')
           echo "released_apps=$released_apps" >> $GITHUB_OUTPUT
           echo "has_released_apps=$(echo "$released_apps" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
 
-          released_packages=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("packages/")) | {package: (.key | ltrimstr("packages/")), version: .value.version, tag: .value.tag, type: .value.type}]')
+          released_packages=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("packages/")) | {package: (.key | ltrimstr("packages/")), version: .value.version, packageVersion: .value.packageVersion, type: .value.type}]')
           echo "released_packages=$released_packages" >> $GITHUB_OUTPUT
           echo "has_released_packages=$(echo "$released_packages" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
 
@@ -756,13 +756,7 @@ jobs:
         run: |
           short_sha=$(git rev-parse --short HEAD)
           full_sha=$(git rev-parse HEAD)
-
-          if [[ "${{ matrix.entry.type }}" == "release" ]]; then
-            build_version="v${{ matrix.entry.tag }}-${short_sha}"
-          else
-            # Prerelease tag already contains sha
-            build_version="v${{ matrix.entry.tag }}"
-          fi
+          build_version="v${{ matrix.entry.packageVersion }}-${short_sha}"
 
           echo "BUILD_VERSION=$build_version" >> $GITHUB_OUTPUT
           echo "BUILD_COMMIT=$full_sha" >> $GITHUB_OUTPUT
@@ -874,7 +868,7 @@ jobs:
           images: ${{ steps.image-names.outputs.IMAGES }}
           tags: |
             type=sha,prefix=sha-,format=short
-            type=semver,pattern={{version}},value=v${{ matrix.entry.tag }}
+            type=semver,pattern={{version}},value=v${{ matrix.entry.packageVersion }}
 
       - name: Prepare app-specific secrets
         id: app-secrets
@@ -1039,7 +1033,7 @@ jobs:
           esac
 
           # Use version tag from release output directly
-          deployment_tag="${{ matrix.entry.tag }}"
+          deployment_tag="${{ matrix.entry.packageVersion }}"
 
           echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
           echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
