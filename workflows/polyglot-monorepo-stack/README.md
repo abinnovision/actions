@@ -331,7 +331,7 @@ jobs:
 This workflow can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v1.1.1`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v1.1.2`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 

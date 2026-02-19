@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/abinnovision/actions/compare/release-source-v2.0.0...release-source-v2.0.1) (2026-02-19)
+
+
+### Bug Fixes
+
+* update versioning structure to include packageVersion and short SHA ([#320](https://github.com/abinnovision/actions/issues/320)) ([f6586bd](https://github.com/abinnovision/actions/commit/f6586bd30a741e6586b71136dcfca38e6536225c))
+
 ## [2.0.0](https://github.com/abinnovision/actions/compare/release-source-v1.0.0...release-source-v2.0.0) (2026-02-18)
 
 
