@@ -20,7 +20,7 @@ outputs:
   versions:
     description: |
       JSON object mapping released package paths to version info.
-      Each entry: {version: "semver", tag: "docker-compatible", type: "release"|"prerelease"}.
+      Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease"}.
       Empty object {} when nothing was released or computed.
 runs:
   using: node20

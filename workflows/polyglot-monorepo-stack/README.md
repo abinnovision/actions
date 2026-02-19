@@ -369,6 +369,6 @@ This workflow can be used with different version ranges. The following ranges ar
 
 ## Outputs
 
-| Output     | Description                                                                                                                                                                                                       |
-| :--------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `versions` | JSON object mapping released/prerelease package paths to version info.<br>Each entry: {version: "semver", tag: "docker-compatible", type: "release"\|"prerelease"}.<br>Empty object {} when nothing was released. |
+| Output     | Description                                                                                                                                                                                                                 |
+| :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `versions` | JSON object mapping released/prerelease package paths to version info.<br>Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"\|"prerelease"}.<br>Empty object {} when nothing was released. |

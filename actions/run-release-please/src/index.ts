@@ -9,7 +9,7 @@ import type { CreatedRelease, Strategy } from "release-please";
 
 interface VersionEntry {
 	version: string;
-	tag: string;
+	packageVersion: string;
 	type: "release" | "prerelease";
 }
 
@@ -20,6 +20,7 @@ interface PrereleaseOptions {
 	manifest: Manifest;
 	resolvedBranch: string;
 	channel: string;
+	shortSha: string;
 	existingVersions: VersionsMap;
 }
 
@@ -110,12 +111,16 @@ const runReleasePlease = async (
 /**
  * Extract stable versions from created releases.
  */
-const extractStableVersions = (releases: CreatedRelease[]): VersionsMap => {
+const extractStableVersions = (
+	releases: CreatedRelease[],
+	shortSha: string,
+): VersionsMap => {
 	const versions: VersionsMap = {};
 	for (const release of releases) {
 		const path = release.path || ".";
-		const version = release.version;
-		versions[path] = { version, tag: version, type: "release" };
+		const packageVersion = release.version;
+		const version = `${packageVersion}+${shortSha}`;
+		versions[path] = { version, packageVersion, type: "release" };
 	}
 
 	return versions;
@@ -142,8 +147,14 @@ const getStrategiesByPath = (
 const computePrereleaseVersions = async (
 	options: PrereleaseOptions,
 ): Promise<VersionsMap> => {
-	const { token, manifest, resolvedBranch, channel, existingVersions } =
-		options;
+	const {
+		token,
+		manifest,
+		resolvedBranch,
+		channel,
+		shortSha,
+		existingVersions,
+	} = options;
 
 	const { owner, repo } = context.repo;
 	const versions = { ...existingVersions };
@@ -207,7 +218,6 @@ const computePrereleaseVersions = async (
 	core.endGroup();
 
 	const octokit = getOctokit(token);
-	const shortSha = context.sha.substring(0, 7);
 
 	// Compute prerelease version for each changed package.
 	for (const [
@@ -268,15 +278,15 @@ const computePrereleaseVersions = async (
 			commitCount = match ? parseInt(match[1], 10) : 1;
 		}
 
-		// Build prerelease version and docker-compatible tag.
+		// Build prerelease version and clean package version.
 		const version = `${nextVersion}-${channel}.${String(commitCount)}+${shortSha}`;
-		const tag = version.replace(/\+/g, "-");
+		const packageVersion = `${nextVersion}-${channel}.${String(commitCount)}`;
 
 		core.info(
 			`  ${path}: ${currentVersion} -> ${version} (component=${String(component)}, lastTag=${lastTagStr}, commits=${String(commitCount)})`,
 		);
 
-		versions[path] = { version, tag, type: "prerelease" };
+		versions[path] = { version, packageVersion, type: "prerelease" };
 	}
 
 	return versions;
@@ -309,10 +319,13 @@ const computePrereleaseVersions = async (
 	// Run release-please (create releases + create/update PRs).
 	const createdReleases = await runReleasePlease(manifest);
 
+	// Compute short SHA once for all version computations.
+	const shortSha = context.sha.substring(0, 7);
+
 	// Extract stable versions from created releases.
 	let versions: VersionsMap = {};
 	if (createdReleases.length > 0) {
-		versions = extractStableVersions(createdReleases);
+		versions = extractStableVersions(createdReleases, shortSha);
 
 		core.startGroup("Computed stable versions");
 		core.info(JSON.stringify(versions, null, 2));
@@ -333,6 +346,7 @@ const computePrereleaseVersions = async (
 		manifest,
 		resolvedBranch,
 		channel: prereleaseChannel,
+		shortSha,
 		existingVersions: versions,
 	});
 
