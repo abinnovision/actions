@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.3...polyglot-monorepo-stack-source-v1.1.4) (2026-02-19)
+
+
+### Bug Fixes
+
+* use release-please version outputs directly for Docker builds ([#324](https://github.com/abinnovision/actions/issues/324)) ([b8eabdf](https://github.com/abinnovision/actions/commit/b8eabdf3785e66d900e29c31add528d9350d7d16))
+
 ## [1.1.3](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.2...polyglot-monorepo-stack-source-v1.1.3) (2026-02-19)
 
 
