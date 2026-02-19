@@ -509,7 +509,7 @@ jobs:
 
           echo '${{ needs.prepare_release.outputs.released-packages }}' | jq -c '.[]' | while read -r entry; do
             package=$(echo "$entry" | jq -r '.package')
-            RELEASE_VERSION=$(echo "$entry" | jq -r '.version')
+            RELEASE_VERSION=$(echo "$entry" | jq -r '.packageVersion')
             RELEASE_TYPE=$(echo "$entry" | jq -r '.type')
             path="packages/$package"
 
