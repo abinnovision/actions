@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.2...polyglot-monorepo-stack-source-v1.1.3) (2026-02-19)
+
+
+### Bug Fixes
+
+* use packageVersion instead of version for npm publishing ([#322](https://github.com/abinnovision/actions/issues/322)) ([ce82d4b](https://github.com/abinnovision/actions/commit/ce82d4b3581848e9c711d7226967dcac0b8de7d2))
+
 ## [1.1.2](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.1...polyglot-monorepo-stack-source-v1.1.2) (2026-02-19)
 
 
