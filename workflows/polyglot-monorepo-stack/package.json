@@ -28,9 +28,9 @@
 		"prettier": "^3.8.1"
 	},
 	"actionDependencies": {
-		"release": "*",
-		"run-workflow-dispatch": "*",
-		"setup-gcp": "*",
-		"setup-tools": "*"
+		"release": "^2.0.0",
+		"run-workflow-dispatch": "^1.0.0",
+		"setup-gcp": "^1.0.0",
+		"setup-tools": "^1.0.0"
 	}
 }

@@ -28,6 +28,6 @@
 		"prettier": "^3.8.1"
 	},
 	"actionDependencies": {
-		"setup-node": "*"
+		"setup-node": "^1.0.0"
 	}
 }

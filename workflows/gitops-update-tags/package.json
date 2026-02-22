@@ -28,8 +28,8 @@
 		"prettier": "^3.8.1"
 	},
 	"actionDependencies": {
-		"get-github-app-token": "*",
-		"setup-gcp": "*",
-		"setup-node": "*"
+		"get-github-app-token": "^1.0.0",
+		"setup-gcp": "^1.0.0",
+		"setup-node": "^1.0.0"
 	}
 }

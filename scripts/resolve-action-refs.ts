@@ -12,6 +12,59 @@ interface PackageJson {
 interface ResolvedDep {
 	name: string;
 	version: string;
+	tag: string;
+}
+
+/**
+ * Parses a semver range from actionDependencies and resolves it to the
+ * appropriate Git tag level based on the actual workspace version.
+ *
+ * - `^X.Y.Z` → `vX` (major floating tag)
+ * - `~X.Y.Z` → `vX.Y` (minor floating tag)
+ * - `X.Y.Z`  → `vX.Y.Z` (exact tag)
+ */
+function resolveTagFromRange(
+	depName: string,
+	range: string,
+	actualVersion: string,
+): string {
+	const semverPattern = /^(\^|~)?(\d+)\.(\d+)\.(\d+)$/;
+	const match = range.match(semverPattern);
+
+	if (!match) {
+		console.error(
+			`Error: Invalid actionDependencies range '${range}' for '${depName}'. Expected '^X.Y.Z', '~X.Y.Z', or 'X.Y.Z'.`,
+		);
+		process.exit(1);
+	}
+
+	const [, prefix, major, minor] = match;
+	const actualParts = actualVersion.split(".");
+	const actualMajor = actualParts[0];
+	const actualMinor = actualParts[1];
+
+	if (prefix === "^") {
+		if (actualMajor !== major) {
+			console.error(
+				`Error: actionDependency '${depName}' declares range '${range}' but workspace version is ${actualVersion} (major version mismatch).`,
+			);
+			process.exit(1);
+		}
+		return `v${major}`;
+	}
+
+	if (prefix === "~") {
+		if (actualMajor !== major || actualMinor !== minor) {
+			console.error(
+				`Error: actionDependency '${depName}' declares range '${range}' but workspace version is ${actualVersion} (major.minor mismatch).`,
+			);
+			process.exit(1);
+		}
+		return `v${major}.${minor}`;
+	}
+
+	// Exact version
+	return `v${actualVersion}`;
 }
 
 function parseArgs(): { stagingDir: string; workspaceRoot: string } {
@@ -125,11 +178,14 @@ function main() {
 		return;
 	}
 
-	// Resolve each dependency's version from workspace
-	const resolvedDeps: ResolvedDep[] = Object.keys(actionDeps).map((name) => {
-		const depPkg = findPackageInWorkspace(workspaceRoot, name);
-		return { name, version: depPkg.version };
-	});
+	// Resolve each dependency's version and tag from workspace
+	const resolvedDeps: ResolvedDep[] = Object.entries(actionDeps).map(
+		([name, range]) => {
+			const depPkg = findPackageInWorkspace(workspaceRoot, name);
+			const tag = resolveTagFromRange(name, range, depPkg.version);
+			return { name, version: depPkg.version, tag };
+		},
+	);
 
 	console.log(
 		`[${pkgJson.name}] Resolving ${resolvedDeps.length} action dependency reference(s)...`,
@@ -162,7 +218,7 @@ function main() {
 				usedDeps.add(dep.name);
 				content = content.replace(
 					pattern,
-					`$1@${dep.name}-v${dep.version}`,
+					`$1@${dep.name}-${dep.tag}`,
 				);
 				totalReplacements += matches.length;
 				modified = true;
@@ -209,7 +265,7 @@ function main() {
 
 	for (const dep of resolvedDeps) {
 		if (usedDeps.has(dep.name)) {
-			console.log(`  ${dep.name}-dev → ${dep.name}-v${dep.version}`);
+			console.log(`  ${dep.name}-dev → ${dep.name}-${dep.tag}`);
 		}
 	}
 
