@@ -140,6 +140,69 @@ const getStrategiesByPath = (
 	).getStrategiesByPath();
 
 /**
+ * Fetch .release-please-manifest.json from a given branch via the GitHub API.
+ * Returns the parsed manifest or null if the branch/file does not exist.
+ */
+const fetchManifestFromBranch = async (options: {
+	token: string;
+	owner: string;
+	repo: string;
+	branch: string;
+}): Promise<Record<string, string> | null> => {
+	try {
+		const response = await getOctokit(options.token).rest.repos.getContent({
+			owner: options.owner,
+			repo: options.repo,
+			path: ".release-please-manifest.json",
+			ref: options.branch,
+		});
+
+		if (!("content" in response.data) || !response.data.content) {
+			return null;
+		}
+
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+		return JSON.parse(
+			Buffer.from(response.data.content, "base64").toString("utf-8"),
+		);
+	} catch {
+		return null;
+	}
+};
+
+/**
+ * Build the set of PR branch names that release-please would create,
+ * using the Manifest's separatePullRequests flag and each strategy's
+ * branch component — the same logic release-please uses internally.
+ */
+const buildPrBranchNames = async (
+	manifest: Manifest,
+	strategiesByPath: Record<string, Strategy>,
+	resolvedBranch: string,
+): Promise<string[]> => {
+	const separatePullRequests = (
+		manifest as unknown as { separatePullRequests: boolean }
+	).separatePullRequests;
+
+	// Aggregated mode: single branch for all components (Merge plugin active).
+	if (!separatePullRequests) {
+		return [BranchName.ofTargetBranch(resolvedBranch).toString()];
+	}
+
+	// Separate PR mode: one branch per component.
+	const branches: string[] = [];
+	for (const [, strategy] of Object.entries(strategiesByPath)) {
+		const branchComponent = await strategy.getBranchComponent();
+		const branchName = branchComponent
+			? BranchName.ofComponentTargetBranch(branchComponent, resolvedBranch)
+			: BranchName.ofTargetBranch(resolvedBranch);
+		branches.push(branchName.toString());
+	}
+
+	return [...new Set(branches)]; // deduplicate
+};
+
+/**
  * Compute prerelease versions by diffing the release-please PR branch
  * manifest against the current manifest. Uses the already-loaded Manifest
  * for strategy-based component resolution and tag construction.
@@ -162,34 +225,37 @@ const computePrereleaseVersions = async (
 	// Get strategies by path for component/tag construction.
 	const strategiesByPath = await getStrategiesByPath(manifest);
 
-	// Determine the release-please PR branch using release-please's own BranchName.
-	const prBranch = BranchName.ofTargetBranch(resolvedBranch).toString();
-	core.info(`PR branch: ${prBranch}`);
+	// Build the set of PR branch names release-please would create.
+	const prBranchNames = await buildPrBranchNames(
+		manifest,
+		strategiesByPath,
+		resolvedBranch,
+	);
 
-	// Fetch PR manifest from the release-please branch via GitHub API.
-	let prManifest: Record<string, string>;
-	try {
-		const response = await getOctokit(token).rest.repos.getContent({
+	core.info(`PR branches to check: ${prBranchNames.join(", ")}`);
+
+	// Fetch and merge manifests from all PR branches.
+	const prManifest: Record<string, string> = {};
+	for (const branch of prBranchNames) {
+		const branchManifest = await fetchManifestFromBranch({
+			token,
 			owner,
 			repo,
-			path: ".release-please-manifest.json",
-			ref: prBranch,
+			branch,
 		});
 
-		if (!("content" in response.data) || !response.data.content) {
-			core.info("PR manifest has no content. Skipping prerelease computation.");
-			return versions;
+		if (branchManifest) {
+			core.info(`  Found manifest on branch: ${branch}`);
+			Object.assign(prManifest, branchManifest);
+		} else {
+			core.info(`  No manifest on branch: ${branch}`);
 		}
+	}
 
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-		prManifest = JSON.parse(
-			Buffer.from(response.data.content, "base64").toString("utf-8"),
-		);
-	} catch {
+	if (Object.keys(prManifest).length === 0) {
 		core.info(
-			`Release-please PR branch '${prBranch}' does not exist or has no manifest. Skipping prerelease computation.`,
+			"No release-please PR branches with manifests found. Skipping prerelease computation.",
 		);
-
 		return versions;
 	}
 
