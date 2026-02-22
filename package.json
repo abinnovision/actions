@@ -1,0 +1,36 @@
+{
+  "name": "polyglot-monorepo-stack",
+  "version": "1.1.5",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "abi group GmbH",
+    "email": "info@abigroup.io",
+    "url": "https://abigroup.io/"
+  },
+  "files": [
+    "workflow.yaml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE.md"
+  ],
+  "scripts": {
+    "format:check": "prettier --check '*.{json,json5,yaml,yml,md}'",
+    "format:fix": "prettier --write '*.{json,json5,yaml,yml,md}'"
+  },
+  "lint-staged": {
+    "*.{json,json5,yaml,yml,md}": [
+      "prettier --write"
+    ]
+  },
+  "prettier": "@abinnovision/prettier-config",
+  "devDependencies": {
+    "@abinnovision/prettier-config": "^2.1.5",
+    "prettier": "^3.8.1"
+  },
+  "actionDependencies": {
+    "release": "^2.0.0",
+    "run-workflow-dispatch": "^1.0.0",
+    "setup-gcp": "^1.0.0",
+    "setup-tools": "^1.0.0"
+  }
+}
