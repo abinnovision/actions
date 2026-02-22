@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.1...run-release-please-source-v1.0.2) (2026-02-22)
+
+
+### Bug Fixes
+
+* support component-specific release-please PR branches ([#330](https://github.com/abinnovision/actions/issues/330)) ([8e973f0](https://github.com/abinnovision/actions/commit/8e973f03f833307e57e8be02369df3703133f507))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.0...run-release-please-source-v1.0.1) (2026-02-19)
 
 

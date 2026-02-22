@@ -50,7 +50,7 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@run-release-please-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@run-release-please-v1.0.1`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@run-release-please-v1.0.2`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
