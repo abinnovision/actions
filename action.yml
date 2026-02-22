@@ -1,0 +1,109 @@
+name: Setup Tools
+author: "abi group GmbH"
+description: |
+  Setup development tools from .tool-versions using native GitHub Actions.
+  Automatically installs all tools defined in the file.
+  Supports Node.js (with corepack), Python (with uv), and Go.
+
+inputs:
+  tool-versions-file:
+    description: "Path to .tool-versions file"
+    required: true
+    default: ".tool-versions"
+
+  # Node.js specific (used when nodejs is in .tool-versions)
+  node-token:
+    description: "Token for GitHub Packages registry"
+    required: false
+    default: ${{ github.token }}
+  node-enable-corepack:
+    description: "Enable corepack for Node.js"
+    required: false
+    default: "true"
+  node-enable-turbo-cache:
+    description: "Enable Turbo cache (auto, true, false)"
+    required: false
+    default: "auto"
+
+outputs:
+  node-version:
+    description: "Installed Node.js version (if nodejs in .tool-versions)"
+    value: ${{ steps.parse.outputs.node-version }}
+  uv-version:
+    description: "Installed uv version (if uv or python in .tool-versions)"
+    value: ${{ steps.parse.outputs.uv-version }}
+  python-version:
+    description: "Installed Python version (if python in .tool-versions)"
+    value: ${{ steps.parse.outputs.python-version }}
+  go-version:
+    description: "Installed Go version (if golang in .tool-versions)"
+    value: ${{ steps.parse.outputs.go-version }}
+
+runs:
+  using: composite
+  steps:
+    - id: parse
+      name: "Parse .tool-versions"
+      shell: bash
+      run: |
+        TOOL_VERSIONS_FILE="${{ inputs.tool-versions-file }}"
+
+        if [ ! -f "$TOOL_VERSIONS_FILE" ]; then
+          echo "::error::File '$TOOL_VERSIONS_FILE' not found"
+          exit 1
+        fi
+
+        # Check for each supported tool
+        if grep -qE '^nodejs' "$TOOL_VERSIONS_FILE"; then
+          echo "has-nodejs=true" >> $GITHUB_OUTPUT
+          echo "node-version=$(grep -E '^nodejs' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+        fi
+
+        if grep -qE '^uv ' "$TOOL_VERSIONS_FILE"; then
+          echo "has-uv=true" >> $GITHUB_OUTPUT
+          echo "uv-version=$(grep -E '^uv ' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+        fi
+
+        if grep -qE '^python' "$TOOL_VERSIONS_FILE"; then
+          echo "has-python=true" >> $GITHUB_OUTPUT
+          echo "python-version=$(grep -E '^python' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+        fi
+
+        if grep -qE '^golang' "$TOOL_VERSIONS_FILE"; then
+          echo "has-golang=true" >> $GITHUB_OUTPUT
+          echo "go-version=$(grep -E '^golang' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+        fi
+
+    # Node.js setup via internal setup-node action
+    - name: Setup Node.js
+      if: steps.parse.outputs.has-nodejs == 'true'
+      uses: abinnovision/actions@setup-node-v1
+      with:
+        token: ${{ inputs.node-token }}
+        version: ${{ steps.parse.outputs.node-version }}
+        enable-corepack: ${{ inputs.node-enable-corepack }}
+        enable-turbo-cache: ${{ inputs.node-enable-turbo-cache }}
+
+    # uv setup via astral-sh/setup-uv
+    # Installed when uv is explicitly in .tool-versions OR when python is requested (uv manages Python)
+    - name: Setup uv
+      if: steps.parse.outputs.has-uv == 'true' || steps.parse.outputs.has-python == 'true'
+      uses: astral-sh/setup-uv@v5
+      with:
+        version: ${{ steps.parse.outputs.uv-version || '' }}
+        enable-cache: true
+
+    # Install Python via uv when python is in .tool-versions
+    - name: Install Python via uv
+      if: steps.parse.outputs.has-python == 'true'
+      shell: bash
+      run: |
+        uv python install ${{ steps.parse.outputs.python-version }}
+
+    # Go setup via actions/setup-go
+    - name: Setup Go
+      if: steps.parse.outputs.has-golang == 'true'
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ steps.parse.outputs.go-version }}
+        cache: true
