@@ -1,0 +1,27 @@
+name: Run Release Please
+author: "abi group GmbH"
+description: |
+  Runs release-please and computes version information, supporting both
+  stable releases and prerelease channels. Replaces googleapis/release-please-action
+  with sane defaults (repo-based configuration via release-please-config.json).
+inputs:
+  token:
+    description: "GitHub token for API access (needs contents:write and pull-requests:write)."
+    required: true
+  prerelease-channel:
+    description: "Prerelease channel name (e.g., beta, canary, rc)."
+    required: false
+    default: ""
+  target-branch:
+    description: "Branch to release from. Defaults to the repository default branch."
+    required: false
+    default: ""
+outputs:
+  versions:
+    description: |
+      JSON object mapping released package paths to version info.
+      Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease"}.
+      Empty object {} when nothing was released or computed.
+runs:
+  using: node20
+  main: dist/index.js
