@@ -1,0 +1,953 @@
+name: GitOps Stack
+
+on:
+  workflow_call:
+    secrets:
+      DEX_ENDPOINT:
+        required: false
+        description: |-
+          DEX OIDC server endpoint URL for ArgoCD authentication.
+          **Required:** When using DEX authentication method
+          **Example:** `https://dex.example.com`
+      DEX_GITHUB_ACTIONS_CLIENT:
+        required: false
+        description: |-
+          DEX client credentials (client_id:client_secret) for GitHub Actions.
+          **Required:** When using DEX authentication method
+          **Example:** `github-actions:secret_value`
+      DEX_GITHUB_ACTIONS_CONNECTOR:
+        required: false
+        description: |-
+          DEX connector ID for GitHub authentication.
+          **Required:** When using DEX authentication method
+          **Example:** `github`
+      ARGOCD_TOKEN:
+        required: false
+        description: |-
+          ArgoCD API token for direct authentication.
+          **Required:** When using token authentication method
+          **Example:** `argocd.token=eyJhbGc...`
+    inputs:
+      # ArgoCD server configuration
+      argocd-server:
+        type: string
+        required: true
+        description: |-
+          ArgoCD server hostname (without https://).
+          **Required:** Always
+          **Example:** `argocd.example.com`
+
+      # Repository and branch configuration
+      default-branch:
+        type: string
+        required: false
+        default: "main"
+        description: |-
+          Default branch name for the repository.
+          **Example:** `main`, `master`, `develop`
+
+      applications-directory:
+        type: string
+        required: false
+        default: "k8s/applications"
+        description: |-
+          Root directory containing application subdirectories.
+          **Example:** `k8s/applications`, `manifests/apps`
+
+      auth-method:
+        type: string
+        required: false
+        default: "dex"
+        description: |-
+          Authentication method for ArgoCD.
+          **Options:** `dex`, `token`
+          **Note:** DEX uses OIDC token exchange, token uses direct API token
+
+      # Validation configuration
+      enable-kube-score:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Enable kube-score validation (best practices).
+          **Note:** kube-score failures are warnings only, won't block deployment
+
+      enable-kubeconform:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Enable kubeconform validation (schema validation).
+          **Note:** kubeconform failures are critical and will block deployment
+
+      kubeconform-schema-locations:
+        type: string
+        required: false
+        default: |
+          default
+          https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+        description: |-
+          Newline-separated list of kubeconform schema locations.
+          **Default:** Default Kubernetes schemas + Datree CRDs catalog
+          **Example:**
+          ```
+          default
+          https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+          https://storage.googleapis.com/custom-crds/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+          ```
+
+      # Deployment configuration
+      sync-timeout:
+        type: number
+        required: false
+        default: 600
+        description: |-
+          ArgoCD sync timeout in seconds.
+          **Default:** `600` (10 minutes)
+
+      health-timeout:
+        type: number
+        required: false
+        default: 600
+        description: |-
+          ArgoCD health check timeout in seconds.
+          **Default:** `600` (10 minutes)
+
+      skip-if-synced:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Skip deployment if application is already in sync.
+
+      # PR comment configuration
+      enable-pr-comments:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Enable posting diff comments on pull requests.
+
+      # GitHub deployment integration
+      enable-github-deployments:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Enable GitHub deployments API integration.
+          **Note:** Creates deployment records with links to ArgoCD UI
+
+    outputs: {}
+
+jobs:
+  # Configure the workflow and discover applications
+  configure:
+    name: Configure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      # Commit SHA to check out
+      commit-sha: ${{ steps.commit.outputs.commit_sha }}
+
+      # Event type flags
+      is-main-push: ${{ steps.event.outputs.is_main_push }}
+      is-pr: ${{ steps.event.outputs.is_pr }}
+
+      # Application discovery outputs
+      applications: ${{ steps.discover.outputs.applications }}
+      argocd-applications: ${{ steps.discover.outputs.argocd_applications }}
+      applications-count: ${{ steps.discover.outputs.applications_count }}
+      argocd-applications-count: ${{ steps.discover.outputs.argocd_applications_count }}
+
+      # Boolean flags
+      has-argocd-applications: ${{ fromJSON(steps.discover.outputs.argocd_applications)[0] != null }}
+
+    steps:
+      # Determine commit SHA based on event type
+      - name: Evaluate commit
+        id: commit
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            echo "PR is #${{ github.event.number }}..."
+            echo "PR Head SHA is ${{ github.event.pull_request.head.sha }}..."
+            echo "commit_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            echo "Merge group SHA is ${{ github.event.merge_group.head_sha }}..."
+            echo "commit_sha=${{ github.event.merge_group.head_sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "Head SHA is ${{ github.sha }}..."
+            echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      # Determine event type
+      - name: Evaluate event type
+        id: event
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/${{ inputs.default-branch }}" ]]; then
+            echo "is_main_push=true" >> $GITHUB_OUTPUT
+            echo "is_pr=false" >> $GITHUB_OUTPUT
+            echo "Event: Push to main branch"
+          elif [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            echo "is_main_push=false" >> $GITHUB_OUTPUT
+            echo "is_pr=true" >> $GITHUB_OUTPUT
+            echo "Event: Pull request"
+          else
+            echo "is_main_push=false" >> $GITHUB_OUTPUT
+            echo "is_pr=false" >> $GITHUB_OUTPUT
+            echo "Event: Other (no deployment)"
+          fi
+
+      # Security check for fork PRs
+      - name: Security check for pull requests from forks
+        if: steps.event.outputs.is_pr == 'true'
+        run: |
+          if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+            echo "::warning::Pull request from fork detected"
+            echo "Fork repository: ${{ github.event.pull_request.head.repo.full_name }}"
+            echo "Base repository: ${{ github.repository }}"
+            echo "::notice::Diff preview will be shown but deployment permissions may be limited"
+          fi
+
+      # Checkout repository
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.commit.outputs.commit_sha }}
+
+      # Discover applications using .argocd-app marker files
+      - name: Discover applications
+        id: discover
+        run: |
+          set -euo pipefail
+
+          applications_dir="${{ inputs.applications-directory }}"
+
+          # Validate directory exists
+          if [[ ! -d "$applications_dir" ]]; then
+            echo "::error::Applications directory '$applications_dir' does not exist"
+            exit 1
+          fi
+
+          echo "::group::Discovering applications"
+          echo "Scanning directory: $applications_dir"
+
+          applications=()
+          argocd_applications=()
+
+          # Scan for application directories
+          for dir in "$applications_dir"/*; do
+            if [[ -d "$dir" ]]; then
+              app_name="$(basename "$dir")"
+              applications+=("$app_name")
+
+              # Check for ArgoCD application marker
+              if [[ -f "$dir/.argocd-app" ]]; then
+                argocd_applications+=("$app_name")
+                argocd_app_name=$(cat "$dir/.argocd-app" | head -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+                echo "Found ArgoCD application: $app_name -> $argocd_app_name"
+              fi
+            fi
+          done
+
+          # Convert to JSON arrays using jq
+          applications_json=$(printf '%s\n' "${applications[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          argocd_applications_json=$(printf '%s\n' "${argocd_applications[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "applications=$applications_json" >> $GITHUB_OUTPUT
+          echo "argocd_applications=$argocd_applications_json" >> $GITHUB_OUTPUT
+          echo "applications_count=${#applications[@]}" >> $GITHUB_OUTPUT
+          echo "argocd_applications_count=${#argocd_applications[@]}" >> $GITHUB_OUTPUT
+
+          echo "::endgroup::"
+
+          echo "::notice::Found ${#applications[@]} total applications"
+          echo "::notice::Found ${#argocd_applications[@]} ArgoCD applications"
+
+  # Code quality checks
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - configure
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+      - name: Setup Node.js
+        uses: abinnovision/actions@setup-node-dev
+      - name: Install dependencies
+        run: |
+          yarn install --immutable
+      - name: Run checks
+        run: |
+          yarn check
+      - name: Check dependencies
+        run: |
+          if yarn dedupe --check; then
+            echo "::notice::Dependencies are consistent"
+          else
+            echo "::error::yarn.lock is not up to date - run 'yarn dedupe'"
+            exit 1
+          fi
+
+  # Preview changes for pull requests
+  preview:
+    name: Preview - ${{ matrix.application }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - configure
+      - check
+    if: needs.configure.outputs.is-pr == 'true' && needs.configure.outputs.has-argocd-applications == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        application: ${{ fromJSON(needs.configure.outputs.argocd-applications) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      # Validate application manifests
+      - name: Validate application
+        id: validate
+        run: |
+          set -euo pipefail
+
+          application="${{ matrix.application }}"
+          working_dir="${{ inputs.applications-directory }}"
+          app_path="$working_dir/$application"
+
+          echo "::group::Validating application: $application"
+
+          # Validate directory exists
+          if [[ ! -d "$app_path" ]]; then
+            echo "::error::Application directory not found: $app_path"
+            exit 1
+          fi
+
+          # Install kubeconform
+          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+            curl -L -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+            tar xf kubeconform.tar.gz
+            sudo mv kubeconform /usr/local/bin/
+          fi
+
+          # Install kube-score
+          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+            curl -L -o kube-score https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64
+            chmod +x kube-score
+            sudo mv kube-score /usr/local/bin/
+          fi
+
+          # Create temporary directory and build manifests
+          manifests_dir=$(mktemp -d)
+          echo "MANIFESTS_DIR=$manifests_dir" >> $GITHUB_ENV
+          echo "manifests_path=$manifests_dir/manifests.yaml" >> $GITHUB_OUTPUT
+
+          kustomize build \
+            --load-restrictor LoadRestrictionsNone \
+            --enable-helm \
+            -o "$manifests_dir/manifests.yaml" \
+            "$app_path"
+
+          # Run validations in parallel
+          validation_failed=0
+
+          # kubeconform (critical)
+          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+            (
+              echo "=== kubeconform validation ===" > "$manifests_dir/__kubeconform.log"
+
+              # Build schema location args
+              schema_args=""
+              while IFS= read -r location; do
+                [[ -z "$location" ]] && continue
+                schema_args="$schema_args -schema-location $location"
+              done <<< "${{ inputs.kubeconform-schema-locations }}"
+
+              if kubeconform -strict $schema_args -summary "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kubeconform.log" 2>&1; then
+                echo "KUBECONFORM_SUCCESS" > "$manifests_dir/.kubeconform-status"
+              else
+                echo "KUBECONFORM_FAILED" > "$manifests_dir/.kubeconform-status"
+              fi
+            ) &
+            KUBECONFORM_PID=$!
+          fi
+
+          # kube-score (warnings only)
+          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+            (
+              echo "=== kube-score validation ===" > "$manifests_dir/__kube-score.log"
+              if kube-score score "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kube-score.log" 2>&1; then
+                echo "KUBE_SCORE_SUCCESS" > "$manifests_dir/.kube-score-status"
+              else
+                echo "KUBE_SCORE_FAILED" > "$manifests_dir/.kube-score-status"
+              fi
+            ) &
+            KUBE_SCORE_PID=$!
+          fi
+
+          # Wait for validations
+          [[ -n "${KUBECONFORM_PID:-}" ]] && wait $KUBECONFORM_PID
+          [[ -n "${KUBE_SCORE_PID:-}" ]] && wait $KUBE_SCORE_PID
+          sleep 1  # Ensure status files are written
+
+          # Evaluate results
+          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+            if [[ -f "$manifests_dir/.kubeconform-status" ]]; then
+              kubeconform_status=$(cat "$manifests_dir/.kubeconform-status")
+            else
+              echo "::error::kubeconform status file not found"
+              kubeconform_status="KUBECONFORM_FAILED"
+            fi
+
+            if [[ "$kubeconform_status" == "KUBECONFORM_FAILED" ]]; then
+              echo "::error::kubeconform validation failed - this is critical"
+              cat "$manifests_dir/__kubeconform.log"
+              validation_failed=1
+            else
+              echo "kubeconform validation passed"
+            fi
+          fi
+
+          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+            if [[ -f "$manifests_dir/.kube-score-status" ]]; then
+              kube_score_status=$(cat "$manifests_dir/.kube-score-status")
+            else
+              kube_score_status="KUBE_SCORE_FAILED"
+            fi
+
+            if [[ "$kube_score_status" == "KUBE_SCORE_FAILED" ]]; then
+              echo "::warning::kube-score validation failed"
+              cat "$manifests_dir/__kube-score.log" || true
+              echo "::notice::kube-score failures won't block deployment"
+            else
+              echo "kube-score validation passed"
+            fi
+          fi
+
+          if [[ $validation_failed -eq 1 ]]; then
+            echo "validation_status=failure" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "validation_status=success" >> $GITHUB_OUTPUT
+          fi
+
+          echo "::endgroup::"
+
+      - name: Upload validation artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-results-${{ matrix.application }}-${{ github.run_id }}
+          path: |
+            ${{ env.MANIFESTS_DIR }}/__kube-score.log
+            ${{ env.MANIFESTS_DIR }}/__kubeconform.log
+          retention-days: 7
+
+      # Setup ArgoCD authentication
+      - name: Setup ArgoCD CLI
+        run: |
+          # Install ArgoCD CLI
+          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x /usr/local/bin/argocd
+
+      - name: Read ArgoCD application name
+        id: argocd-app
+        run: |
+          argocd_app_file="${{ inputs.applications-directory }}/${{ matrix.application }}/.argocd-app"
+
+          if [[ ! -f "$argocd_app_file" ]]; then
+            echo "::error::ArgoCD application file not found: $argocd_app_file"
+            exit 1
+          fi
+
+          argocd_app=$(cat "$argocd_app_file" | head -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+          if [[ -z "$argocd_app" ]]; then
+            echo "::error::ArgoCD application name is empty in $argocd_app_file"
+            exit 1
+          fi
+
+          echo "application_name=$argocd_app" >> $GITHUB_OUTPUT
+          echo "ArgoCD application: $argocd_app"
+
+      - name: Authenticate with ArgoCD (DEX)
+        if: inputs.auth-method == 'dex'
+        id: auth-dex
+        run: |
+          set -euo pipefail
+
+          # Get GitHub OIDC token
+          ID_TOKEN=$(curl -s \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=core-argocd-github-actions" \
+            | jq -r ".value")
+
+          if [[ -z "$ID_TOKEN" || "$ID_TOKEN" == "null" ]]; then
+            echo "::error::Failed to get GitHub OIDC token"
+            exit 1
+          fi
+
+          echo "::add-mask::$ID_TOKEN"
+
+          # Exchange with DEX
+          DEX_TOKEN_RESPONSE=$(curl -s \
+            ${{ secrets.DEX_ENDPOINT }}/token \
+            --user "${{ secrets.DEX_GITHUB_ACTIONS_CLIENT }}" \
+            --data-urlencode "connector_id=${{ secrets.DEX_GITHUB_ACTIONS_CONNECTOR }}" \
+            --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+            --data-urlencode "scope=openid profile groups" \
+            --data-urlencode "requested_token_type=urn:ietf:params:oauth:token-type:id_token" \
+            --data-urlencode "subject_token=$ID_TOKEN" \
+            --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:id_token")
+
+          DEX_TOKEN=$(jq -r .access_token <<< "$DEX_TOKEN_RESPONSE")
+
+          if [[ -z "$DEX_TOKEN" || "$DEX_TOKEN" == "null" ]]; then
+            echo "::error::Failed to exchange token with DEX"
+            echo "Response: $DEX_TOKEN_RESPONSE"
+            exit 1
+          fi
+
+          echo "::add-mask::$DEX_TOKEN"
+
+          # Build CLI arguments
+          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${DEX_TOKEN}"
+          echo "::add-mask::$ARGOCD_CLI_ARGS"
+
+          echo "argocd_cli_args=$ARGOCD_CLI_ARGS" >> $GITHUB_OUTPUT
+          echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
+
+      - name: Authenticate with ArgoCD (Token)
+        if: inputs.auth-method == 'token'
+        id: auth-token
+        run: |
+          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${{ secrets.ARGOCD_TOKEN }}"
+          echo "::add-mask::$ARGOCD_CLI_ARGS"
+
+          echo "argocd_cli_args=$ARGOCD_CLI_ARGS" >> $GITHUB_OUTPUT
+          echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
+
+      # Perform ArgoCD diff
+      - name: Perform ArgoCD diff
+        id: argocd-diff
+        env:
+          REVISION: ${{ github.event.pull_request.head.ref }}
+          ARGOCD_APP: ${{ steps.argocd-app.outputs.application_name }}
+        run: |
+          set +e  # Don't exit on non-zero
+
+          DIFF_FILE=$(mktemp)
+
+          # Perform diff with color output
+          (KUBECTL_EXTERNAL_DIFF="diff --color=always" \
+            argocd $ARGOCD_CLI_ARGS app diff $ARGOCD_APP \
+              --revision "$REVISION" \
+              --hard-refresh) > $DIFF_FILE
+          EXIT_CODE=$?
+
+          cat $DIFF_FILE  # Display in console
+
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "::notice::No changes detected for $ARGOCD_APP"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          elif [ $EXIT_CODE -eq 1 ]; then
+            echo "::warning::Changes detected for $ARGOCD_APP"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+
+            # Store diff without ANSI colors for PR comment
+            delimiter="$(openssl rand -hex 8)"
+            echo "diff_content<<$delimiter" >> $GITHUB_OUTPUT
+            cat $DIFF_FILE | sed -r 's/\x1B\[(;?[0-9]{1,3})+[mGK]//g' >> $GITHUB_OUTPUT
+            echo "$delimiter" >> $GITHUB_OUTPUT
+          else
+            echo "::error::ArgoCD diff failed with exit code $EXIT_CODE"
+            cat $DIFF_FILE
+            exit 1
+          fi
+
+      # Comment on PR
+      - name: Comment on PR
+        if: inputs.enable-pr-comments && steps.argocd-diff.outputs.has_changes == 'true'
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            ## 🔍 Changes detected in `${{ matrix.application }}`
+
+            This PR contains changes to the ArgoCD Application **${{ steps.argocd-app.outputs.application_name }}**.
+
+            ```diff
+            ${{ steps.argocd-diff.outputs.diff_content }}
+            ```
+
+            ---
+            <sub>Preview generated for application: `${{ matrix.application }}`</sub>
+          comment_tag: application-${{ matrix.application }}
+
+  # Deploy to ArgoCD (main branch only)
+  deploy:
+    name: Deploy - ${{ matrix.application }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - configure
+      - check
+    if: needs.configure.outputs.is-main-push == 'true' && needs.configure.outputs.has-argocd-applications == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        application: ${{ fromJSON(needs.configure.outputs.argocd-applications) }}
+    concurrency:
+      group: deploy-${{ matrix.application }}-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      deployments: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      # Validate application (same as preview)
+      - name: Validate application
+        id: validate
+        run: |
+          set -euo pipefail
+
+          application="${{ matrix.application }}"
+          working_dir="${{ inputs.applications-directory }}"
+          app_path="$working_dir/$application"
+
+          echo "::group::Validating application: $application"
+
+          if [[ ! -d "$app_path" ]]; then
+            echo "::error::Application directory not found: $app_path"
+            exit 1
+          fi
+
+          # Install kubeconform
+          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+            curl -L -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+            tar xf kubeconform.tar.gz
+            sudo mv kubeconform /usr/local/bin/
+          fi
+
+          # Install kube-score
+          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+            curl -L -o kube-score https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64
+            chmod +x kube-score
+            sudo mv kube-score /usr/local/bin/
+          fi
+
+          # Create temporary directory and build manifests
+          manifests_dir=$(mktemp -d)
+          echo "MANIFESTS_DIR=$manifests_dir" >> $GITHUB_ENV
+
+          kustomize build \
+            --load-restrictor LoadRestrictionsNone \
+            --enable-helm \
+            -o "$manifests_dir/manifests.yaml" \
+            "$app_path"
+
+          validation_failed=0
+
+          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+            (
+              echo "=== kubeconform validation ===" > "$manifests_dir/__kubeconform.log"
+
+              schema_args=""
+              while IFS= read -r location; do
+                [[ -z "$location" ]] && continue
+                schema_args="$schema_args -schema-location $location"
+              done <<< "${{ inputs.kubeconform-schema-locations }}"
+
+              if kubeconform -strict $schema_args -summary "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kubeconform.log" 2>&1; then
+                echo "KUBECONFORM_SUCCESS" > "$manifests_dir/.kubeconform-status"
+              else
+                echo "KUBECONFORM_FAILED" > "$manifests_dir/.kubeconform-status"
+              fi
+            ) &
+            KUBECONFORM_PID=$!
+          fi
+
+          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+            (
+              echo "=== kube-score validation ===" > "$manifests_dir/__kube-score.log"
+              if kube-score score "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kube-score.log" 2>&1; then
+                echo "KUBE_SCORE_SUCCESS" > "$manifests_dir/.kube-score-status"
+              else
+                echo "KUBE_SCORE_FAILED" > "$manifests_dir/.kube-score-status"
+              fi
+            ) &
+            KUBE_SCORE_PID=$!
+          fi
+
+          [[ -n "${KUBECONFORM_PID:-}" ]] && wait $KUBECONFORM_PID
+          [[ -n "${KUBE_SCORE_PID:-}" ]] && wait $KUBE_SCORE_PID
+          sleep 1
+
+          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+            kubeconform_status=$(cat "$manifests_dir/.kubeconform-status" 2>/dev/null || echo "KUBECONFORM_FAILED")
+            if [[ "$kubeconform_status" == "KUBECONFORM_FAILED" ]]; then
+              echo "::error::kubeconform validation failed"
+              cat "$manifests_dir/__kubeconform.log"
+              validation_failed=1
+            else
+              echo "kubeconform validation passed"
+            fi
+          fi
+
+          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+            kube_score_status=$(cat "$manifests_dir/.kube-score-status" 2>/dev/null || echo "KUBE_SCORE_FAILED")
+            if [[ "$kube_score_status" == "KUBE_SCORE_FAILED" ]]; then
+              echo "::warning::kube-score validation failed (won't block deployment)"
+              cat "$manifests_dir/__kube-score.log" || true
+            else
+              echo "kube-score validation passed"
+            fi
+          fi
+
+          if [[ $validation_failed -eq 1 ]]; then
+            exit 1
+          fi
+
+          echo "::endgroup::"
+
+      - name: Upload validation artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-results-${{ matrix.application }}-${{ github.run_id }}
+          path: |
+            ${{ env.MANIFESTS_DIR }}/__kube-score.log
+            ${{ env.MANIFESTS_DIR }}/__kubeconform.log
+          retention-days: 7
+
+      # Setup ArgoCD
+      - name: Setup ArgoCD CLI
+        run: |
+          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x /usr/local/bin/argocd
+
+      - name: Read ArgoCD application name
+        id: argocd-app
+        run: |
+          argocd_app_file="${{ inputs.applications-directory }}/${{ matrix.application }}/.argocd-app"
+
+          if [[ ! -f "$argocd_app_file" ]]; then
+            echo "::error::ArgoCD application file not found: $argocd_app_file"
+            exit 1
+          fi
+
+          argocd_app=$(cat "$argocd_app_file" | head -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+          if [[ -z "$argocd_app" ]]; then
+            echo "::error::ArgoCD application name is empty"
+            exit 1
+          fi
+
+          echo "application_name=$argocd_app" >> $GITHUB_OUTPUT
+          echo "ArgoCD application: $argocd_app"
+
+      - name: Authenticate with ArgoCD (DEX)
+        if: inputs.auth-method == 'dex'
+        run: |
+          set -euo pipefail
+
+          ID_TOKEN=$(curl -s \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=core-argocd-github-actions" \
+            | jq -r ".value")
+
+          echo "::add-mask::$ID_TOKEN"
+
+          DEX_TOKEN_RESPONSE=$(curl -s \
+            ${{ secrets.DEX_ENDPOINT }}/token \
+            --user "${{ secrets.DEX_GITHUB_ACTIONS_CLIENT }}" \
+            --data-urlencode "connector_id=${{ secrets.DEX_GITHUB_ACTIONS_CONNECTOR }}" \
+            --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+            --data-urlencode "scope=openid profile groups" \
+            --data-urlencode "requested_token_type=urn:ietf:params:oauth:token-type:id_token" \
+            --data-urlencode "subject_token=$ID_TOKEN" \
+            --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:id_token")
+
+          DEX_TOKEN=$(jq -r .access_token <<< "$DEX_TOKEN_RESPONSE")
+          echo "::add-mask::$DEX_TOKEN"
+
+          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${DEX_TOKEN}"
+          echo "::add-mask::$ARGOCD_CLI_ARGS"
+
+          echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
+
+      - name: Authenticate with ArgoCD (Token)
+        if: inputs.auth-method == 'token'
+        run: |
+          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${{ secrets.ARGOCD_TOKEN }}"
+          echo "::add-mask::$ARGOCD_CLI_ARGS"
+          echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
+
+      # Check sync status
+      - name: Check sync status
+        id: check-sync
+        env:
+          ARGOCD_APP: ${{ steps.argocd-app.outputs.application_name }}
+        run: |
+          set -euo pipefail
+
+          app_status=$(argocd $ARGOCD_CLI_ARGS app get $ARGOCD_APP -o json --hard-refresh)
+          sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
+          health_status=$(echo "$app_status" | jq -r '.status.health.status')
+          sync_revision=$(echo "$app_status" | jq -r '.status.sync.revision // "unknown"')
+
+          echo "Current Status:"
+          echo "  Sync Status: $sync_status"
+          echo "  Health Status: $health_status"
+          echo "  Sync Revision: $sync_revision"
+
+          if [[ "${{ inputs.skip-if-synced }}" == "true" && "$sync_status" == "Synced" ]]; then
+            echo "::notice::Application is already in sync - skipping deployment"
+            echo "sync_required=false" >> $GITHUB_OUTPUT
+          else
+            echo "::notice::Application deployment required"
+            echo "sync_required=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Create GitHub deployment
+      - name: Create GitHub deployment
+        id: deployment
+        if: inputs.enable-github-deployments && steps.check-sync.outputs.sync_required == 'true'
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ github.token }}
+          environment-url: https://${{ inputs.argocd-server }}/applications/${{ steps.argocd-app.outputs.application_name }}
+          environment: ${{ matrix.application }}
+          description: Deployment of ${{ matrix.application }} using ArgoCD application ${{ steps.argocd-app.outputs.application_name }}
+
+      # Sync application
+      - name: Sync ArgoCD Application
+        id: sync-app
+        if: steps.check-sync.outputs.sync_required == 'true'
+        env:
+          ARGOCD_APP: ${{ steps.argocd-app.outputs.application_name }}
+        run: |
+          set -euo pipefail
+
+          echo "::group::Syncing ArgoCD application: $ARGOCD_APP"
+
+          if argocd $ARGOCD_CLI_ARGS app sync $ARGOCD_APP --timeout ${{ inputs.sync-timeout }}; then
+            echo "::notice::Sync operation completed successfully"
+
+            # Wait for application to become healthy
+            if argocd $ARGOCD_CLI_ARGS app wait $ARGOCD_APP --health --timeout ${{ inputs.health-timeout }}; then
+              echo "::notice::Application is now healthy"
+
+              final_status=$(argocd $ARGOCD_CLI_ARGS app get $ARGOCD_APP -o json)
+              final_health=$(echo "$final_status" | jq -r '.status.health.status')
+              final_sync=$(echo "$final_status" | jq -r '.status.sync.status')
+
+              echo "Final Status:"
+              echo "  Health: $final_health"
+              echo "  Sync: $final_sync"
+
+              echo "status=success" >> $GITHUB_OUTPUT
+            else
+              echo "::error::Application failed to become healthy"
+
+              current_status=$(argocd $ARGOCD_CLI_ARGS app get $ARGOCD_APP -o json)
+              current_health=$(echo "$current_status" | jq -r '.status.health.status')
+
+              echo "Current Status:"
+              echo "  Health: $current_health"
+
+              echo "status=failure" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          else
+            echo "::error::Application sync failed"
+            echo "status=failure" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "::endgroup::"
+
+      - name: Update deployment status (success)
+        if: success() && inputs.enable-github-deployments && steps.deployment.outputs.deployment_id != ''
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ github.token }}
+          environment-url: ${{ steps.deployment.outputs.environment_url }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: "success"
+          description: Application synced successfully
+
+      - name: Update deployment status (failure)
+        if: failure() && inputs.enable-github-deployments && steps.deployment.outputs.deployment_id != ''
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ github.token }}
+          environment-url: ${{ steps.deployment.outputs.environment_url }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: "failure"
+          description: Application deployment failed
+
+  # Workflow status consolidation
+  workflow-status:
+    name: Workflow Status
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - configure
+      - check
+      - preview
+      - deploy
+    if: always()
+    steps:
+      - name: Evaluate workflow status
+        run: |
+          check_result="${{ needs.check.result }}"
+          preview_result="${{ needs.preview.result }}"
+          deploy_result="${{ needs.deploy.result }}"
+
+          overall_success=true
+
+          # Code checks must succeed
+          if [[ "$check_result" == "failure" ]]; then
+            echo "::error::Code checks failed"
+            overall_success=false
+          fi
+
+          # For PRs, preview failures are critical
+          if [[ "${{ needs.configure.outputs.is-pr }}" == "true" && "$preview_result" == "failure" ]]; then
+            echo "::error::Preview failed on PR"
+            overall_success=false
+          fi
+
+          # For main branch, deployment must succeed
+          if [[ "${{ needs.configure.outputs.is-main-push }}" == "true" && "$deploy_result" == "failure" ]]; then
+            echo "::error::Deployment failed on main branch"
+            overall_success=false
+          fi
+
+          if [[ "$overall_success" == "false" ]]; then
+            exit 1
+          fi
+
+          echo "::notice::Workflow completed successfully"
