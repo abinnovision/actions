@@ -144,6 +144,14 @@ function main() {
 					errors.push(
 						`${relative}: References internal action '${name}' but it is not declared in actionDependencies`,
 					);
+				} else {
+					// Validate the range format
+					const rangePattern = /^(\^|~)?\d+\.\d+\.\d+$/;
+					if (!rangePattern.test(actionDeps[name])) {
+						errors.push(
+							`${relative}: actionDependencies['${name}'] has invalid range '${actionDeps[name]}'. Expected '^X.Y.Z', '~X.Y.Z', or 'X.Y.Z'.`,
+						);
+					}
 				}
 			}
 		}
