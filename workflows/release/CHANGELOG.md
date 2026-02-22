@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/abinnovision/actions/compare/release-source-v2.0.1...release-source-v2.0.2) (2026-02-22)
+
+
+### Bug Fixes
+
+* support floating semver ranges in actionDependencies ([#332](https://github.com/abinnovision/actions/issues/332)) ([a00cdcd](https://github.com/abinnovision/actions/commit/a00cdcd50a1586f39dfae8f34492ea5c3e52aaa6))
+
 ## [2.0.1](https://github.com/abinnovision/actions/compare/release-source-v2.0.0...release-source-v2.0.1) (2026-02-19)
 
 

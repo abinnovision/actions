@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.3.1...node-monorepo-stack-source-v1.3.2) (2026-02-22)
+
+
+### Bug Fixes
+
+* support floating semver ranges in actionDependencies ([#332](https://github.com/abinnovision/actions/issues/332)) ([a00cdcd](https://github.com/abinnovision/actions/commit/a00cdcd50a1586f39dfae8f34492ea5c3e52aaa6))
+
 ## [1.3.1](https://github.com/abinnovision/actions/compare/node-monorepo-stack-source-v1.3.0...node-monorepo-stack-source-v1.3.1) (2026-02-18)
 
 
