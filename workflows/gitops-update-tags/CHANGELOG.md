@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.1...gitops-update-tags-source-v1.1.2) (2026-02-22)
+
+
+### Bug Fixes
+
+* support floating semver ranges in actionDependencies ([#332](https://github.com/abinnovision/actions/issues/332)) ([a00cdcd](https://github.com/abinnovision/actions/commit/a00cdcd50a1586f39dfae8f34492ea5c3e52aaa6))
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.0...gitops-update-tags-source-v1.1.1) (2026-01-21)
 
 

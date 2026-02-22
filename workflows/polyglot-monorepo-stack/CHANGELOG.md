@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.4...polyglot-monorepo-stack-source-v1.1.5) (2026-02-22)
+
+
+### Bug Fixes
+
+* support floating semver ranges in actionDependencies ([#332](https://github.com/abinnovision/actions/issues/332)) ([a00cdcd](https://github.com/abinnovision/actions/commit/a00cdcd50a1586f39dfae8f34492ea5c3e52aaa6))
+
 ## [1.1.4](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.3...polyglot-monorepo-stack-source-v1.1.4) (2026-02-19)
 
 
