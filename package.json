@@ -56,7 +56,7 @@
 		"sort-package-json": "^3.6.1",
 		"tablemark": "^3.1.0",
 		"tsx": "^4.21.0",
-		"turbo": "^2.8.9",
+		"turbo": "^2.8.10",
 		"typescript": "^5.9.3"
 	},
 	"packageManager": "yarn@4.12.0",
