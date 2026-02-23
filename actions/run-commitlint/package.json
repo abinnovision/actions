@@ -39,7 +39,7 @@
 		"@actions/github": "^6.0.0",
 		"@commitlint/execute-rule": "20.0.0",
 		"@commitlint/format": "20.4.0",
-		"@commitlint/lint": "20.4.1",
+		"@commitlint/lint": "20.4.2",
 		"chalk": "^5.3.0",
 		"conventional-changelog-conventionalcommits": "9.1.0"
 	},
