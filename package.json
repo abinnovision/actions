@@ -1,0 +1,30 @@
+{
+  "name": "get-github-app-token",
+  "version": "1.2.0",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "abi group GmbH",
+    "email": "info@abigroup.io",
+    "url": "https://abigroup.io/"
+  },
+  "files": [
+    "action.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE.md"
+  ],
+  "scripts": {
+    "format:check": "prettier --check '*.{md,json,json5,yaml,yml}'",
+    "format:fix": "prettier --write '*.{md,json,json5,yaml,yml}'"
+  },
+  "lint-staged": {
+    "*.{json,json5,yaml,yml,md}": [
+      "prettier --write"
+    ]
+  },
+  "prettier": "@abinnovision/prettier-config",
+  "devDependencies": {
+    "@abinnovision/prettier-config": "^2.1.5",
+    "prettier": "^3.8.1"
+  }
+}
