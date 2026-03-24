@@ -1,0 +1,87 @@
+name: Setup Node
+author: "abi group GmbH"
+description: |
+  Setup a Node.js environment, including package mangers and private registries.
+  This uses the opinionated way of AB Innovision.
+inputs:
+  token:
+    required: true
+    description: |
+      The token for the package registry. The GITHUB_TOKEN secret can be used.
+    default: ${{ github.token }}
+  version:
+    required: false
+    default: ""
+    description: |
+      Defines a version, which overrides the default version.
+  enable-corepack:
+    required: false
+    default: "true"
+    description: |
+      If set to 'true', the corepack will be enabled.
+  enable-turbo-cache:
+    required: false
+    default: "auto"
+    description: |
+      The following values are supported:
+      - 'auto': Enables turbo cache if 'turbo.json' is present.
+      - 'true': Enables turbo cache.
+      - 'false': Disables turbo cache.
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      name: "Prepare"
+      shell: bash
+      env:
+        DEFAULT_VERSION: lts/iron # Node.js 20.x LTS
+        DEFAULT_VERSION_FILE: .tool-versions
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+        elif [ -f "${{ env.DEFAULT_VERSION_FILE }}" ]; then
+          echo "VERSION_FILE=${{ env.DEFAULT_VERSION_FILE }}" >> $GITHUB_ENV
+        else
+          echo "VERSION=${{ env.DEFAULT_VERSION }}" >> $GITHUB_ENV
+        fi
+    # Enable corepack if requested. By default, it is enabled.
+    - id: setup-corepack
+      name: "Setup corepack"
+      shell: bash
+      if: ${{ inputs.enable-corepack == 'true' }}
+      run: |
+        corepack enable
+    - id: setup
+      name: "Setup"
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ env.VERSION_FILE }}
+        node-version: ${{ env.VERSION }}
+        cache: yarn
+    # For the 'abinnovision'-scope we need to set up a private registry.
+    # This is hosted on GitHub Packages.
+    - id: setup-private-registry
+      name: "Setup private registry (for 'abinnovision' scope)"
+      shell: bash
+      run: |
+        yarn config set -H --json npmScopes '{"abinnovision": {"npmPublishRegistry": "https://npm.pkg.github.com", "npmRegistryServer": "https://npm.pkg.github.com", "npmAlwaysAuth": false, "npmAuthToken": "${{ inputs.token }}"}}'
+    - id: setup-turbo-cache-config
+      name: "Evaluate Turbo cache configuration"
+      shell: bash
+      # If the 'enable-turbo-cache' input is 'auto' or 'true', enable turbo cache.
+      if: ${{ inputs.enable-turbo-cache == 'auto' || inputs.enable-turbo-cache == 'true' }}
+      run: |
+        # If 'enable-turbo-cache' is 'auto', check if 'turbo.json' exists.
+        if [[ ${{ inputs.enable-turbo-cache }} == 'auto' ]]; then
+          if [[ -f 'turbo.json' ]]; then
+            echo "enable-turbo=true" >> $GITHUB_OUTPUT
+          else
+            echo "enable-turbo=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "enable-turbo=true" >> $GITHUB_OUTPUT
+        fi
+    - id: setup-turbo-cache
+      name: "Setup Turbo cache"
+      if: ${{ steps.setup-turbo-cache-config.outputs.enable-turbo == 'true' }}
+      uses: rharkor/caching-for-turbo@v2.1.1
