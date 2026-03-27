@@ -36,7 +36,7 @@
 	"dependencies": {
 		"@abinnovision/commitlint-config": "^2.2.3",
 		"@actions/core": "^1.11.1",
-		"@actions/github": "^6.0.0",
+		"@actions/github": "^9.0.0",
 		"@commitlint/execute-rule": "20.0.0",
 		"@commitlint/format": "20.4.0",
 		"@commitlint/lint": "20.4.1",
