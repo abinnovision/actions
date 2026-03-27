@@ -45,7 +45,7 @@
 	"devDependencies": {
 		"@abinnovision/commitlint-config": "^2.2.3",
 		"@abinnovision/prettier-config": "^2.1.5",
-		"@commitlint/cli": "^20.4.1",
+		"@commitlint/cli": "^20.4.2",
 		"@types/js-yaml": "^4.0.9",
 		"@types/node": "^22.10.0",
 		"handlebars": "^4.7.8",
