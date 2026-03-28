@@ -47,7 +47,7 @@
 		"@abinnovision/prettier-config": "^2.1.5",
 		"@commitlint/cli": "^20.4.1",
 		"@types/js-yaml": "^4.0.9",
-		"@types/node": "^22.10.0",
+		"@types/node": "^25.3.0",
 		"handlebars": "^4.7.8",
 		"husky": "^9.1.7",
 		"js-yaml": "^4.1.0",
