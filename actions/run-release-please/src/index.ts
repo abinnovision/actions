@@ -11,6 +11,7 @@ interface VersionEntry {
 	version: string;
 	packageVersion: string;
 	type: "release" | "prerelease";
+	sha: string;
 }
 
 type VersionsMap = Record<string, VersionEntry>;
@@ -121,7 +122,12 @@ const extractStableVersions = (
 		const path = release.path || ".";
 		const packageVersion = release.version;
 		const version = `${packageVersion}+${shortSha}`;
-		versions[path] = { version, packageVersion, type: "release" };
+		versions[path] = {
+			version,
+			packageVersion,
+			type: "release",
+			sha: shortSha,
+		};
 	}
 
 	return versions;
@@ -352,7 +358,12 @@ const computePrereleaseVersions = async (
 			`  ${path}: ${currentVersion} -> ${version} (commits=${String(commitCount)}, componentSha=${componentSha})`,
 		);
 
-		versions[path] = { version, packageVersion, type: "prerelease" };
+		versions[path] = {
+			version,
+			packageVersion,
+			type: "prerelease",
+			sha: componentSha,
+		};
 	}
 
 	return versions;
