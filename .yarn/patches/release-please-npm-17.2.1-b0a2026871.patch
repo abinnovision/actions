@@ -1,8 +1,37 @@
+diff --git a/build/src/manifest.d.ts b/build/src/manifest.d.ts
+index bac02ad92f6ae9738a72615b7a073b12e29217f9..29d17661d6a15c2ff6b4f828775cddcf20312774 100644
+--- a/build/src/manifest.d.ts
++++ b/build/src/manifest.d.ts
+@@ -1,3 +1,4 @@
++import { Commit } from './commit';
+ import { ChangelogSection } from './changelog-notes';
+ import { GitHub, GitHubRelease } from './github';
+ import { Version } from './version';
+@@ -239,6 +240,7 @@ export declare class Manifest {
+     readonly plugins: ManifestPlugin[];
+     private _strategiesByPath?;
+     private _pathsByComponent?;
++    _commitsPerPath: Record<string, Commit[]>;
+     private manifestPath;
+     private bootstrapSha?;
+     private lastReleaseSha?;
+diff --git a/build/src/manifest.js b/build/src/manifest.js
+index db31d247db8a017ff3200e51c936628e68817bde..ecbfa227d30489ab51a397d45719d1ec04204a9d 100644
+--- a/build/src/manifest.js
++++ b/build/src/manifest.js
+@@ -314,6 +314,7 @@ class Manifest {
+         }
+         const commitExclude = new commit_exclude_1.CommitExclude(this.repositoryConfig);
+         commitsPerPath = commitExclude.excludeCommits(commitsPerPath);
++        this._commitsPerPath = commitsPerPath;
+         // backfill latest release tags from manifest
+         for (const path in this.repositoryConfig) {
+             const latestRelease = releasesByPath[path];
 diff --git a/package.json b/package.json
-index 5785aaaf94842ec5f6ba66086acf3abd7d8ebcf6..917c755c34be662fded17191e15484e1ce07a2ec 100644
+index 5785aaaf94842ec5f6ba66086acf3abd7d8ebcf6..546a8afc97a636f145754b24281491828268e32e 100644
 --- a/package.json
 +++ b/package.json
-@@ -2,8 +2,24 @@
+@@ -2,8 +2,32 @@
    "name": "release-please",
    "version": "17.2.1",
    "description": "generate release PRs based on the conventionalcommits.org spec",
@@ -24,6 +53,14 @@ index 5785aaaf94842ec5f6ba66086acf3abd7d8ebcf6..917c755c34be662fded17191e15484e1
 +    "./version": {
 +      "types": "./build/src/version.d.ts",
 +      "default": "./build/src/version.js"
++    },
++    "./commit": {
++      "types": "./build/src/commit.d.ts",
++      "default": "./build/src/commit.js"
++    },
++    "./util/filter-commits": {
++      "types": "./build/src/util/filter-commits.d.ts",
++      "default": "./build/src/util/filter-commits.js"
 +    }
 +  },
    "scripts": {
