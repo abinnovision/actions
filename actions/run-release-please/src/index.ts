@@ -1,9 +1,9 @@
 import * as core from "@actions/core";
 import { context, getOctokit } from "@actions/github";
 import { GitHub, Manifest } from "release-please";
+import { parseConventionalCommits } from "release-please/commit";
 import { BranchName } from "release-please/util/branch-name";
-import { TagName } from "release-please/util/tag-name";
-import { Version } from "release-please/version";
+import { filterCommits } from "release-please/util/filter-commits";
 
 import type { CreatedRelease, Strategy } from "release-please";
 
@@ -22,6 +22,7 @@ interface PrereleaseOptions {
 	channel: string;
 	shortSha: string;
 	existingVersions: VersionsMap;
+	commitsPerPath: Record<string, Array<{ sha: string; message: string }>>;
 }
 
 /**
@@ -140,6 +141,20 @@ const getStrategiesByPath = (
 	).getStrategiesByPath();
 
 /**
+ * Access Manifest._commitsPerPath which is populated by buildPullRequests()
+ * during createPullRequests(). Contains per-component commits since last release,
+ * already split by path and filtered by CommitExclude.
+ */
+const getCommitsPerPath = (
+	manifest: Manifest,
+): Record<string, Array<{ sha: string; message: string }>> =>
+	(
+		manifest as unknown as {
+			_commitsPerPath: Record<string, Array<{ sha: string; message: string }>>;
+		}
+	)._commitsPerPath;
+
+/**
  * Fetch .release-please-manifest.json from a given branch via the GitHub API.
  * Returns the parsed manifest or null if the branch/file does not exist.
  */
@@ -217,6 +232,7 @@ const computePrereleaseVersions = async (
 		channel,
 		shortSha,
 		existingVersions,
+		commitsPerPath,
 	} = options;
 
 	const { owner, repo } = context.repo;
@@ -290,8 +306,6 @@ const computePrereleaseVersions = async (
 	core.info(JSON.stringify(changedPackages, null, 2));
 	core.endGroup();
 
-	const octokit = getOctokit(token);
-
 	// Compute prerelease version for each changed package.
 	for (const [
 		path,
@@ -311,52 +325,31 @@ const computePrereleaseVersions = async (
 			continue;
 		}
 
-		// Get component via strategy -> handles normalization per release-type
-		const component = await strategy.getComponent();
+		// Get per-component commits already fetched by Manifest.buildPullRequests().
+		// These are split by path, filtered to since-last-release, and exclusions applied.
+		const pathCommits = commitsPerPath[path] ?? [];
 
-		// Get tag config from repositoryConfig (public, properly merged).
+		// Parse conventional commits and filter to changelog-worthy entries only.
+		// filterCommits defaults to standard sections (feat, fix, perf, revert visible)
+		// when changelogSections is undefined.
 		const config = manifest.repositoryConfig[path];
-
-		// Construct last release tag using release-please's TagName.
-		const lastVersion = Version.parse(currentVersion);
-
-		const lastTag = new TagName(
-			lastVersion,
-			component ?? undefined,
-			config.tagSeparator,
-			config.includeVInTag,
+		const parsed = parseConventionalCommits(
+			pathCommits.map((c) => ({ sha: c.sha, message: c.message })),
 		);
+		const worthy = filterCommits(parsed, config.changelogSections);
+		const commitCount = worthy.length;
 
-		const lastTagStr = lastTag.toString();
-
-		// Count commits since the last release tag via GitHub API.
-		let commitCount: number;
-		try {
-			const { data } = await octokit.rest.repos.compareCommitsWithBasehead({
-				owner,
-				repo,
-				basehead: `${lastTagStr}...${context.sha}`,
-			});
-
-			commitCount = data.ahead_by;
-		} catch {
-			// Tag doesn't exist (e.g., first release). Get total commit count via Link header.
-			const { headers } = await octokit.rest.repos.listCommits({
-				owner,
-				repo,
-				sha: context.sha,
-				per_page: 1,
-			});
-			const match = headers.link?.match(/page=(\d+)>; rel="last"/);
-			commitCount = match ? parseInt(match[1], 10) : 1;
-		}
+		// Component-scoped SHA: most recent commit touching this path.
+		// Falls back to HEAD SHA for dependency-triggered bumps with no direct commits.
+		const componentSha =
+			pathCommits.length > 0 ? pathCommits[0].sha.substring(0, 7) : shortSha;
 
 		// Build prerelease version and clean package version.
-		const version = `${nextVersion}-${channel}.${String(commitCount)}+${shortSha}`;
+		const version = `${nextVersion}-${channel}.${String(commitCount)}+${componentSha}`;
 		const packageVersion = `${nextVersion}-${channel}.${String(commitCount)}`;
 
 		core.info(
-			`  ${path}: ${currentVersion} -> ${version} (component=${String(component)}, lastTag=${lastTagStr}, commits=${String(commitCount)})`,
+			`  ${path}: ${currentVersion} -> ${version} (commits=${String(commitCount)}, componentSha=${componentSha})`,
 		);
 
 		versions[path] = { version, packageVersion, type: "prerelease" };
@@ -421,6 +414,7 @@ const computePrereleaseVersions = async (
 		channel: prereleaseChannel,
 		shortSha,
 		existingVersions: versions,
+		commitsPerPath: getCommitsPerPath(manifest),
 	});
 
 	core.startGroup("Final versions");
