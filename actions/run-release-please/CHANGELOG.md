@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.2...run-release-please-source-v1.0.3) (2026-04-11)
+
+
+### Bug Fixes
+
+* improve merge logic to avoid overwriting version bumps from PR branches ([#351](https://github.com/abinnovision/actions/issues/351)) ([9809975](https://github.com/abinnovision/actions/commit/980997527584f196413ff6453ab1caf4a39993d3))
+
 ## [1.0.2](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.1...run-release-please-source-v1.0.2) (2026-02-22)
 
 
