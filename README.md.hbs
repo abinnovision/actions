@@ -1,0 +1,45 @@
+# {{name}}
+
+{{description}}
+
+## How it works
+
+This action wraps [release-please](https://github.com/googleapis/release-please) and extends it with prerelease channel support. It replaces both `googleapis/release-please-action@v4` and the companion bash script that was previously needed to compute version metadata.
+
+### Stable releases
+
+On every run, the action calls `createReleases()` (to publish GitHub releases for merged release PRs) and `createPullRequests()` (to create or update release PRs for pending changes). This mirrors what `googleapis/release-please-action` does in manifest mode. Stable versions are extracted directly from the created release objects.
+
+### Prerelease channels
+
+When `prerelease-channel` is set (e.g., `beta`), the action computes prerelease versions for packages that have pending changes but haven't been released yet:
+
+1. Fetches the `.release-please-manifest.json` from the release-please PR branch and compares it against the current manifest on disk.
+2. For each package where the version differs (i.e., release-please has bumped it), computes a prerelease version in the format: `{next-version}-{channel}.{commit-count}+{short-sha}` (e.g., `1.4.0-beta.5+a3f2c1d`).
+3. Uses release-please's own strategy classes for correct component resolution (e.g., Node strips `@scope/` from package names) and tag construction, avoiding the gaps that a standalone bash script would have.
+
+The `versions` output is a JSON object mapping package paths to version info, where each entry includes a `type` field (`"release"` or `"prerelease"`) so callers can distinguish between the two.
+
+### Differences from `googleapis/release-please-action`
+
+- **Single step** instead of action + bash script for version computation.
+- **Built-in prerelease support** with correct component resolution via release-please internals.
+- **Simplified output**: a single `versions` JSON object instead of flat key-value pairs (e.g., `path--version`, `releases_created`).
+- **No `releases-created` output**: callers check `versions != '{}'` or inspect the `type` field instead.
+- **Config-driven**: all release-please configuration comes from `release-please-config.json` in the repository; no action-level config inputs beyond `token`, `prerelease-channel`, and `target-branch`.
+
+## Usage
+
+{{{usage-example type="action" name=name inputs=inputs version=version}}}
+
+## Latest versions
+
+{{{version-examples type="action" name=name version=version}}}
+
+## Inputs
+
+{{> inputs-table inputs}}
+
+## Outputs
+
+{{> outputs-table outputs}}
