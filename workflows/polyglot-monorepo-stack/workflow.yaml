@@ -860,7 +860,7 @@ jobs:
         with:
           images: ${{ steps.image-names.outputs.IMAGES }}
           tags: |
-            type=sha,prefix=sha-,format=short
+            type=raw,value=sha-${{ matrix.entry.sha }}
             type=semver,pattern={{version}},value=v${{ matrix.entry.packageVersion }}
 
       - name: Prepare app-specific secrets
