@@ -235,6 +235,10 @@ const computePrereleaseVersions = async (
 	core.info(`PR branches to check: ${prBranchNames.join(", ")}`);
 
 	// Fetch and merge manifests from all PR branches.
+	// Each branch manifest contains ALL components, but only some are bumped.
+	// We only take entries that differ from the current released versions to
+	// avoid a later branch overwriting a bump from an earlier branch.
+	const currentVersions = manifest.releasedVersions;
 	const prManifest: Record<string, string> = {};
 	for (const branch of prBranchNames) {
 		const branchManifest = await fetchManifestFromBranch({
@@ -246,7 +250,13 @@ const computePrereleaseVersions = async (
 
 		if (branchManifest) {
 			core.info(`  Found manifest on branch: ${branch}`);
-			Object.assign(prManifest, branchManifest);
+			for (const [path, version] of Object.entries(branchManifest)) {
+				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+				const currentVersion = currentVersions[path]?.toString();
+				if (currentVersion !== version) {
+					prManifest[path] = version;
+				}
+			}
 		} else {
 			core.info(`  No manifest on branch: ${branch}`);
 		}
@@ -258,9 +268,6 @@ const computePrereleaseVersions = async (
 		);
 		return versions;
 	}
-
-	// Use the manifest's already-loaded released versions (from .release-please-manifest.json).
-	const currentVersions = manifest.releasedVersions;
 
 	core.startGroup("Manifest comparison");
 	core.info(
