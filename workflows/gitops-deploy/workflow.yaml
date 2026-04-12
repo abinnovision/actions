@@ -210,7 +210,7 @@ jobs:
 
       # Checkout repository
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ steps.commit.outputs.commit_sha }}
@@ -273,7 +273,7 @@ jobs:
       - configure
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
       - name: Setup Node.js
@@ -312,12 +312,12 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
 
       - name: Setup kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: imranismail/setup-kustomize@v3
 
       # Validate application manifests
       - name: Validate application
@@ -448,7 +448,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: validation-results-${{ matrix.application }}-${{ github.run_id }}
@@ -582,7 +582,7 @@ jobs:
       # Comment on PR
       - name: Comment on PR
         if: inputs.enable-pr-comments && steps.argocd-diff.outputs.has_changes == 'true'
-        uses: thollander/actions-comment-pull-request@v2
+        uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
             ## 🔍 Changes detected in `${{ matrix.application }}`
@@ -595,7 +595,7 @@ jobs:
 
             ---
             <sub>Preview generated for application: `${{ matrix.application }}`</sub>
-          comment_tag: application-${{ matrix.application }}
+          comment-tag: application-${{ matrix.application }}
 
   # Deploy to ArgoCD (main branch only)
   deploy:
@@ -619,12 +619,12 @@ jobs:
       deployments: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
 
       - name: Setup kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: imranismail/setup-kustomize@v3
 
       # Validate application (same as preview)
       - name: Validate application
@@ -732,7 +732,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: validation-results-${{ matrix.application }}-${{ github.run_id }}

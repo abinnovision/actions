@@ -7,5 +7,5 @@ inputs:
     description: "'GITHUB_TOKEN' or a repo scoped Personal Access Token (PAT)."
     default: ${{ github.token }}
 runs:
-  using: node16
+  using: node24
   main: dist/index.js

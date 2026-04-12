@@ -103,7 +103,7 @@ runs:
     # Go setup via actions/setup-go
     - name: Setup Go
       if: steps.parse.outputs.has-golang == 'true'
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ steps.parse.outputs.go-version }}
         cache: true

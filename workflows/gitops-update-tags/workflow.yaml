@@ -106,7 +106,7 @@ jobs:
           identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           token: ${{ steps.token.outputs.token }}
 
@@ -173,7 +173,7 @@ jobs:
         uses: abinnovision/actions@setup-node-dev
 
       - name: Setup kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: imranismail/setup-kustomize@v3
 
       - name: Validate application directory
         run: |
