@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
 import Handlebars from "handlebars";
-import tablemark from "tablemark";
+import { tablemark } from "tablemark";
 
 // Type definitions
 interface InputConfig {
