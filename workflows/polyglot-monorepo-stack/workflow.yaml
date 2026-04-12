@@ -209,7 +209,7 @@ on:
         value: ${{ jobs.release.outputs.versions }}
         description: |-
           JSON object mapping released/prerelease package paths to version info.
-          Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease"}.
+          Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease", sha: "short commit SHA"}.
           Empty object {} when nothing was released.
 
 env:
@@ -942,27 +942,21 @@ jobs:
           deployment_tag="${{ matrix.entry.packageVersion }}"
 
           echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
-          echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
-          echo "RELEASE_APP=$release_app" >> $GITHUB_OUTPUT
+          # Resolve deployment app based on release type
+          if [[ "${{ matrix.entry.type }}" == "release" ]]; then
+            echo "DEPLOY_APP=$release_app" >> $GITHUB_OUTPUT
+          else
+            echo "DEPLOY_APP=$dev_app" >> $GITHUB_OUTPUT
+          fi
           echo "IMAGE_NAME=$image_name" >> $GITHUB_OUTPUT
           echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
 
-      - name: Update Release Deployment
-        if: matrix.entry.type == 'release' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
+      - name: Update GitOps Deployment (${{ steps.gitops-config.outputs.DEPLOY_APP }})
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
         uses: abinnovision/actions@run-workflow-dispatch-dev
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
           target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
           workflow: ${{ inputs.gitops-workflow-file }}
           workflow-inputs: |
-            {"application": "${{ steps.gitops-config.outputs.RELEASE_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
-
-      - name: Update Dev Deployment
-        if: matrix.entry.type == 'prerelease' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
-        uses: abinnovision/actions@run-workflow-dispatch-dev
-        with:
-          proxy: ${{ secrets.GITOPS_PROXY_URL }}
-          target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
-          workflow: ${{ inputs.gitops-workflow-file }}
-          workflow-inputs: |
-            {"application": "${{ steps.gitops-config.outputs.DEV_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
+            {"application": "${{ steps.gitops-config.outputs.DEPLOY_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
