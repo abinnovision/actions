@@ -43,7 +43,7 @@
 		"conventional-changelog-conventionalcommits@npm:9.1.0": "patch:conventional-changelog-conventionalcommits@npm%3A9.1.0#~/.yarn/patches/conventional-changelog-conventionalcommits-npm-9.1.0-d8dfa4c13e.patch"
 	},
 	"devDependencies": {
-		"@abinnovision/commitlint-config": "^2.2.3",
+		"@abinnovision/commitlint-config": "^2.2.4",
 		"@abinnovision/prettier-config": "^2.1.5",
 		"@commitlint/cli": "^20.4.1",
 		"@types/js-yaml": "^4.0.9",
@@ -51,12 +51,12 @@
 		"handlebars": "^4.7.8",
 		"husky": "^9.1.7",
 		"js-yaml": "^4.1.0",
-		"lint-staged": "^16.2.7",
-		"prettier": "^3.8.1",
+		"lint-staged": "^16.4.0",
+		"prettier": "^3.8.2",
 		"sort-package-json": "^3.6.1",
 		"tablemark": "^3.1.0",
 		"tsx": "^4.21.0",
-		"turbo": "^2.8.9",
+		"turbo": "^2.9.6",
 		"typescript": "^5.9.3"
 	},
 	"packageManager": "yarn@4.12.0",
