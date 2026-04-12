@@ -192,7 +192,7 @@ on:
         required: false
         default: "false"
         description: |-
-          Wether to checkout submodules.
+          Whether to checkout submodules.
           **Default:** `false`
           **Example:** `true`, `false`, `recursive`
           **Note:** Use `recursive` to recursively checkout submodules
@@ -209,7 +209,7 @@ on:
         value: ${{ jobs.release.outputs.versions }}
         description: |-
           JSON object mapping released/prerelease package paths to version info.
-          Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease"}.
+          Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease", sha: "short commit SHA"}.
           Empty object {} when nothing was released.
 
 env:
@@ -224,17 +224,6 @@ jobs:
     outputs:
       # Commit SHA to check out.
       commit-sha: ${{ steps.commit.outputs.commit_sha }}
-
-      # Available apps and packages.
-      # JSON array of app names (only names, no paths).
-      # Apps are only valid if a Dockerfile is present.
-      apps: ${{ steps.evaluate.outputs.apps_available }}
-      # JSON array of package names (only names, no paths).
-      packages: ${{ steps.evaluate.outputs.packages_available }}
-
-      # Boolean flags for existence checks.
-      has-apps: ${{ fromJSON(steps.evaluate.outputs.apps_available)[0] != null }}
-      has-packages: ${{ fromJSON(steps.evaluate.outputs.packages_available)[0] != null }}
 
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
@@ -266,6 +255,18 @@ jobs:
           fetch-depth: 0
           ref: ${{ steps.commit.outputs.commit_sha }}
           submodules: false
+
+      - name: Validate Makefile
+        run: |
+          if [ ! -f "Makefile" ]; then
+            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
+            echo "::error::Required targets: 'install' and 'install-immutable'"
+            exit 1
+          fi
+          if ! grep -qE '^install-immutable:' Makefile; then
+            echo "::error::Makefile missing required 'install-immutable' target"
+            exit 1
+          fi
 
       # Discover available apps and packages, parse test types.
       - name: Evaluate
@@ -346,17 +347,6 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
-      - name: Validate Makefile
-        run: |
-          if [ ! -f "Makefile" ]; then
-            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
-            echo "::error::Required targets: 'install' and 'install-immutable'"
-            exit 1
-          fi
-          if ! grep -qE '^install-immutable:' Makefile; then
-            echo "::error::Makefile missing required 'install-immutable' target"
-            exit 1
-          fi
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
       - name: Install dependencies
@@ -397,17 +387,6 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
-      - name: Validate Makefile
-        run: |
-          if [ ! -f "Makefile" ]; then
-            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
-            echo "::error::Required targets: 'install' and 'install-immutable'"
-            exit 1
-          fi
-          if ! grep -qE '^install-immutable:' Makefile; then
-            echo "::error::Makefile missing required 'install-immutable' target"
-            exit 1
-          fi
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
       - name: Install dependencies
@@ -450,7 +429,7 @@ jobs:
         id: extract
         run: |
           VERSIONS='${{ needs.release.outputs.versions }}'
-          released_apps=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("apps/")) | {app: (.key | ltrimstr("apps/")), version: .value.version, packageVersion: .value.packageVersion, type: .value.type}]')
+          released_apps=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("apps/")) | {app: (.key | ltrimstr("apps/")), version: .value.version, packageVersion: .value.packageVersion, type: .value.type, sha: .value.sha}]')
           echo "released_apps=$released_apps" >> $GITHUB_OUTPUT
           echo "has_released_apps=$(echo "$released_apps" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
 
@@ -479,18 +458,6 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
-
-      - name: Validate Makefile
-        run: |
-          if [ ! -f "Makefile" ]; then
-            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
-            echo "::error::Required targets: 'install' and 'install-immutable'"
-            exit 1
-          fi
-          if ! grep -qE '^install-immutable:' Makefile; then
-            echo "::error::Makefile missing required 'install-immutable' target"
-            exit 1
-          fi
 
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
@@ -604,7 +571,8 @@ jobs:
     needs:
       - configure
       - publish_prepare
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && needs.publish_prepare.outputs.has-released-apps == 'true'
+    # Push/branch guard enforced by release job via publish_prepare dependency chain.
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && inputs.enable-app-image-builds && needs.publish_prepare.outputs.has-released-apps == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -620,18 +588,6 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
-
-      - name: Validate Makefile
-        run: |
-          if [ ! -f "Makefile" ]; then
-            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
-            echo "::error::Required targets: 'install' and 'install-immutable'"
-            exit 1
-          fi
-          if ! grep -qE '^install-immutable:' Makefile; then
-            echo "::error::Makefile missing required 'install-immutable' target"
-            exit 1
-          fi
 
       - name: Validate GitOps configuration
         if: inputs.gitops-app-config != ''
@@ -713,13 +669,8 @@ jobs:
 
           echo "Turbo version: $TURBO_VERSION"
 
-          # Read the package name from the app's package.json
+          # Read the package name from the app's package.json (existence validated by app-meta step)
           APP_PACKAGE_JSON="apps/${{ matrix.entry.app }}/package.json"
-          if [ ! -f "$APP_PACKAGE_JSON" ]; then
-            echo "::error::package.json not found at $APP_PACKAGE_JSON"
-            exit 1
-          fi
-
           SCOPE_NAME=$(jq -r '.name' "$APP_PACKAGE_JSON")
           if [ -z "$SCOPE_NAME" ] || [ "$SCOPE_NAME" = "null" ]; then
             echo "::error::Package name not found in $APP_PACKAGE_JSON"
@@ -746,17 +697,6 @@ jobs:
             echo "::error::Turbo prune failed for $SCOPE_NAME"
             exit 1
           fi
-
-      - name: Calculate build version
-        id: build-version
-        run: |
-          build_version="v${{ matrix.entry.version }}"
-
-          echo "BUILD_VERSION=$build_version" >> $GITHUB_OUTPUT
-          echo "BUILD_COMMIT=${{ github.sha }}" >> $GITHUB_OUTPUT
-
-          echo "Build version: $build_version"
-          echo "Build commit: ${{ github.sha }}"
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -796,7 +736,7 @@ jobs:
       - name: Prepare image names
         id: image-names
         run: |
-          images=""
+          images=()
           cache_from=""
           cache_to=""
 
@@ -804,29 +744,18 @@ jobs:
           if [[ "${{ inputs.enable-apps-registry-gcpar }}" == "true" ]] && [[ -n "${{ inputs.registry-gcpar-url }}" ]]; then
             gcpar_image="${{ inputs.registry-gcpar-url }}/app-${{ matrix.entry.app }}"
             gcpar_cache="${{ inputs.registry-gcpar-url }}/app-${{ matrix.entry.app }}-cache"
-
             echo "IMAGE_GCPAR=$gcpar_image" >> $GITHUB_OUTPUT
-            images="$gcpar_image"
-
-            # GCP AR supports registry caching
+            images+=("$gcpar_image")
             cache_from="type=registry,ref=$gcpar_cache:latest"
             cache_to="type=registry,ref=$gcpar_cache:latest,mode=max"
-
             echo "GCP AR image: $gcpar_image"
-            echo "GCP AR cache: $gcpar_cache"
           fi
 
           # GitHub Container Registry (ghcr)
           if [[ "${{ inputs.enable-apps-registry-ghcr }}" == "true" ]]; then
             ghcr_image="ghcr.io/${{ github.repository_owner }}/$(basename ${{ github.repository }})-${{ matrix.entry.app }}"
             echo "IMAGE_GHCR=$ghcr_image" >> $GITHUB_OUTPUT
-
-            if [[ -n "$images" ]]; then
-              images="$images"$'\n'"$ghcr_image"
-            else
-              images="$ghcr_image"
-            fi
-
+            images+=("$ghcr_image")
             echo "GHCR image: $ghcr_image"
           fi
 
@@ -834,25 +763,17 @@ jobs:
           if [[ "${{ inputs.enable-apps-registry-dockerhub }}" == "true" ]]; then
             dockerhub_image="${{ inputs.registry-dockerhub-url }}/${{ inputs.registry-dockerhub-username }}/$(basename ${{ github.repository }})-${{ matrix.entry.app }}"
             echo "IMAGE_DOCKERHUB=$dockerhub_image" >> $GITHUB_OUTPUT
-
-            if [[ -n "$images" ]]; then
-              images="$images"$'\n'"$dockerhub_image"
-            else
-              images="$dockerhub_image"
-            fi
-
+            images+=("$dockerhub_image")
             echo "DockerHub image: $dockerhub_image"
           fi
 
           # Save images list and cache config
           echo "IMAGES<<EOF" >> $GITHUB_OUTPUT
-          echo "$images" >> $GITHUB_OUTPUT
+          printf '%s\n' "${images[@]}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
           echo "CACHE_FROM=$cache_from" >> $GITHUB_OUTPUT
           echo "CACHE_TO=$cache_to" >> $GITHUB_OUTPUT
-
-          echo "Configured registries: $(echo "$images" | wc -l | xargs)"
+          echo "Configured registries: ${#images[@]}"
 
       - name: Extract Docker metadata
         id: meta
@@ -874,10 +795,7 @@ jobs:
             # Format: app-name,secret-name,secret-value
             # Only first two commas are delimiters; value can contain commas
 
-            secrets_mount_string=""
-            secrets_found=false
-
-            # Create a temp directory to hold all secret files
+            secrets_mounts=()
             secrets_dir=$(mktemp -d)
 
             while IFS= read -r line; do
@@ -896,23 +814,15 @@ jobs:
                 # Create individual temp file for this secret
                 secret_file="$secrets_dir/secret_${secret_name}"
                 echo -n "$secret_value" > "$secret_file"
-
-                # Append to secrets mount string
-                if [[ -n "$secrets_mount_string" ]]; then
-                  secrets_mount_string="${secrets_mount_string}"$'\n'"${secret_name}=${secret_file}"
-                else
-                  secrets_mount_string="${secret_name}=${secret_file}"
-                fi
-
-                secrets_found=true
+                secrets_mounts+=("${secret_name}=${secret_file}")
                 echo "Prepared secret: $secret_name"
               fi
             done <<< "$APP_IMAGE_SECRETS"
 
-            if [[ "$secrets_found" == "true" ]] && [[ -n "$secrets_mount_string" ]]; then
+            if [[ ${#secrets_mounts[@]} -gt 0 ]]; then
               echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
               echo "SECRETS_MOUNT_STRING<<EOF" >> $GITHUB_OUTPUT
-              echo "$secrets_mount_string" >> $GITHUB_OUTPUT
+              printf '%s\n' "${secrets_mounts[@]}" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
               echo "App-specific secrets prepared for ${{ matrix.entry.app }}"
             else
@@ -940,8 +850,8 @@ jobs:
             python_version=${{ steps.app-meta.outputs.PYTHON_VERSION }}
             golang_version=${{ steps.app-meta.outputs.GOLANG_VERSION }}
             uv_version=${{ steps.app-meta.outputs.UV_VERSION }}
-            build_version=${{ steps.build-version.outputs.BUILD_VERSION }}
-            build_commit=${{ steps.build-version.outputs.BUILD_COMMIT }}
+            build_version=v${{ matrix.entry.version }}
+            build_commit=${{ matrix.entry.sha }}
           secret-files: |
             ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && steps.app-secrets.outputs.SECRETS_MOUNT_STRING || '' }}
 
@@ -1008,17 +918,9 @@ jobs:
             exit 0
           fi
 
-          # Determine the image base URL based on registry for filtering
+          # Validate registry value
           case "$registry" in
-            ghcr)
-              registry_url="${{ steps.image-names.outputs.IMAGE_GHCR }}"
-              ;;
-            gcpar)
-              registry_url="${{ steps.image-names.outputs.IMAGE_GCPAR }}"
-              ;;
-            dockerhub)
-              registry_url="${{ steps.image-names.outputs.IMAGE_DOCKERHUB }}"
-              ;;
+            ghcr|gcpar|dockerhub) ;;
             *)
               echo "::error::Invalid registry '$registry' for app ${{ matrix.entry.app }}. Valid options: ghcr, gcpar, dockerhub"
               exit 1
@@ -1029,27 +931,21 @@ jobs:
           deployment_tag="${{ matrix.entry.packageVersion }}"
 
           echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
-          echo "DEV_APP=$dev_app" >> $GITHUB_OUTPUT
-          echo "RELEASE_APP=$release_app" >> $GITHUB_OUTPUT
+          # Resolve deployment app based on release type
+          if [[ "${{ matrix.entry.type }}" == "release" ]]; then
+            echo "DEPLOY_APP=$release_app" >> $GITHUB_OUTPUT
+          else
+            echo "DEPLOY_APP=$dev_app" >> $GITHUB_OUTPUT
+          fi
           echo "IMAGE_NAME=$image_name" >> $GITHUB_OUTPUT
           echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
 
-      - name: Update Release Deployment
-        if: matrix.entry.type == 'release' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
+      - name: Update GitOps Deployment (${{ steps.gitops-config.outputs.DEPLOY_APP }})
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
         uses: abinnovision/actions@run-workflow-dispatch-dev
         with:
           proxy: ${{ secrets.GITOPS_PROXY_URL }}
           target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
           workflow: ${{ inputs.gitops-workflow-file }}
           workflow-inputs: |
-            {"application": "${{ steps.gitops-config.outputs.RELEASE_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
-
-      - name: Update Dev Deployment
-        if: matrix.entry.type == 'prerelease' && inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
-        uses: abinnovision/actions@run-workflow-dispatch-dev
-        with:
-          proxy: ${{ secrets.GITOPS_PROXY_URL }}
-          target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
-          workflow: ${{ inputs.gitops-workflow-file }}
-          workflow-inputs: |
-            {"application": "${{ steps.gitops-config.outputs.DEV_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
+            {"application": "${{ steps.gitops-config.outputs.DEPLOY_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
