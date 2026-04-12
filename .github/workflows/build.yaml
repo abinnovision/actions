@@ -93,7 +93,7 @@ jobs:
     steps:
       - id: gh-app-token
         name: "Generate GitHub App Token"
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.APP_RELASER_CUSTOM_ID }}
           private-key: ${{ secrets.APP_RELASER_CUSTOM_PK }}

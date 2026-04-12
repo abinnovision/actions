@@ -35,7 +35,7 @@ runs:
           certificate:${{ env.APP_CERTIFICATE }}
     - id: token
       name: "Generate token"
-      uses: actions/create-github-app-token@v1
+      uses: actions/create-github-app-token@v3
       with:
         app-id: ${{ steps.secrets.outputs.id }}
         private-key: ${{ steps.secrets.outputs.certificate }}

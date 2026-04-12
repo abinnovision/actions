@@ -448,7 +448,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: validation-results-${{ matrix.application }}-${{ github.run_id }}
@@ -732,7 +732,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: validation-results-${{ matrix.application }}-${{ github.run_id }}
