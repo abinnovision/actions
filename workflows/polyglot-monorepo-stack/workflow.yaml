@@ -379,7 +379,7 @@ jobs:
 
   # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
   test:
-    name: Test (${{ matrix.test-type }})
+    name: Test / ${{ matrix.test-type }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
@@ -434,8 +434,8 @@ jobs:
     if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch)
 
   # Extract released apps from versions output into a matrix-compatible format.
-  prepare_release:
-    name: Prepare Release
+  publish_prepare:
+    name: Publish / Prepare
     runs-on: ubuntu-latest
     timeout-minutes: 2
     needs: [release]
@@ -458,15 +458,15 @@ jobs:
           echo "released_packages=$released_packages" >> $GITHUB_OUTPUT
           echo "has_released_packages=$(echo "$released_packages" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
 
-  packages_publish:
-    name: Publish Packages
+  publish_packages:
+    name: Publish / Packages
     runs-on: ubuntu-latest
     needs:
       - configure
-      - prepare_release
+      - publish_prepare
     if: >-
       always() && !cancelled() && !contains(needs.*.result, 'failure')
-      && needs.prepare_release.outputs.has-released-packages == 'true'
+      && needs.publish_prepare.outputs.has-released-packages == 'true'
       && inputs.enable-package-publishing
     permissions:
       contents: "write"
@@ -507,7 +507,7 @@ jobs:
         run: |
           set -e
 
-          echo '${{ needs.prepare_release.outputs.released-packages }}' | jq -c '.[]' | while read -r entry; do
+          echo '${{ needs.publish_prepare.outputs.released-packages }}' | jq -c '.[]' | while read -r entry; do
             package=$(echo "$entry" | jq -r '.package')
             RELEASE_VERSION=$(echo "$entry" | jq -r '.packageVersion')
             RELEASE_TYPE=$(echo "$entry" | jq -r '.type')
@@ -596,19 +596,19 @@ jobs:
           done
 
   # Build and publish Docker images for released apps.
-  # Matrix is driven by prepare_release, which filters to only released apps.
-  apps_build_images:
-    name: Build Image - ${{ matrix.entry.app }}
+  # Matrix is driven by publish_prepare, which filters to only released apps.
+  publish_apps:
+    name: Publish / ${{ matrix.entry.app }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
       - configure
-      - prepare_release
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && needs.prepare_release.outputs.has-released-apps == 'true'
+      - publish_prepare
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && needs.publish_prepare.outputs.has-released-apps == 'true'
     strategy:
       fail-fast: false
       matrix:
-        entry: ${{ fromJSON(needs.prepare_release.outputs.released-apps) }}
+        entry: ${{ fromJSON(needs.publish_prepare.outputs.released-apps) }}
     permissions:
       contents: "read"
       id-token: "write"
