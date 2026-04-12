@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.0.1...setup-tools-source-v1.0.2) (2026-04-12)
+
+
+### Bug Fixes
+
+* upgrade GitHub actions to latest versions ([#365](https://github.com/abinnovision/actions/issues/365)) ([01d818a](https://github.com/abinnovision/actions/commit/01d818a9115747dbaf4e7b54fd3a3a64f94e1305))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.0.0...setup-tools-source-v1.0.1) (2026-02-22)
 
 

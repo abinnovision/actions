@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.3...run-release-please-source-v1.1.0) (2026-04-12)
+
+
+### Features
+
+* add sha field to versions output and avoid duplicate builds ([#355](https://github.com/abinnovision/actions/issues/355)) ([4839cf5](https://github.com/abinnovision/actions/commit/4839cf56b3947bc3addc2e1d9194eda8327f78ef))
+* per-component changelog-based prerelease versioning ([#353](https://github.com/abinnovision/actions/issues/353)) ([da995d1](https://github.com/abinnovision/actions/commit/da995d1bccce3d4e778ba35bffa2a1fea2d30026))
+
+
+### Bug Fixes
+
+* upgrade GitHub actions to latest versions ([#365](https://github.com/abinnovision/actions/issues/365)) ([01d818a](https://github.com/abinnovision/actions/commit/01d818a9115747dbaf4e7b54fd3a3a64f94e1305))
+
 ## [1.0.3](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.2...run-release-please-source-v1.0.3) (2026-04-11)
 
 
