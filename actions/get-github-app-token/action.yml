@@ -28,7 +28,7 @@ runs:
         echo "APP_CERTIFICATE=$(echo "$DECODED" | jq -cr ".certificate")" >> $GITHUB_ENV
     - id: secrets
       name: "Load secrets"
-      uses: google-github-actions/get-secretmanager-secrets@v1.0.0
+      uses: google-github-actions/get-secretmanager-secrets@v3
       with:
         secrets: |-
           id:${{ env.APP_ID }}
