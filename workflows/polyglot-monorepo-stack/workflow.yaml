@@ -113,10 +113,10 @@ on:
       enable-apps-registry-ghcr:
         type: boolean
         required: false
-        default: true
+        default: false
         description: |-
           Enable publishing Docker images to GitHub Container Registry (GHCR).
-          **Default:** `true` (automatically available in GitHub Actions)
+          **Default:** `false`
           **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
       enable-apps-registry-dockerhub:
         type: boolean
