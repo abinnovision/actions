@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/abinnovision/actions/compare/get-github-app-token-source-v1.2.0...get-github-app-token-source-v1.2.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* upgrade GitHub actions to latest versions ([#365](https://github.com/abinnovision/actions/issues/365)) ([01d818a](https://github.com/abinnovision/actions/commit/01d818a9115747dbaf4e7b54fd3a3a64f94e1305))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/get-github-app-token-source-v1.1.0...get-github-app-token-source-v1.2.0) (2025-10-22)
 
 

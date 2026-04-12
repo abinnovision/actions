@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/abinnovision/actions/compare/setup-node-source-v1.2.0...setup-node-source-v1.2.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* update caching-for-turbo action to version 2.3.13 ([#368](https://github.com/abinnovision/actions/issues/368)) ([eac7e10](https://github.com/abinnovision/actions/commit/eac7e10ef58ad63efcea452d3a8324a8e89f4ec6))
+* upgrade GitHub actions to latest versions ([#365](https://github.com/abinnovision/actions/issues/365)) ([01d818a](https://github.com/abinnovision/actions/commit/01d818a9115747dbaf4e7b54fd3a3a64f94e1305))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/setup-node-source-v1.1.3...setup-node-source-v1.2.0) (2025-10-22)
 
 

@@ -23,7 +23,7 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@setup-node-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@setup-node-v1.2.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@setup-node-v1.2.1`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 

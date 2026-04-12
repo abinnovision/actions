@@ -1,14 +1,14 @@
 {
-	"actions/get-github-app-token": "1.2.0",
-	"actions/run-commitlint": "1.2.0",
-	"actions/run-release-please": "1.0.3",
+	"actions/get-github-app-token": "1.2.1",
+	"actions/run-commitlint": "1.2.1",
+	"actions/run-release-please": "1.1.0",
 	"actions/setup-gcp": "1.1.1",
-	"actions/setup-node": "1.2.0",
-	"actions/setup-tools": "1.0.1",
+	"actions/setup-node": "1.2.1",
+	"actions/setup-tools": "1.0.2",
 	"actions/run-workflow-dispatch": "1.1.0",
 	"workflows/release": "2.0.2",
-	"workflows/node-monorepo-stack": "1.3.2",
-	"workflows/gitops-deploy": "1.0.2",
-	"workflows/gitops-update-tags": "1.1.2",
-	"workflows/polyglot-monorepo-stack": "1.1.5"
+	"workflows/node-monorepo-stack": "1.3.3",
+	"workflows/gitops-deploy": "1.0.3",
+	"workflows/gitops-update-tags": "1.1.3",
+	"workflows/polyglot-monorepo-stack": "1.2.0"
 }

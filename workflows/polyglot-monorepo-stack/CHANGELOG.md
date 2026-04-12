@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.5...polyglot-monorepo-stack-source-v1.2.0) (2026-04-12)
+
+
+### Features
+
+* add sha field to versions output and avoid duplicate builds ([#355](https://github.com/abinnovision/actions/issues/355)) ([4839cf5](https://github.com/abinnovision/actions/commit/4839cf56b3947bc3addc2e1d9194eda8327f78ef))
+
+
+### Bug Fixes
+
+* change default value for enable-apps-registry-ghcr to false ([#366](https://github.com/abinnovision/actions/issues/366)) ([8253dc8](https://github.com/abinnovision/actions/commit/8253dc8e439772ec0a0fd5101cb3939033128482))
+* streamline workflow and simplify ([#367](https://github.com/abinnovision/actions/issues/367)) ([68caeee](https://github.com/abinnovision/actions/commit/68caeee38083d82fb4c9d3b86f933c8c11a70819))
+* update workflow naming conventions for clarity ([#364](https://github.com/abinnovision/actions/issues/364)) ([25b2578](https://github.com/abinnovision/actions/commit/25b257854e2c97af2b99a8876d1a82b1a19ae377))
+* upgrade GitHub actions to latest versions ([#365](https://github.com/abinnovision/actions/issues/365)) ([01d818a](https://github.com/abinnovision/actions/commit/01d818a9115747dbaf4e7b54fd3a3a64f94e1305))
+
 ## [1.1.5](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.4...polyglot-monorepo-stack-source-v1.1.5) (2026-02-22)
 
 
