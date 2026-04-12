@@ -225,13 +225,6 @@ jobs:
       # Commit SHA to check out.
       commit-sha: ${{ steps.commit.outputs.commit_sha }}
 
-      # Available apps and packages.
-      # JSON array of app names (only names, no paths).
-      # Apps are only valid if a Dockerfile is present.
-      apps: ${{ steps.evaluate.outputs.apps_available }}
-      # JSON array of package names (only names, no paths).
-      packages: ${{ steps.evaluate.outputs.packages_available }}
-
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
       test-types-for-matrix: ${{ steps.evaluate.outputs.test_types_for_matrix }}
@@ -676,13 +669,8 @@ jobs:
 
           echo "Turbo version: $TURBO_VERSION"
 
-          # Read the package name from the app's package.json
+          # Read the package name from the app's package.json (existence validated by app-meta step)
           APP_PACKAGE_JSON="apps/${{ matrix.entry.app }}/package.json"
-          if [ ! -f "$APP_PACKAGE_JSON" ]; then
-            echo "::error::package.json not found at $APP_PACKAGE_JSON"
-            exit 1
-          fi
-
           SCOPE_NAME=$(jq -r '.name' "$APP_PACKAGE_JSON")
           if [ -z "$SCOPE_NAME" ] || [ "$SCOPE_NAME" = "null" ]; then
             echo "::error::Package name not found in $APP_PACKAGE_JSON"
@@ -818,10 +806,7 @@ jobs:
             # Format: app-name,secret-name,secret-value
             # Only first two commas are delimiters; value can contain commas
 
-            secrets_mount_string=""
-            secrets_found=false
-
-            # Create a temp directory to hold all secret files
+            secrets_mounts=()
             secrets_dir=$(mktemp -d)
 
             while IFS= read -r line; do
@@ -840,23 +825,15 @@ jobs:
                 # Create individual temp file for this secret
                 secret_file="$secrets_dir/secret_${secret_name}"
                 echo -n "$secret_value" > "$secret_file"
-
-                # Append to secrets mount string
-                if [[ -n "$secrets_mount_string" ]]; then
-                  secrets_mount_string="${secrets_mount_string}"$'\n'"${secret_name}=${secret_file}"
-                else
-                  secrets_mount_string="${secret_name}=${secret_file}"
-                fi
-
-                secrets_found=true
+                secrets_mounts+=("${secret_name}=${secret_file}")
                 echo "Prepared secret: $secret_name"
               fi
             done <<< "$APP_IMAGE_SECRETS"
 
-            if [[ "$secrets_found" == "true" ]] && [[ -n "$secrets_mount_string" ]]; then
+            if [[ ${#secrets_mounts[@]} -gt 0 ]]; then
               echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
               echo "SECRETS_MOUNT_STRING<<EOF" >> $GITHUB_OUTPUT
-              echo "$secrets_mount_string" >> $GITHUB_OUTPUT
+              printf '%s\n' "${secrets_mounts[@]}" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
               echo "App-specific secrets prepared for ${{ matrix.entry.app }}"
             else
@@ -952,17 +929,9 @@ jobs:
             exit 0
           fi
 
-          # Determine the image base URL based on registry for filtering
+          # Validate registry value
           case "$registry" in
-            ghcr)
-              registry_url="${{ steps.image-names.outputs.IMAGE_GHCR }}"
-              ;;
-            gcpar)
-              registry_url="${{ steps.image-names.outputs.IMAGE_GCPAR }}"
-              ;;
-            dockerhub)
-              registry_url="${{ steps.image-names.outputs.IMAGE_DOCKERHUB }}"
-              ;;
+            ghcr|gcpar|dockerhub) ;;
             *)
               echo "::error::Invalid registry '$registry' for app ${{ matrix.entry.app }}. Valid options: ghcr, gcpar, dockerhub"
               exit 1
