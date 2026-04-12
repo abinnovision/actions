@@ -35,7 +35,7 @@
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
 		"@actions/core": "^3.0.0",
-		"@actions/github": "^9.0.0",
+		"@actions/github": "^9.1.0",
 		"release-please": "patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch"
 	},
 	"devDependencies": {
