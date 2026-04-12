@@ -192,7 +192,7 @@ on:
         required: false
         default: "false"
         description: |-
-          Wether to checkout submodules.
+          Whether to checkout submodules.
           **Default:** `false`
           **Example:** `true`, `false`, `recursive`
           **Note:** Use `recursive` to recursively checkout submodules
@@ -232,10 +232,6 @@ jobs:
       # JSON array of package names (only names, no paths).
       packages: ${{ steps.evaluate.outputs.packages_available }}
 
-      # Boolean flags for existence checks.
-      has-apps: ${{ fromJSON(steps.evaluate.outputs.apps_available)[0] != null }}
-      has-packages: ${{ fromJSON(steps.evaluate.outputs.packages_available)[0] != null }}
-
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
       test-types-for-matrix: ${{ steps.evaluate.outputs.test_types_for_matrix }}
@@ -266,6 +262,18 @@ jobs:
           fetch-depth: 0
           ref: ${{ steps.commit.outputs.commit_sha }}
           submodules: false
+
+      - name: Validate Makefile
+        run: |
+          if [ ! -f "Makefile" ]; then
+            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
+            echo "::error::Required targets: 'install' and 'install-immutable'"
+            exit 1
+          fi
+          if ! grep -qE '^install-immutable:' Makefile; then
+            echo "::error::Makefile missing required 'install-immutable' target"
+            exit 1
+          fi
 
       # Discover available apps and packages, parse test types.
       - name: Evaluate
@@ -346,17 +354,6 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
-      - name: Validate Makefile
-        run: |
-          if [ ! -f "Makefile" ]; then
-            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
-            echo "::error::Required targets: 'install' and 'install-immutable'"
-            exit 1
-          fi
-          if ! grep -qE '^install-immutable:' Makefile; then
-            echo "::error::Makefile missing required 'install-immutable' target"
-            exit 1
-          fi
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
       - name: Install dependencies
@@ -397,17 +394,6 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
-      - name: Validate Makefile
-        run: |
-          if [ ! -f "Makefile" ]; then
-            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
-            echo "::error::Required targets: 'install' and 'install-immutable'"
-            exit 1
-          fi
-          if ! grep -qE '^install-immutable:' Makefile; then
-            echo "::error::Makefile missing required 'install-immutable' target"
-            exit 1
-          fi
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
       - name: Install dependencies
@@ -450,7 +436,7 @@ jobs:
         id: extract
         run: |
           VERSIONS='${{ needs.release.outputs.versions }}'
-          released_apps=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("apps/")) | {app: (.key | ltrimstr("apps/")), version: .value.version, packageVersion: .value.packageVersion, type: .value.type}]')
+          released_apps=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("apps/")) | {app: (.key | ltrimstr("apps/")), version: .value.version, packageVersion: .value.packageVersion, type: .value.type, sha: .value.sha}]')
           echo "released_apps=$released_apps" >> $GITHUB_OUTPUT
           echo "has_released_apps=$(echo "$released_apps" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
 
@@ -479,18 +465,6 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
-
-      - name: Validate Makefile
-        run: |
-          if [ ! -f "Makefile" ]; then
-            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
-            echo "::error::Required targets: 'install' and 'install-immutable'"
-            exit 1
-          fi
-          if ! grep -qE '^install-immutable:' Makefile; then
-            echo "::error::Makefile missing required 'install-immutable' target"
-            exit 1
-          fi
 
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
@@ -604,7 +578,8 @@ jobs:
     needs:
       - configure
       - publish_prepare
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'push' && github.ref == format('refs/heads/{0}', inputs.default-branch) && inputs.enable-app-image-builds && needs.publish_prepare.outputs.has-released-apps == 'true'
+    # Push/branch guard enforced by release job via publish_prepare dependency chain.
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && inputs.enable-app-image-builds && needs.publish_prepare.outputs.has-released-apps == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -620,18 +595,6 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
-
-      - name: Validate Makefile
-        run: |
-          if [ ! -f "Makefile" ]; then
-            echo "::error::Makefile not found. polyglot-monorepo-stack requires a Makefile."
-            echo "::error::Required targets: 'install' and 'install-immutable'"
-            exit 1
-          fi
-          if ! grep -qE '^install-immutable:' Makefile; then
-            echo "::error::Makefile missing required 'install-immutable' target"
-            exit 1
-          fi
 
       - name: Validate GitOps configuration
         if: inputs.gitops-app-config != ''
@@ -796,7 +759,7 @@ jobs:
       - name: Prepare image names
         id: image-names
         run: |
-          images=""
+          images=()
           cache_from=""
           cache_to=""
 
@@ -804,29 +767,18 @@ jobs:
           if [[ "${{ inputs.enable-apps-registry-gcpar }}" == "true" ]] && [[ -n "${{ inputs.registry-gcpar-url }}" ]]; then
             gcpar_image="${{ inputs.registry-gcpar-url }}/app-${{ matrix.entry.app }}"
             gcpar_cache="${{ inputs.registry-gcpar-url }}/app-${{ matrix.entry.app }}-cache"
-
             echo "IMAGE_GCPAR=$gcpar_image" >> $GITHUB_OUTPUT
-            images="$gcpar_image"
-
-            # GCP AR supports registry caching
+            images+=("$gcpar_image")
             cache_from="type=registry,ref=$gcpar_cache:latest"
             cache_to="type=registry,ref=$gcpar_cache:latest,mode=max"
-
             echo "GCP AR image: $gcpar_image"
-            echo "GCP AR cache: $gcpar_cache"
           fi
 
           # GitHub Container Registry (ghcr)
           if [[ "${{ inputs.enable-apps-registry-ghcr }}" == "true" ]]; then
             ghcr_image="ghcr.io/${{ github.repository_owner }}/$(basename ${{ github.repository }})-${{ matrix.entry.app }}"
             echo "IMAGE_GHCR=$ghcr_image" >> $GITHUB_OUTPUT
-
-            if [[ -n "$images" ]]; then
-              images="$images"$'\n'"$ghcr_image"
-            else
-              images="$ghcr_image"
-            fi
-
+            images+=("$ghcr_image")
             echo "GHCR image: $ghcr_image"
           fi
 
@@ -834,25 +786,17 @@ jobs:
           if [[ "${{ inputs.enable-apps-registry-dockerhub }}" == "true" ]]; then
             dockerhub_image="${{ inputs.registry-dockerhub-url }}/${{ inputs.registry-dockerhub-username }}/$(basename ${{ github.repository }})-${{ matrix.entry.app }}"
             echo "IMAGE_DOCKERHUB=$dockerhub_image" >> $GITHUB_OUTPUT
-
-            if [[ -n "$images" ]]; then
-              images="$images"$'\n'"$dockerhub_image"
-            else
-              images="$dockerhub_image"
-            fi
-
+            images+=("$dockerhub_image")
             echo "DockerHub image: $dockerhub_image"
           fi
 
           # Save images list and cache config
           echo "IMAGES<<EOF" >> $GITHUB_OUTPUT
-          echo "$images" >> $GITHUB_OUTPUT
+          printf '%s\n' "${images[@]}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
           echo "CACHE_FROM=$cache_from" >> $GITHUB_OUTPUT
           echo "CACHE_TO=$cache_to" >> $GITHUB_OUTPUT
-
-          echo "Configured registries: $(echo "$images" | wc -l | xargs)"
+          echo "Configured registries: ${#images[@]}"
 
       - name: Extract Docker metadata
         id: meta
