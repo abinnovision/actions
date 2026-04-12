@@ -252,7 +252,7 @@ jobs:
 
       # Check out the commit SHA to run other evaluations on.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ steps.commit.outputs.commit_sha }}
@@ -334,7 +334,7 @@ jobs:
       - configure
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
@@ -375,7 +375,7 @@ jobs:
         test-type: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
@@ -417,7 +417,7 @@ jobs:
       packages: "write"
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
@@ -528,7 +528,7 @@ jobs:
       packages: "write"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}

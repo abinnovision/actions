@@ -23,5 +23,5 @@ outputs:
       Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease"}.
       Empty object {} when nothing was released or computed.
 runs:
-  using: node20
+  using: node24
   main: dist/index.js

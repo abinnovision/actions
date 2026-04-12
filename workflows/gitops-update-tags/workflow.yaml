@@ -106,7 +106,7 @@ jobs:
           identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           token: ${{ steps.token.outputs.token }}
 
