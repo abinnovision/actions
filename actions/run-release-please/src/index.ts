@@ -332,9 +332,11 @@ const syncLinkedPrereleaseVersions = async (options: {
 	).plugins;
 
 	for (const plugin of plugins) {
-		if (!plugin.groupName || !plugin.components) {
+		if (!plugin.components) {
 			continue;
 		}
+
+		const groupLabel = plugin.groupName ?? "unnamed";
 
 		// Map component names to paths for this linked group.
 		const groupPaths: string[] = [];
@@ -345,10 +347,10 @@ const syncLinkedPrereleaseVersions = async (options: {
 			}
 		}
 
-		// Find the highest commit count and most recent SHA across all group
-		// members independently. The commit count determines the prerelease
-		// ordinal; the SHA represents the latest state of the codebase.
-		let highestCount = -1;
+		// Sum the commit counts and find the most recent SHA across all group
+		// members. The total commit count reflects the full set of changes to
+		// the linked group; the SHA represents the latest state of the codebase.
+		let totalCount = 0;
 		let latestSha = "";
 		let baseVersion = "";
 		let hasPrerelease = false;
@@ -357,9 +359,7 @@ const syncLinkedPrereleaseVersions = async (options: {
 				hasPrerelease = true;
 				const match = versions[path].packageVersion.match(/\.(\d+)$/);
 				const count = match ? parseInt(match[1], 10) : 0;
-				if (count > highestCount) {
-					highestCount = count;
-				}
+				totalCount += count;
 				if (!latestSha || versions[path].sha.localeCompare(latestSha) > 0) {
 					latestSha = versions[path].sha;
 				}
@@ -380,7 +380,7 @@ const syncLinkedPrereleaseVersions = async (options: {
 		const syncedEntry = buildPrereleaseEntry({
 			baseVersion,
 			channel,
-			commitCount: highestCount,
+			commitCount: totalCount,
 			sha: latestSha,
 		});
 
@@ -388,7 +388,7 @@ const syncLinkedPrereleaseVersions = async (options: {
 		for (const path of groupPaths) {
 			if (!(path in versions)) {
 				core.info(
-					`  ${path}: synced prerelease from linked group "${plugin.groupName}" -> ${syncedEntry.version}`,
+					`  ${path}: synced prerelease from linked group "${groupLabel}" -> ${syncedEntry.version}`,
 				);
 				versions[path] = { ...syncedEntry };
 			} else if (
@@ -396,7 +396,7 @@ const syncLinkedPrereleaseVersions = async (options: {
 				versions[path].version !== syncedEntry.version
 			) {
 				core.info(
-					`  ${path}: aligned prerelease to linked group "${plugin.groupName}" -> ${syncedEntry.version}`,
+					`  ${path}: aligned prerelease to linked group "${groupLabel}" -> ${syncedEntry.version}`,
 				);
 				versions[path] = { ...syncedEntry };
 			}
