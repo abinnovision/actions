@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.0...run-release-please-source-v1.1.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* handle linked-version groups without groupName ([#372](https://github.com/abinnovision/actions/issues/372)) ([e9fc447](https://github.com/abinnovision/actions/commit/e9fc447f3f74179b26293539977d0861da8ae765))
+* synchronize prerelease versions for linked-version groups ([#369](https://github.com/abinnovision/actions/issues/369)) ([d8e5f5c](https://github.com/abinnovision/actions/commit/d8e5f5c080a0baa7928dd3db6ab2785ad1356ae1))
+* synchronize prerelease versions for linked-version groups ([#371](https://github.com/abinnovision/actions/issues/371)) ([91eb6cf](https://github.com/abinnovision/actions/commit/91eb6cff376eef7e1705d0bc9c9b97c294cac955))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.3...run-release-please-source-v1.1.0) (2026-04-12)
 
 
