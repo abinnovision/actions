@@ -205,22 +205,100 @@ const buildPrBranchNames = async (
 		manifest as unknown as { separatePullRequests: boolean }
 	).separatePullRequests;
 
+	const branches: string[] = [];
+
 	// Aggregated mode: single branch for all components (Merge plugin active).
 	if (!separatePullRequests) {
-		return [BranchName.ofTargetBranch(resolvedBranch).toString()];
+		branches.push(BranchName.ofTargetBranch(resolvedBranch).toString());
+	} else {
+		// Separate PR mode: one branch per component.
+		for (const [, strategy] of Object.entries(strategiesByPath)) {
+			const branchComponent = await strategy.getBranchComponent();
+			const branchName = branchComponent
+				? BranchName.ofComponentTargetBranch(branchComponent, resolvedBranch)
+				: BranchName.ofTargetBranch(resolvedBranch);
+			branches.push(branchName.toString());
+		}
 	}
 
-	// Separate PR mode: one branch per component.
-	const branches: string[] = [];
-	for (const [, strategy] of Object.entries(strategiesByPath)) {
-		const branchComponent = await strategy.getBranchComponent();
-		const branchName = branchComponent
-			? BranchName.ofComponentTargetBranch(branchComponent, resolvedBranch)
-			: BranchName.ofTargetBranch(resolvedBranch);
-		branches.push(branchName.toString());
+	// Add group branches from linked-versions plugins.
+	// The linked-versions plugin merges linked components into a single PR on a
+	// group branch (release-please--branches--{branch}--groups--{groupName}).
+	// Without this, prerelease computation misses linked packages that have no
+	// direct commits but are version-synchronized by the plugin.
+	const plugins = (
+		manifest as unknown as {
+			plugins: Array<{ groupName?: string }>;
+		}
+	).plugins;
+	for (const plugin of plugins) {
+		if (plugin.groupName) {
+			branches.push(
+				BranchName.ofGroupTargetBranch(
+					plugin.groupName,
+					resolvedBranch,
+				).toString(),
+			);
+		}
 	}
 
 	return [...new Set(branches)]; // deduplicate
+};
+
+/**
+ * Synchronize prerelease versions for linked-version groups.
+ * The linked-versions plugin ensures all group members share the same base
+ * version in release PRs. Mirror that for prerelease: if any group member
+ * received a prerelease version, all other members get the same version.
+ */
+const syncLinkedPrereleaseVersions = async (
+	manifest: Manifest,
+	strategiesByPath: Record<string, Strategy>,
+	versions: VersionsMap,
+): Promise<void> => {
+	const plugins = (
+		manifest as unknown as {
+			plugins: Array<{ groupName?: string; components?: Set<string> }>;
+		}
+	).plugins;
+
+	for (const plugin of plugins) {
+		if (!plugin.groupName || !plugin.components) {
+			continue;
+		}
+
+		// Map component names to paths for this linked group.
+		const groupPaths: string[] = [];
+		for (const [path, strategy] of Object.entries(strategiesByPath)) {
+			const component = await strategy.getComponent();
+			if (component && plugin.components.has(component)) {
+				groupPaths.push(path);
+			}
+		}
+
+		// Find the primary prerelease version in this group.
+		let primaryEntry: VersionEntry | undefined;
+		for (const path of groupPaths) {
+			if (path in versions && versions[path].type === "prerelease") {
+				primaryEntry = versions[path];
+				break;
+			}
+		}
+
+		if (!primaryEntry) {
+			continue;
+		}
+
+		// Fill in missing group members with the primary prerelease version.
+		for (const path of groupPaths) {
+			if (!(path in versions)) {
+				core.info(
+					`  ${path}: synced prerelease from linked group "${plugin.groupName}" -> ${primaryEntry.version}`,
+				);
+				versions[path] = { ...primaryEntry };
+			}
+		}
+	}
 };
 
 /**
@@ -348,7 +426,9 @@ const computePrereleaseVersions = async (
 		// Component-scoped SHA: most recent commit touching this path.
 		// Falls back to HEAD SHA for dependency-triggered bumps with no direct commits.
 		const componentSha =
-			pathCommits.length > 0 ? pathCommits[0].sha.substring(0, 7) : shortSha;
+			pathCommits.length > 0 && pathCommits[0].sha
+				? pathCommits[0].sha.substring(0, 7)
+				: shortSha;
 
 		// Build prerelease version and clean package version.
 		const version = `${nextVersion}-${channel}.${String(commitCount)}+${componentSha}`;
@@ -365,6 +445,9 @@ const computePrereleaseVersions = async (
 			sha: componentSha,
 		};
 	}
+
+	// Synchronize prerelease versions for linked-version groups.
+	await syncLinkedPrereleaseVersions(manifest, strategiesByPath, versions);
 
 	return versions;
 };
