@@ -205,22 +205,203 @@ const buildPrBranchNames = async (
 		manifest as unknown as { separatePullRequests: boolean }
 	).separatePullRequests;
 
+	const branches: string[] = [];
+
 	// Aggregated mode: single branch for all components (Merge plugin active).
 	if (!separatePullRequests) {
-		return [BranchName.ofTargetBranch(resolvedBranch).toString()];
+		branches.push(BranchName.ofTargetBranch(resolvedBranch).toString());
+	} else {
+		// Separate PR mode: one branch per component.
+		for (const [, strategy] of Object.entries(strategiesByPath)) {
+			const branchComponent = await strategy.getBranchComponent();
+			const branchName = branchComponent
+				? BranchName.ofComponentTargetBranch(branchComponent, resolvedBranch)
+				: BranchName.ofTargetBranch(resolvedBranch);
+			branches.push(branchName.toString());
+		}
 	}
 
-	// Separate PR mode: one branch per component.
-	const branches: string[] = [];
-	for (const [, strategy] of Object.entries(strategiesByPath)) {
-		const branchComponent = await strategy.getBranchComponent();
-		const branchName = branchComponent
-			? BranchName.ofComponentTargetBranch(branchComponent, resolvedBranch)
-			: BranchName.ofTargetBranch(resolvedBranch);
-		branches.push(branchName.toString());
+	// Add group branches from linked-versions plugins.
+	// The linked-versions plugin merges linked components into a single PR on a
+	// group branch (release-please--branches--{branch}--groups--{groupName}).
+	// Without this, prerelease computation misses linked packages that have no
+	// direct commits but are version-synchronized by the plugin.
+	const plugins = (
+		manifest as unknown as {
+			plugins: Array<{ groupName?: string }>;
+		}
+	).plugins;
+	for (const plugin of plugins) {
+		if (plugin.groupName) {
+			branches.push(
+				BranchName.ofGroupTargetBranch(
+					plugin.groupName,
+					resolvedBranch,
+				).toString(),
+			);
+		}
 	}
 
 	return [...new Set(branches)]; // deduplicate
+};
+
+/**
+ * Build a prerelease VersionEntry from structured components.
+ */
+const buildPrereleaseEntry = (options: {
+	baseVersion: string;
+	channel: string;
+	commitCount: number;
+	sha: string;
+}): VersionEntry => {
+	const packageVersion = `${options.baseVersion}-${options.channel}.${String(options.commitCount)}`;
+	return {
+		version: `${packageVersion}+${options.sha}`,
+		packageVersion,
+		type: "prerelease",
+		sha: options.sha,
+	};
+};
+
+/**
+ * Fetch the release-please manifest from all candidate PR branches and return
+ * only the entries that differ from the currently released versions.
+ */
+const fetchChangedManifestEntries = async (options: {
+	token: string;
+	manifest: Manifest;
+	strategiesByPath: Record<string, Strategy>;
+	resolvedBranch: string;
+}): Promise<Record<string, string>> => {
+	const { token, manifest, strategiesByPath, resolvedBranch } = options;
+	const { owner, repo } = context.repo;
+
+	const prBranchNames = await buildPrBranchNames(
+		manifest,
+		strategiesByPath,
+		resolvedBranch,
+	);
+
+	core.info(`PR branches to check: ${prBranchNames.join(", ")}`);
+
+	const currentVersions = manifest.releasedVersions;
+	const changed: Record<string, string> = {};
+
+	for (const branch of prBranchNames) {
+		const branchManifest = await fetchManifestFromBranch({
+			token,
+			owner,
+			repo,
+			branch,
+		});
+
+		if (branchManifest) {
+			core.info(`  Found manifest on branch: ${branch}`);
+			for (const [path, version] of Object.entries(branchManifest)) {
+				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+				if (currentVersions[path]?.toString() !== version) {
+					changed[path] = version;
+				}
+			}
+		} else {
+			core.info(`  No manifest on branch: ${branch}`);
+		}
+	}
+
+	return changed;
+};
+
+/**
+ * Synchronize prerelease versions for linked-version groups.
+ * The linked-versions plugin ensures all group members share the same base
+ * version in release PRs. Mirror that for prerelease: if any group member
+ * received a prerelease version, all other members get the same version,
+ * using the highest commit count and most recent SHA from the group.
+ */
+const syncLinkedPrereleaseVersions = async (options: {
+	manifest: Manifest;
+	strategiesByPath: Record<string, Strategy>;
+	versions: VersionsMap;
+	channel: string;
+}): Promise<void> => {
+	const { manifest, strategiesByPath, versions, channel } = options;
+	const plugins = (
+		manifest as unknown as {
+			plugins: Array<{ groupName?: string; components?: Set<string> }>;
+		}
+	).plugins;
+
+	for (const plugin of plugins) {
+		if (!plugin.groupName || !plugin.components) {
+			continue;
+		}
+
+		// Map component names to paths for this linked group.
+		const groupPaths: string[] = [];
+		for (const [path, strategy] of Object.entries(strategiesByPath)) {
+			const component = await strategy.getComponent();
+			if (component && plugin.components.has(component)) {
+				groupPaths.push(path);
+			}
+		}
+
+		// Find the highest commit count and most recent SHA across all group
+		// members independently. The commit count determines the prerelease
+		// ordinal; the SHA represents the latest state of the codebase.
+		let highestCount = -1;
+		let latestSha = "";
+		let baseVersion = "";
+		let hasPrerelease = false;
+		for (const path of groupPaths) {
+			if (path in versions && versions[path].type === "prerelease") {
+				hasPrerelease = true;
+				const match = versions[path].packageVersion.match(/\.(\d+)$/);
+				const count = match ? parseInt(match[1], 10) : 0;
+				if (count > highestCount) {
+					highestCount = count;
+				}
+				if (!latestSha || versions[path].sha.localeCompare(latestSha) > 0) {
+					latestSha = versions[path].sha;
+				}
+				// All linked members share the same base version.
+				if (!baseVersion) {
+					baseVersion = versions[path].packageVersion.replace(
+						new RegExp(`-${channel}\\.\\d+$`),
+						"",
+					);
+				}
+			}
+		}
+
+		if (!hasPrerelease) {
+			continue;
+		}
+
+		const syncedEntry = buildPrereleaseEntry({
+			baseVersion,
+			channel,
+			commitCount: highestCount,
+			sha: latestSha,
+		});
+
+		// Apply the synced version to all group members.
+		for (const path of groupPaths) {
+			if (!(path in versions)) {
+				core.info(
+					`  ${path}: synced prerelease from linked group "${plugin.groupName}" -> ${syncedEntry.version}`,
+				);
+				versions[path] = { ...syncedEntry };
+			} else if (
+				versions[path].type === "prerelease" &&
+				versions[path].version !== syncedEntry.version
+			) {
+				core.info(
+					`  ${path}: aligned prerelease to linked group "${plugin.groupName}" -> ${syncedEntry.version}`,
+				);
+				versions[path] = { ...syncedEntry };
+			}
+		}
+	}
 };
 
 /**
@@ -241,50 +422,18 @@ const computePrereleaseVersions = async (
 		commitsPerPath,
 	} = options;
 
-	const { owner, repo } = context.repo;
 	const versions = { ...existingVersions };
-
-	// Get strategies by path for component/tag construction.
 	const strategiesByPath = await getStrategiesByPath(manifest);
 
-	// Build the set of PR branch names release-please would create.
-	const prBranchNames = await buildPrBranchNames(
+	// Fetch PR branch manifests and find entries that differ from current.
+	const changedEntries = await fetchChangedManifestEntries({
+		token,
 		manifest,
 		strategiesByPath,
 		resolvedBranch,
-	);
+	});
 
-	core.info(`PR branches to check: ${prBranchNames.join(", ")}`);
-
-	// Fetch and merge manifests from all PR branches.
-	// Each branch manifest contains ALL components, but only some are bumped.
-	// We only take entries that differ from the current released versions to
-	// avoid a later branch overwriting a bump from an earlier branch.
-	const currentVersions = manifest.releasedVersions;
-	const prManifest: Record<string, string> = {};
-	for (const branch of prBranchNames) {
-		const branchManifest = await fetchManifestFromBranch({
-			token,
-			owner,
-			repo,
-			branch,
-		});
-
-		if (branchManifest) {
-			core.info(`  Found manifest on branch: ${branch}`);
-			for (const [path, version] of Object.entries(branchManifest)) {
-				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-				const currentVersion = currentVersions[path]?.toString();
-				if (currentVersion !== version) {
-					prManifest[path] = version;
-				}
-			}
-		} else {
-			core.info(`  No manifest on branch: ${branch}`);
-		}
-	}
-
-	if (Object.keys(prManifest).length === 0) {
+	if (Object.keys(changedEntries).length === 0) {
 		core.info(
 			"No release-please PR branches with manifests found. Skipping prerelease computation.",
 		);
@@ -293,30 +442,13 @@ const computePrereleaseVersions = async (
 
 	core.startGroup("Manifest comparison");
 	core.info(
-		`Current: ${JSON.stringify(Object.fromEntries(Object.entries(currentVersions).map(([k, v]) => [k, v.toString()])), null, 2)}`,
+		`Current: ${JSON.stringify(Object.fromEntries(Object.entries(manifest.releasedVersions).map(([k, v]) => [k, v.toString()])), null, 2)}`,
 	);
-	core.info(`PR: ${JSON.stringify(prManifest, null, 2)}`);
-	core.endGroup();
-
-	// Diff manifests to find changed packages.
-	const changedPackages: Record<string, { current: string; next: string }> = {};
-	for (const [path, nextVersion] of Object.entries(prManifest)) {
-		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-		const currentVersion = currentVersions[path]?.toString();
-		if (currentVersion !== nextVersion) {
-			changedPackages[path] = { current: currentVersion, next: nextVersion };
-		}
-	}
-
-	core.startGroup("Changed packages");
-	core.info(JSON.stringify(changedPackages, null, 2));
+	core.info(`PR: ${JSON.stringify(changedEntries, null, 2)}`);
 	core.endGroup();
 
 	// Compute prerelease version for each changed package.
-	for (const [
-		path,
-		{ current: currentVersion, next: nextVersion },
-	] of Object.entries(changedPackages)) {
+	for (const [path, nextVersion] of Object.entries(changedEntries)) {
 		// Skip packages already covered by a stable release.
 		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (versions[path]) {
@@ -332,39 +464,43 @@ const computePrereleaseVersions = async (
 		}
 
 		// Get per-component commits already fetched by Manifest.buildPullRequests().
-		// These are split by path, filtered to since-last-release, and exclusions applied.
 		const pathCommits = commitsPerPath[path] ?? [];
 
 		// Parse conventional commits and filter to changelog-worthy entries only.
-		// filterCommits defaults to standard sections (feat, fix, perf, revert visible)
-		// when changelogSections is undefined.
 		const config = manifest.repositoryConfig[path];
 		const parsed = parseConventionalCommits(
 			pathCommits.map((c) => ({ sha: c.sha, message: c.message })),
 		);
-		const worthy = filterCommits(parsed, config.changelogSections);
-		const commitCount = worthy.length;
+		const commitCount = filterCommits(parsed, config.changelogSections).length;
 
 		// Component-scoped SHA: most recent commit touching this path.
 		// Falls back to HEAD SHA for dependency-triggered bumps with no direct commits.
 		const componentSha =
-			pathCommits.length > 0 ? pathCommits[0].sha.substring(0, 7) : shortSha;
+			pathCommits.length > 0 && pathCommits[0].sha
+				? pathCommits[0].sha.substring(0, 7)
+				: shortSha;
 
-		// Build prerelease version and clean package version.
-		const version = `${nextVersion}-${channel}.${String(commitCount)}+${componentSha}`;
-		const packageVersion = `${nextVersion}-${channel}.${String(commitCount)}`;
+		const entry = buildPrereleaseEntry({
+			baseVersion: nextVersion,
+			channel,
+			commitCount,
+			sha: componentSha,
+		});
 
 		core.info(
-			`  ${path}: ${currentVersion} -> ${version} (commits=${String(commitCount)}, componentSha=${componentSha})`,
+			`  ${path}: ${nextVersion} -> ${entry.version} (commits=${String(commitCount)}, sha=${componentSha})`,
 		);
 
-		versions[path] = {
-			version,
-			packageVersion,
-			type: "prerelease",
-			sha: componentSha,
-		};
+		versions[path] = entry;
 	}
+
+	// Synchronize prerelease versions for linked-version groups.
+	await syncLinkedPrereleaseVersions({
+		manifest,
+		strategiesByPath,
+		versions,
+		channel,
+	});
 
 	return versions;
 };
