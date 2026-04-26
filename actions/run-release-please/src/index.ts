@@ -312,6 +312,83 @@ const fetchChangedManifestEntries = async (options: {
 };
 
 /**
+ * Synchronize stable release versions across linked-version groups.
+ *
+ * Manifest.createReleases() only emits a CreatedRelease for paths whose
+ * strategy produced changelog-worthy output. Linked-versions group members
+ * without their own commits get their manifest version bumped silently and
+ * never appear in createReleases(), which leaves them out of `versions`
+ * even though they share the same released version as their group siblings.
+ *
+ * For every linked-versions plugin, this fills in missing group members
+ * with the release entry of any sibling that did appear in createReleases().
+ * Must run after extractStableVersions() and before computePrereleaseVersions(),
+ * so prerelease computation correctly skips paths that are now known to be
+ * stable releases.
+ */
+const syncLinkedReleaseVersions = async (options: {
+	manifest: Manifest;
+	strategiesByPath: Record<string, Strategy>;
+	versions: VersionsMap;
+}): Promise<void> => {
+	const { manifest, strategiesByPath, versions } = options;
+	const plugins = (
+		manifest as unknown as {
+			plugins: Array<{ groupName?: string; components?: Set<string> }>;
+		}
+	).plugins;
+
+	for (const plugin of plugins) {
+		if (!plugin.components) {
+			continue;
+		}
+
+		const groupLabel = plugin.groupName ?? "unnamed";
+
+		// Map component names to paths for this linked group.
+		const groupPaths: string[] = [];
+		for (const [path, strategy] of Object.entries(strategiesByPath)) {
+			const component = await strategy.getComponent();
+			if (component && plugin.components.has(component)) {
+				groupPaths.push(path);
+			}
+		}
+
+		// Pick the first released sibling as the template for this group.
+		// Linked-versions guarantees all members share the same manifest
+		// version after a merge; warn (but don't fail) if they don't.
+		let templateEntry: VersionEntry | undefined;
+		for (const path of groupPaths) {
+			if (!(path in versions) || versions[path].type !== "release") {
+				continue;
+			}
+			const entry = versions[path];
+			if (!templateEntry) {
+				templateEntry = entry;
+			} else if (templateEntry.packageVersion !== entry.packageVersion) {
+				core.warning(
+					`Linked group "${groupLabel}" has members at differing versions (${templateEntry.packageVersion} vs ${entry.packageVersion}); using ${templateEntry.packageVersion}.`,
+				);
+			}
+		}
+
+		if (!templateEntry) {
+			continue;
+		}
+
+		// Fill missing siblings only — never overwrite an existing entry.
+		for (const path of groupPaths) {
+			if (!(path in versions)) {
+				core.info(
+					`  ${path}: synced release from linked group "${groupLabel}" -> ${templateEntry.version}`,
+				);
+				versions[path] = { ...templateEntry };
+			}
+		}
+	}
+};
+
+/**
  * Synchronize prerelease versions for linked-version groups.
  * The linked-versions plugin ensures all group members share the same base
  * version in release PRs. Mirror that for prerelease: if any group member
@@ -345,6 +422,14 @@ const syncLinkedPrereleaseVersions = async (options: {
 			if (component && plugin.components.has(component)) {
 				groupPaths.push(path);
 			}
+		}
+
+		// If any member is already a stable release for this run, the linked
+		// group is fully released; do not introduce prereleases.
+		if (
+			groupPaths.some((p) => p in versions && versions[p].type === "release")
+		) {
+			continue;
 		}
 
 		// Sum the commit counts and find the most recent SHA across all group
@@ -539,6 +624,17 @@ const computePrereleaseVersions = async (
 	let versions: VersionsMap = {};
 	if (createdReleases.length > 0) {
 		versions = extractStableVersions(createdReleases, shortSha);
+
+		// Propagate stable releases to all linked-versions group siblings.
+		// createReleases() only emits one CreatedRelease per package with
+		// changelog content; silent group members would otherwise be missing
+		// from `versions` even though they share the bumped manifest version.
+		const strategiesByPath = await getStrategiesByPath(manifest);
+		await syncLinkedReleaseVersions({
+			manifest,
+			strategiesByPath,
+			versions,
+		});
 
 		core.startGroup("Computed stable versions");
 		core.info(JSON.stringify(versions, null, 2));
