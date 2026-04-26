@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.1...run-release-please-source-v1.1.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* propagate linked-versions releases to silent group siblings ([#374](https://github.com/abinnovision/actions/issues/374)) ([a31f285](https://github.com/abinnovision/actions/commit/a31f285c1255b6787135438b723bd76c85608cfb))
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.0...run-release-please-source-v1.1.1) (2026-04-13)
 
 
