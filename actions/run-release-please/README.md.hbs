@@ -10,6 +10,8 @@ This action wraps [release-please](https://github.com/googleapis/release-please)
 
 On every run, the action calls `createReleases()` (to publish GitHub releases for merged release PRs) and `createPullRequests()` (to create or update release PRs for pending changes). This mirrors what `googleapis/release-please-action` does in manifest mode. Stable versions are extracted directly from the created release objects.
 
+When the consumer's `release-please-config.json` declares a `linked-versions` plugin, this action propagates the released version to every group member in the `versions` output. `createReleases()` only emits a release for packages that produced changelog content, so silent group members (whose manifest version was bumped by the linked-versions plugin without their own commits) would otherwise be missing from the output. With this propagation, every linked sibling appears with `type: "release"` at the same version as its released siblings.
+
 ### Prerelease channels
 
 When `prerelease-channel` is set (e.g., `beta`), the action computes prerelease versions for packages that have pending changes but haven't been released yet:
