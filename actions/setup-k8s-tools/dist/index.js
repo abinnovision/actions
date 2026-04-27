@@ -65657,7 +65657,9 @@ const TOOLS = [
 (async () => {
     const token = getInput("github-token", { required: true });
     const octokit = getOctokit(token);
-    await Promise.all(TOOLS.map((tool) => installTool(tool, getInput(tool.name), { octokit, token })));
+    for (const tool of TOOLS) {
+        await installTool(tool, getInput(tool.name), { octokit, token });
+    }
 })().catch((error) => {
     core_error(error instanceof Error ? error : String(error));
     setFailed("Error while setting up k8s tools");

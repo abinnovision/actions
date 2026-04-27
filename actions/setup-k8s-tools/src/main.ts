@@ -8,11 +8,9 @@ import { TOOLS } from "./tools.js";
 	const token = core.getInput("github-token", { required: true });
 	const octokit = getOctokit(token);
 
-	await Promise.all(
-		TOOLS.map((tool) =>
-			installTool(tool, core.getInput(tool.name), { octokit, token }),
-		),
-	);
+	for (const tool of TOOLS) {
+		await installTool(tool, core.getInput(tool.name), { octokit, token });
+	}
 })().catch((error: unknown) => {
 	core.error(error instanceof Error ? error : String(error));
 	core.setFailed("Error while setting up k8s tools");
