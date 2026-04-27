@@ -4,6 +4,7 @@
 	"actions/run-release-please": "1.1.2",
 	"actions/setup-gcp": "1.1.1",
 	"actions/setup-node": "1.2.1",
+	"actions/setup-k8s-tools": "1.0.0",
 	"actions/setup-tools": "1.0.2",
 	"actions/run-workflow-dispatch": "1.1.0",
 	"workflows/release": "2.0.2",
