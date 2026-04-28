@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.2.1...run-commitlint-source-v1.2.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* upgrade GitHub Action dependencies to latest versions ([#380](https://github.com/abinnovision/actions/issues/380)) ([a95663b](https://github.com/abinnovision/actions/commit/a95663bbd9220d7fd39e1914f81eb2c31680e113))
+
 ## [1.2.1](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.2.0...run-commitlint-source-v1.2.1) (2026-04-12)
 
 
