@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.3...gitops-update-tags-source-v1.1.4) (2026-04-28)
+
+
+### Bug Fixes
+
+* replace setup-kustomize with setup-k8s-tool ([#378](https://github.com/abinnovision/actions/issues/378)) ([6212bbd](https://github.com/abinnovision/actions/commit/6212bbddf0fe812a4be82501f55e852d968c6083))
+
 ## [1.1.3](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.2...gitops-update-tags-source-v1.1.3) (2026-04-12)
 
 
