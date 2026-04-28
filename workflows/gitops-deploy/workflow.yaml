@@ -316,10 +316,8 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
 
-      - name: Setup k8s tools
-        uses: abinnovision/actions@feat/k8s-tools-action
-        with:
-          kustomize: latest
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v3
 
       # Validate application manifests
       - name: Validate application
@@ -625,10 +623,8 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
 
-      - name: Setup k8s tools
-        uses: abinnovision/actions@feat/k8s-tools-action
-        with:
-          kustomize: latest
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v3
 
       # Validate application (same as preview)
       - name: Validate application

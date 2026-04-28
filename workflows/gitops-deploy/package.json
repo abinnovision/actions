@@ -28,7 +28,6 @@
 		"prettier": "^3.8.2"
 	},
 	"actionDependencies": {
-		"setup-node": "^1.0.0",
-		"setup-k8s-tools": "^1.0.0"
+		"setup-node": "^1.0.0"
 	}
 }
