@@ -22,7 +22,7 @@ Each tool input accepts `"latest"` to resolve and install the newest release at 
 jobs:
   <job>:
     steps:
-      - uses: abinnovision/actions@setup-k8s-tools-v1
+      - uses: abinnovision/actions@setup-k8s-tools-v0
         with:
           github-token: ${{ github.token }}
 ```
@@ -33,8 +33,8 @@ jobs:
 
 This action can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions@setup-k8s-tools-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@setup-k8s-tools-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@setup-k8s-tools-v0`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions@setup-k8s-tools-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
