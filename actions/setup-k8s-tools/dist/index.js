@@ -65604,6 +65604,15 @@ const resolveLatestTag = async (octokit, owner, repo) => {
     const { data } = await octokit.rest.repos.getLatestRelease({ owner, repo });
     return data.tag_name;
 };
+const resolveLatestKustomizeTag = async (octokit) => {
+    for await (const { data } of octokit.paginate.iterator(octokit.rest.repos.listReleases, { owner: "kubernetes-sigs", repo: "kustomize", per_page: 20 })) {
+        const release = data.find((r) => r.tag_name.startsWith("kustomize/v"));
+        if (release) {
+            return release.tag_name;
+        }
+    }
+    throw new Error("Could not find a kustomize release");
+};
 const TOOLS = [
     {
         name: "kube-score",
@@ -65637,7 +65646,7 @@ const TOOLS = [
         archiveType: "tar",
         async resolve(input, { octokit, platform, arch }) {
             const tag = input === "latest"
-                ? await resolveLatestTag(octokit, "kubernetes-sigs", "kustomize")
+                ? await resolveLatestKustomizeTag(octokit)
                 : `kustomize/${input}`;
             const version = tag.replace("kustomize/", "");
             return {
@@ -65658,6 +65667,7 @@ const TOOLS = [
     const token = getInput("github-token", { required: true });
     const octokit = getOctokit(token);
     for (const tool of TOOLS) {
+        // eslint-disable-next-line no-await-in-loop
         await installTool(tool, getInput(tool.name), { octokit, token });
     }
 })().catch((error) => {

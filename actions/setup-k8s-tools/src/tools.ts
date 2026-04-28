@@ -28,6 +28,21 @@ const resolveLatestTag = async (
 	return data.tag_name;
 };
 
+const resolveLatestKustomizeTag = async (
+	octokit: OctokitType,
+): Promise<string> => {
+	for await (const { data } of octokit.paginate.iterator(
+		octokit.rest.repos.listReleases,
+		{ owner: "kubernetes-sigs", repo: "kustomize", per_page: 20 },
+	)) {
+		const release = data.find((r) => r.tag_name.startsWith("kustomize/v"));
+		if (release) {
+			return release.tag_name;
+		}
+	}
+	throw new Error("Could not find a kustomize release");
+};
+
 const TOOLS: ToolConfig[] = [
 	{
 		name: "kube-score",
@@ -37,6 +52,7 @@ const TOOLS: ToolConfig[] = [
 				input === "latest"
 					? await resolveLatestTag(octokit, "zegl", "kube-score")
 					: input;
+
 			const version = tag.replace(/^v/, "");
 			return {
 				version: tag,
@@ -64,7 +80,7 @@ const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const tag =
 				input === "latest"
-					? await resolveLatestTag(octokit, "kubernetes-sigs", "kustomize")
+					? await resolveLatestKustomizeTag(octokit)
 					: `kustomize/${input}`;
 			const version = tag.replace("kustomize/", "");
 			return {

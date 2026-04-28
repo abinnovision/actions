@@ -9,6 +9,7 @@ import { TOOLS } from "./tools.js";
 	const octokit = getOctokit(token);
 
 	for (const tool of TOOLS) {
+		// eslint-disable-next-line no-await-in-loop
 		await installTool(tool, core.getInput(tool.name), { octokit, token });
 	}
 })().catch((error: unknown) => {
