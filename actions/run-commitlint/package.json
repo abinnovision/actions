@@ -35,8 +35,8 @@
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
 		"@abinnovision/commitlint-config": "^2.3.0",
-		"@actions/core": "^3.0.0",
-		"@actions/github": "^9.1.0",
+		"@actions/core": "^3.0.1",
+		"@actions/github": "^9.1.1",
 		"@commitlint/execute-rule": "20.0.0",
 		"@commitlint/format": "20.5.0",
 		"@commitlint/lint": "20.5.0",
