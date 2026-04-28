@@ -21,26 +21,22 @@ interface ToolConfig {
 
 const resolveLatestTag = async (
 	octokit: OctokitType,
-	owner: string,
-	repo: string,
+	{
+		owner,
+		repo,
+		tagFilter = () => true,
+	}: { owner: string; repo: string; tagFilter?: (tag: string) => boolean },
 ): Promise<string> => {
-	const { data } = await octokit.rest.repos.getLatestRelease({ owner, repo });
-	return data.tag_name;
-};
-
-const resolveLatestKustomizeTag = async (
-	octokit: OctokitType,
-): Promise<string> => {
-	for await (const { data } of octokit.paginate.iterator(
-		octokit.rest.repos.listReleases,
-		{ owner: "kubernetes-sigs", repo: "kustomize", per_page: 20 },
-	)) {
-		const release = data.find((r) => r.tag_name.startsWith("kustomize/v"));
-		if (release) {
-			return release.tag_name;
-		}
+	const { data } = await octokit.rest.repos.listReleases({
+		owner,
+		repo,
+		per_page: 50,
+	});
+	const release = data.find((r) => tagFilter(r.tag_name));
+	if (release) {
+		return release.tag_name;
 	}
-	throw new Error("Could not find a kustomize release");
+	throw new Error(`Could not find a release for ${owner}/${repo}`);
 };
 
 const TOOLS: ToolConfig[] = [
@@ -50,7 +46,10 @@ const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const tag =
 				input === "latest"
-					? await resolveLatestTag(octokit, "zegl", "kube-score")
+					? await resolveLatestTag(octokit, {
+							owner: "zegl",
+							repo: "kube-score",
+						})
 					: input;
 
 			const version = tag.replace(/^v/, "");
@@ -66,7 +65,10 @@ const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const tag =
 				input === "latest"
-					? await resolveLatestTag(octokit, "yannh", "kubeconform")
+					? await resolveLatestTag(octokit, {
+							owner: "yannh",
+							repo: "kubeconform",
+						})
 					: input;
 			return {
 				version: tag,
@@ -80,7 +82,11 @@ const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const tag =
 				input === "latest"
-					? await resolveLatestKustomizeTag(octokit)
+					? await resolveLatestTag(octokit, {
+							owner: "kubernetes-sigs",
+							repo: "kustomize",
+							tagFilter: (tag) => tag.startsWith("kustomize/v"),
+						})
 					: `kustomize/${input}`;
 			const version = tag.replace("kustomize/", "");
 			return {

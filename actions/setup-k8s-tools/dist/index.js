@@ -65600,18 +65600,17 @@ const installTool = async (config, input, ctx) => {
 };
 
 ;// CONCATENATED MODULE: ./src/tools.ts
-const resolveLatestTag = async (octokit, owner, repo) => {
-    const { data } = await octokit.rest.repos.getLatestRelease({ owner, repo });
-    return data.tag_name;
-};
-const resolveLatestKustomizeTag = async (octokit) => {
-    for await (const { data } of octokit.paginate.iterator(octokit.rest.repos.listReleases, { owner: "kubernetes-sigs", repo: "kustomize", per_page: 20 })) {
-        const release = data.find((r) => r.tag_name.startsWith("kustomize/v"));
-        if (release) {
-            return release.tag_name;
-        }
+const resolveLatestTag = async (octokit, { owner, repo, tagFilter = () => true, }) => {
+    const { data } = await octokit.rest.repos.listReleases({
+        owner,
+        repo,
+        per_page: 50,
+    });
+    const release = data.find((r) => tagFilter(r.tag_name));
+    if (release) {
+        return release.tag_name;
     }
-    throw new Error("Could not find a kustomize release");
+    throw new Error(`Could not find a release for ${owner}/${repo}`);
 };
 const TOOLS = [
     {
@@ -65619,7 +65618,7 @@ const TOOLS = [
         archiveType: "tar",
         async resolve(input, { octokit, platform, arch }) {
             const tag = input === "latest"
-                ? await resolveLatestTag(octokit, "zegl", "kube-score")
+                ? await resolveLatestTag(octokit, { owner: "zegl", repo: "kube-score" })
                 : input;
             const version = tag.replace(/^v/, "");
             return {
@@ -65633,7 +65632,7 @@ const TOOLS = [
         archiveType: "tar",
         async resolve(input, { octokit, platform, arch }) {
             const tag = input === "latest"
-                ? await resolveLatestTag(octokit, "yannh", "kubeconform")
+                ? await resolveLatestTag(octokit, { owner: "yannh", repo: "kubeconform" })
                 : input;
             return {
                 version: tag,
@@ -65646,7 +65645,7 @@ const TOOLS = [
         archiveType: "tar",
         async resolve(input, { octokit, platform, arch }) {
             const tag = input === "latest"
-                ? await resolveLatestKustomizeTag(octokit)
+                ? await resolveLatestTag(octokit, { owner: "kubernetes-sigs", repo: "kustomize", tagFilter: (tag) => tag.startsWith("kustomize/v") })
                 : `kustomize/${input}`;
             const version = tag.replace("kustomize/", "");
             return {
@@ -65666,10 +65665,8 @@ const TOOLS = [
 (async () => {
     const token = getInput("github-token", { required: true });
     const octokit = getOctokit(token);
-    for (const tool of TOOLS) {
-        // eslint-disable-next-line no-await-in-loop
-        await installTool(tool, getInput(tool.name), { octokit, token });
-    }
+    // Install all enabled tools.
+    await Promise.all(TOOLS.map((tool) => installTool(tool, getInput(tool.name), { octokit, token })));
 })().catch((error) => {
     core_error(error instanceof Error ? error : String(error));
     setFailed("Error while setting up k8s tools");
