@@ -172,8 +172,10 @@ jobs:
       - name: Setup Node
         uses: abinnovision/actions@setup-node-dev
 
-      - name: Setup kustomize
-        uses: imranismail/setup-kustomize@v3
+      - name: Setup k8s tools
+        uses: abinnovision/actions@setup-k8s-tools-dev
+        with:
+          kustomize: latest
 
       - name: Validate application directory
         run: |
