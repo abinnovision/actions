@@ -14,6 +14,7 @@ const mapPlatform = (platform: string): string => {
 		darwin: "darwin",
 		win32: "windows",
 	};
+
 	return map[platform] ?? platform;
 };
 
@@ -22,6 +23,7 @@ const mapArch = (arch: string): string => {
 		x64: "amd64",
 		arm64: "arm64",
 	};
+
 	return map[arch] ?? arch;
 };
 

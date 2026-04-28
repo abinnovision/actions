@@ -2,7 +2,7 @@ name: Setup Kubernetes Tools
 author: "abi group GmbH"
 description: |
   Installs kubernetes tooling (kube-score, kubeconform, kustomize) with
-  GitHub Actions tool caching. Pass "latest" or a pinned version per tool;
+  GitHub Actions tool caching. Pass 'latest' or a pinned version per tool;
   omit or leave empty to skip a tool.
 inputs:
   github-token:
