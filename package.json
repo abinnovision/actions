@@ -57,7 +57,7 @@
 		"tablemark": "^4.1.0",
 		"tsx": "^4.21.0",
 		"turbo": "^2.9.6",
-		"typescript": "^5.9.3"
+		"typescript": "^6.0.3"
 	},
 	"packageManager": "yarn@4.14.1",
 	"engines": {
