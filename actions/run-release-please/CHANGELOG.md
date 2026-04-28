@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.2...run-release-please-source-v1.1.3) (2026-04-28)
+
+
+### Bug Fixes
+
+* upgrade GitHub Action dependencies to latest versions ([#380](https://github.com/abinnovision/actions/issues/380)) ([a95663b](https://github.com/abinnovision/actions/commit/a95663bbd9220d7fd39e1914f81eb2c31680e113))
+
 ## [1.1.2](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.1...run-release-please-source-v1.1.2) (2026-04-26)
 
 
