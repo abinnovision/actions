@@ -1,23 +1,6 @@
+import { resolveLatestTagCached } from "./latest-tag-cache.js";
+
 import type { getOctokit } from "@actions/github";
-
-const resolveLatestTag = async (
-	octokit: OctokitType,
-	input: { owner: string; repo: string; tagFilter?: (tag: string) => boolean },
-): Promise<string> => {
-	const { data } = await octokit.rest.repos.listReleases({
-		owner: input.owner,
-		repo: input.repo,
-		per_page: 50,
-	});
-
-	// If a tagFilter is provided, find the first release that matches the filter. Otherwise, take the first release.
-	const release = data.find((r) => input.tagFilter?.(r.tag_name) ?? true);
-	if (release) {
-		return release.tag_name;
-	}
-
-	throw new Error(`Could not find a release for ${input.owner}/${input.repo}`);
-};
 
 export type OctokitType = ReturnType<typeof getOctokit>;
 
@@ -45,7 +28,8 @@ export const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const tag =
 				input === "latest"
-					? await resolveLatestTag(octokit, {
+					? await resolveLatestTagCached(octokit, {
+							cacheId: "kube-score",
 							owner: "zegl",
 							repo: "kube-score",
 						})
@@ -64,7 +48,8 @@ export const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const tag =
 				input === "latest"
-					? await resolveLatestTag(octokit, {
+					? await resolveLatestTagCached(octokit, {
+							cacheId: "kubeconform",
 							owner: "yannh",
 							repo: "kubeconform",
 						})
@@ -82,7 +67,8 @@ export const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const tag =
 				input === "latest"
-					? await resolveLatestTag(octokit, {
+					? await resolveLatestTagCached(octokit, {
+							cacheId: "kustomize",
 							owner: "kubernetes-sigs",
 							repo: "kustomize",
 							tagFilter: (tag) => tag.startsWith("kustomize/v"),
