@@ -17,7 +17,7 @@ export interface ResolveContext {
 
 export interface ToolConfig {
 	name: string;
-	archiveType: "tar" | "zip";
+	archiveType: "tar" | "zip" | "binary";
 	resolve: (input: string, ctx: ResolveContext) => Promise<ToolResolution>;
 }
 
@@ -79,6 +79,26 @@ export const TOOLS: ToolConfig[] = [
 			return {
 				version,
 				downloadUrl: `https://github.com/kubernetes-sigs/kustomize/releases/download/${encodeURIComponent(tag)}/kustomize_${version}_${platform}_${arch}.tar.gz`,
+			};
+		},
+	},
+	{
+		name: "argocd",
+		archiveType: "binary",
+		async resolve(input, { octokit, platform, arch }) {
+			const tag =
+				input === "latest"
+					? await resolveLatestTagCached(octokit, {
+							cacheId: "argocd",
+							owner: "argoproj",
+							repo: "argo-cd",
+						})
+					: input;
+
+			const suffix = platform === "windows" ? ".exe" : "";
+			return {
+				version: tag,
+				downloadUrl: `https://github.com/argoproj/argo-cd/releases/download/${tag}/argocd-${platform}-${arch}${suffix}`,
 			};
 		},
 	},
