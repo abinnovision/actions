@@ -144,7 +144,7 @@ jobs:
   configure:
     name: Configure
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     outputs:
       # Commit SHA to check out
       commit-sha: ${{ steps.commit.outputs.commit_sha }}
@@ -264,18 +264,6 @@ jobs:
           echo "::notice::Found ${#applications[@]} total applications"
           echo "::notice::Found ${#argocd_applications[@]} ArgoCD applications"
 
-  # Code quality checks
-  check:
-    name: Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs:
-      - configure
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.configure.outputs.commit-sha }}
       - name: Setup Node.js
         uses: abinnovision/actions@setup-node-dev
       - name: Install dependencies
@@ -300,7 +288,6 @@ jobs:
     timeout-minutes: 15
     needs:
       - configure
-      - check
     if: needs.configure.outputs.is-pr == 'true' && needs.configure.outputs.has-argocd-applications == 'true'
     strategy:
       fail-fast: false
@@ -587,7 +574,6 @@ jobs:
     timeout-minutes: 30
     needs:
       - configure
-      - check
     if: needs.configure.outputs.is-main-push == 'true' && needs.configure.outputs.has-argocd-applications == 'true'
     strategy:
       fail-fast: false
@@ -882,21 +868,20 @@ jobs:
     timeout-minutes: 5
     needs:
       - configure
-      - check
       - preview
       - deploy
     if: always()
     steps:
       - name: Evaluate workflow status
         run: |
-          check_result="${{ needs.check.result }}"
+          configure_result="${{ needs.configure.result }}"
           preview_result="${{ needs.preview.result }}"
           deploy_result="${{ needs.deploy.result }}"
 
           overall_success=true
 
           # Code checks must succeed
-          if [[ "$check_result" == "failure" ]]; then
+          if [[ "$configure_result" == "failure" ]]; then
             echo "::error::Code checks failed"
             overall_success=false
           fi
