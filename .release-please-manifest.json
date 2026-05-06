@@ -9,7 +9,7 @@
 	"actions/run-workflow-dispatch": "1.1.0",
 	"workflows/release": "2.0.2",
 	"workflows/node-monorepo-stack": "1.3.3",
-	"workflows/gitops-deploy": "1.0.6",
+	"workflows/gitops-deploy": "1.0.7",
 	"workflows/gitops-update-tags": "1.1.4",
 	"workflows/polyglot-monorepo-stack": "1.2.0"
 }
