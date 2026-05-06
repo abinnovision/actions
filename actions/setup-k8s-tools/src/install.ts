@@ -1,6 +1,7 @@
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
 import * as tc from "@actions/tool-cache";
+import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -88,10 +89,29 @@ export const installTool = async (
 		`Bearer ${ctx.token}`,
 	);
 
-	const extractedPath =
-		config.archiveType === "tar"
-			? await tc.extractTar(downloaded)
-			: await tc.extractZip(downloaded);
+	let extractedPath: string;
+	if (config.archiveType === "binary") {
+		const binName = platform === "windows" ? `${config.name}.exe` : config.name;
+		const binDir = path.join(
+			process.env["RUNNER_TEMP"] ?? os.tmpdir(),
+			"setup-k8s-tools",
+			config.name,
+			version,
+			"bin",
+		);
+		await fs.mkdir(binDir, { recursive: true });
+		const dest = path.join(binDir, binName);
+		await fs.copyFile(downloaded, dest);
+		if (platform !== "windows") {
+			await fs.chmod(dest, 0o755);
+		}
+		extractedPath = binDir;
+	} else {
+		extractedPath =
+			config.archiveType === "tar"
+				? await tc.extractTar(downloaded)
+				: await tc.extractZip(downloaded);
+	}
 
 	try {
 		await cache.saveCache([extractedPath], cacheKey);
