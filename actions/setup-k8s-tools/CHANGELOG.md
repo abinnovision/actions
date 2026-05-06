@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/setup-k8s-tools-source-v1.0.1...setup-k8s-tools-source-v1.1.0) (2026-05-06)
+
+
+### Features
+
+* **setup-k8s-tools:** add argocd CLI ([#389](https://github.com/abinnovision/actions/issues/389)) ([7f9f699](https://github.com/abinnovision/actions/commit/7f9f699b545706557469cd3fb693587daab0e3b5))
+* **setup-k8s-tools:** cache latest tag lookups for 24h ([#384](https://github.com/abinnovision/actions/issues/384)) ([81e777d](https://github.com/abinnovision/actions/commit/81e777de1a069c485f0af6cf7a4a2fb10fe0ccf3))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/setup-k8s-tools-source-v1.0.0...setup-k8s-tools-source-v1.0.1) (2026-04-28)
 
 
