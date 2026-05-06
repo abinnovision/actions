@@ -880,9 +880,9 @@ jobs:
 
           overall_success=true
 
-          # Code checks must succeed
+          # Configure job (app discovery + code checks) must succeed
           if [[ "$configure_result" == "failure" ]]; then
-            echo "::error::Code checks failed"
+            echo "::error::Configure failed (app discovery or code checks)"
             overall_success=false
           fi
 
