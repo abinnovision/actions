@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.4...gitops-deploy-source-v1.0.5) (2026-05-06)
+
+
+### Bug Fixes
+
+* **gitops-deploy:** deduplicate steps and refactor workflow ([#390](https://github.com/abinnovision/actions/issues/390)) ([1f00db1](https://github.com/abinnovision/actions/commit/1f00db1f7723873a1c04b0b83911796baf19f38a))
+
 ## [1.0.4](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.3...gitops-deploy-source-v1.0.4) (2026-04-28)
 
 
