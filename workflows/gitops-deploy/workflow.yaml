@@ -317,7 +317,7 @@ jobs:
   configure:
     name: Configure
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     outputs:
       # Commit SHA to check out
       commit-sha: ${{ steps.commit.outputs.commit_sha }}
