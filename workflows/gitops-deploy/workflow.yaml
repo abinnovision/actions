@@ -266,12 +266,12 @@ on:
         "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=core-argocd-github-actions" \
         | jq -r ".value")
 
+      echo "::add-mask::$ID_TOKEN"
+
       if [[ -z "$ID_TOKEN" || "$ID_TOKEN" == "null" ]]; then
         echo "::error::Failed to get GitHub OIDC token"
         exit 1
       fi
-
-      echo "::add-mask::$ID_TOKEN"
 
       # Exchange with DEX
       DEX_TOKEN_RESPONSE=$(curl -s \
