@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.8](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.7...gitops-deploy-source-v1.0.8) (2026-05-06)
+
+
+### Bug Fixes
+
+* **gitops-deploy:** use commit SHA instead of branch ref for ArgoCD diff ([#396](https://github.com/abinnovision/actions/issues/396)) ([39adb70](https://github.com/abinnovision/actions/commit/39adb702f6b4fb6ba959a2684bace6a3ac47837e))
+
 ## [1.0.7](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.6...gitops-deploy-source-v1.0.7) (2026-05-06)
 
 
