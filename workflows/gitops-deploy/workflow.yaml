@@ -518,7 +518,7 @@ jobs:
       - name: Perform ArgoCD diff
         id: argocd-diff
         env:
-          REVISION: ${{ github.event.pull_request.head.ref }}
+          REVISION: ${{ needs.check.outputs.commit-sha }}
           ARGOCD_APP: ${{ steps.argocd-app.outputs.application_name }}
         run: |
           set +e  # Don't exit on non-zero
