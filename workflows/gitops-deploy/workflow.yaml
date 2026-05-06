@@ -456,7 +456,7 @@ jobs:
 
   # Preview changes for pull requests
   preview:
-    name: Preview - ${{ matrix.application }}
+    name: Preview / ${{ matrix.application }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
@@ -578,7 +578,7 @@ jobs:
 
   # Deploy to ArgoCD (main branch only)
   deploy:
-    name: Deploy - ${{ matrix.application }}
+    name: Deploy / ${{ matrix.application }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
