@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.6](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.5...gitops-deploy-source-v1.0.6) (2026-05-06)
+
+
+### Bug Fixes
+
+* **gitops-deploy:** define YAML anchors inline to avoid schema rejection ([#392](https://github.com/abinnovision/actions/issues/392)) ([308ae72](https://github.com/abinnovision/actions/commit/308ae723463506c0688b5303866113a6ccca0156))
+
 ## [1.0.5](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.4...gitops-deploy-source-v1.0.5) (2026-05-06)
 
 
