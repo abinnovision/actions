@@ -141,8 +141,8 @@ on:
 
 jobs:
   # Configure the workflow and discover applications
-  configure:
-    name: Configure
+  check:
+    name: Check
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -287,12 +287,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
-      - configure
-    if: needs.configure.outputs.is-pr == 'true' && needs.configure.outputs.has-argocd-applications == 'true'
+      - check
+    if: needs.check.outputs.is-pr == 'true' && needs.check.outputs.has-argocd-applications == 'true'
     strategy:
       fail-fast: false
       matrix:
-        application: ${{ fromJSON(needs.configure.outputs.argocd-applications) }}
+        application: ${{ fromJSON(needs.check.outputs.argocd-applications) }}
     permissions:
       contents: read
       id-token: write
@@ -301,7 +301,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.configure.outputs.commit-sha }}
+          ref: ${{ needs.check.outputs.commit-sha }}
 
       - name: Setup k8s tools
         uses: abinnovision/actions@setup-k8s-tools-dev
@@ -576,12 +576,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
-      - configure
-    if: needs.configure.outputs.is-main-push == 'true' && needs.configure.outputs.has-argocd-applications == 'true'
+      - check
+    if: needs.check.outputs.is-main-push == 'true' && needs.check.outputs.has-argocd-applications == 'true'
     strategy:
       fail-fast: false
       matrix:
-        application: ${{ fromJSON(needs.configure.outputs.argocd-applications) }}
+        application: ${{ fromJSON(needs.check.outputs.argocd-applications) }}
     concurrency:
       group: deploy-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: false
@@ -593,7 +593,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.configure.outputs.commit-sha }}
+          ref: ${{ needs.check.outputs.commit-sha }}
 
       - name: Setup k8s tools
         uses: abinnovision/actions@setup-k8s-tools-dev
@@ -749,33 +749,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs:
-      - configure
+      - check
       - preview
       - deploy
     if: always()
     steps:
       - name: Evaluate workflow status
         run: |
-          configure_result="${{ needs.configure.result }}"
+          check_result="${{ needs.check.result }}"
           preview_result="${{ needs.preview.result }}"
           deploy_result="${{ needs.deploy.result }}"
 
           overall_success=true
 
-          # Configure job (app discovery + code checks) must succeed
-          if [[ "$configure_result" == "failure" ]]; then
-            echo "::error::Configure failed (app discovery or code checks)"
+          # Check job (app discovery + code checks) must succeed
+          if [[ "$check_result" == "failure" ]]; then
+            echo "::error::Check failed (app discovery or code checks)"
             overall_success=false
           fi
 
           # For PRs, preview failures are critical
-          if [[ "${{ needs.configure.outputs.is-pr }}" == "true" && "$preview_result" == "failure" ]]; then
+          if [[ "${{ needs.check.outputs.is-pr }}" == "true" && "$preview_result" == "failure" ]]; then
             echo "::error::Preview failed on PR"
             overall_success=false
           fi
 
           # For main branch, deployment must succeed
-          if [[ "${{ needs.configure.outputs.is-main-push }}" == "true" && "$deploy_result" == "failure" ]]; then
+          if [[ "${{ needs.check.outputs.is-main-push }}" == "true" && "$deploy_result" == "failure" ]]; then
             echo "::error::Deployment failed on main branch"
             overall_success=false
           fi
