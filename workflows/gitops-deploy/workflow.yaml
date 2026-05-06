@@ -393,7 +393,6 @@ jobs:
           # Wait for validations
           [[ -n "${KUBECONFORM_PID:-}" ]] && wait $KUBECONFORM_PID
           [[ -n "${KUBE_SCORE_PID:-}" ]] && wait $KUBE_SCORE_PID
-          sleep 1  # Ensure status files are written
 
           # Evaluate results
           if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
@@ -677,7 +676,6 @@ jobs:
 
           [[ -n "${KUBECONFORM_PID:-}" ]] && wait $KUBECONFORM_PID
           [[ -n "${KUBE_SCORE_PID:-}" ]] && wait $KUBE_SCORE_PID
-          sleep 1
 
           if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
             kubeconform_status=$(cat "$manifests_dir/.kubeconform-status" 2>/dev/null || echo "KUBECONFORM_FAILED")
