@@ -139,6 +139,179 @@ on:
 
     outputs: {}
 
+.anchors:
+  validate-application: &validate-application
+    name: Validate application
+    id: validate
+    run: |
+      set -euo pipefail
+
+      application="${{ matrix.application }}"
+      working_dir="${{ inputs.applications-directory }}"
+      app_path="$working_dir/$application"
+
+      echo "::group::Validating application: $application"
+
+      # Validate directory exists
+      if [[ ! -d "$app_path" ]]; then
+        echo "::error::Application directory not found: $app_path"
+        exit 1
+      fi
+
+      # Create temporary directory and build manifests
+      manifests_dir=$(mktemp -d)
+      echo "MANIFESTS_DIR=$manifests_dir" >> $GITHUB_ENV
+      echo "manifests_path=$manifests_dir/manifests.yaml" >> $GITHUB_OUTPUT
+
+      kustomize build \
+        --load-restrictor LoadRestrictionsNone \
+        --enable-helm \
+        -o "$manifests_dir/manifests.yaml" \
+        "$app_path"
+
+      # Run validations in parallel
+      validation_failed=0
+
+      # kubeconform (critical)
+      if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+        (
+          echo "=== kubeconform validation ===" > "$manifests_dir/__kubeconform.log"
+
+          # Build schema location args
+          schema_args=""
+          while IFS= read -r location; do
+            [[ -z "$location" ]] && continue
+            schema_args="$schema_args -schema-location $location"
+          done <<< "${{ inputs.kubeconform-schema-locations }}"
+
+          if kubeconform -strict $schema_args -summary "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kubeconform.log" 2>&1; then
+            echo "KUBECONFORM_SUCCESS" > "$manifests_dir/.kubeconform-status"
+          else
+            echo "KUBECONFORM_FAILED" > "$manifests_dir/.kubeconform-status"
+          fi
+        ) &
+        KUBECONFORM_PID=$!
+      fi
+
+      # kube-score (warnings only)
+      if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+        (
+          echo "=== kube-score validation ===" > "$manifests_dir/__kube-score.log"
+          if kube-score score "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kube-score.log" 2>&1; then
+            echo "KUBE_SCORE_SUCCESS" > "$manifests_dir/.kube-score-status"
+          else
+            echo "KUBE_SCORE_FAILED" > "$manifests_dir/.kube-score-status"
+          fi
+        ) &
+        KUBE_SCORE_PID=$!
+      fi
+
+      # Wait for validations
+      [[ -n "${KUBECONFORM_PID:-}" ]] && wait $KUBECONFORM_PID
+      [[ -n "${KUBE_SCORE_PID:-}" ]] && wait $KUBE_SCORE_PID
+
+      # Evaluate results
+      if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+        if [[ -f "$manifests_dir/.kubeconform-status" ]]; then
+          kubeconform_status=$(cat "$manifests_dir/.kubeconform-status")
+        else
+          echo "::error::kubeconform status file not found"
+          kubeconform_status="KUBECONFORM_FAILED"
+        fi
+
+        if [[ "$kubeconform_status" == "KUBECONFORM_FAILED" ]]; then
+          echo "::error::kubeconform validation failed - this is critical"
+          cat "$manifests_dir/__kubeconform.log"
+          validation_failed=1
+        else
+          echo "kubeconform validation passed"
+        fi
+      fi
+
+      if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+        if [[ -f "$manifests_dir/.kube-score-status" ]]; then
+          kube_score_status=$(cat "$manifests_dir/.kube-score-status")
+        else
+          kube_score_status="KUBE_SCORE_FAILED"
+        fi
+
+        if [[ "$kube_score_status" == "KUBE_SCORE_FAILED" ]]; then
+          echo "::warning::kube-score validation failed"
+          cat "$manifests_dir/__kube-score.log" || true
+          echo "::notice::kube-score failures won't block deployment"
+        else
+          echo "kube-score validation passed"
+        fi
+      fi
+
+      if [[ $validation_failed -eq 1 ]]; then
+        echo "validation_status=failure" >> $GITHUB_OUTPUT
+        exit 1
+      else
+        echo "validation_status=success" >> $GITHUB_OUTPUT
+      fi
+
+      echo "::endgroup::"
+
+  auth-dex: &auth-dex
+    name: Authenticate with ArgoCD (DEX)
+    if: inputs.auth-method == 'dex'
+    id: auth-dex
+    run: |
+      set -euo pipefail
+
+      # Get GitHub OIDC token
+      ID_TOKEN=$(curl -s \
+        -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=core-argocd-github-actions" \
+        | jq -r ".value")
+
+      if [[ -z "$ID_TOKEN" || "$ID_TOKEN" == "null" ]]; then
+        echo "::error::Failed to get GitHub OIDC token"
+        exit 1
+      fi
+
+      echo "::add-mask::$ID_TOKEN"
+
+      # Exchange with DEX
+      DEX_TOKEN_RESPONSE=$(curl -s \
+        ${{ secrets.DEX_ENDPOINT }}/token \
+        --user "${{ secrets.DEX_GITHUB_ACTIONS_CLIENT }}" \
+        --data-urlencode "connector_id=${{ secrets.DEX_GITHUB_ACTIONS_CONNECTOR }}" \
+        --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+        --data-urlencode "scope=openid profile groups" \
+        --data-urlencode "requested_token_type=urn:ietf:params:oauth:token-type:id_token" \
+        --data-urlencode "subject_token=$ID_TOKEN" \
+        --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:id_token")
+
+      DEX_TOKEN=$(jq -r .access_token <<< "$DEX_TOKEN_RESPONSE")
+
+      if [[ -z "$DEX_TOKEN" || "$DEX_TOKEN" == "null" ]]; then
+        echo "::error::Failed to exchange token with DEX"
+        echo "Response: $DEX_TOKEN_RESPONSE"
+        exit 1
+      fi
+
+      echo "::add-mask::$DEX_TOKEN"
+
+      # Build CLI arguments
+      ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${DEX_TOKEN}"
+      echo "::add-mask::$ARGOCD_CLI_ARGS"
+
+      echo "argocd_cli_args=$ARGOCD_CLI_ARGS" >> $GITHUB_OUTPUT
+      echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
+
+  auth-token: &auth-token
+    name: Authenticate with ArgoCD (Token)
+    if: inputs.auth-method == 'token'
+    id: auth-token
+    run: |
+      ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${{ secrets.ARGOCD_TOKEN }}"
+      echo "::add-mask::$ARGOCD_CLI_ARGS"
+
+      echo "argocd_cli_args=$ARGOCD_CLI_ARGS" >> $GITHUB_OUTPUT
+      echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
+
 jobs:
   # Configure the workflow and discover applications
   configure:
@@ -312,117 +485,7 @@ jobs:
           argocd: latest
 
       # Validate application manifests
-      - name: Validate application
-        id: validate
-        run: |
-          set -euo pipefail
-
-          application="${{ matrix.application }}"
-          working_dir="${{ inputs.applications-directory }}"
-          app_path="$working_dir/$application"
-
-          echo "::group::Validating application: $application"
-
-          # Validate directory exists
-          if [[ ! -d "$app_path" ]]; then
-            echo "::error::Application directory not found: $app_path"
-            exit 1
-          fi
-
-          # Create temporary directory and build manifests
-          manifests_dir=$(mktemp -d)
-          echo "MANIFESTS_DIR=$manifests_dir" >> $GITHUB_ENV
-          echo "manifests_path=$manifests_dir/manifests.yaml" >> $GITHUB_OUTPUT
-
-          kustomize build \
-            --load-restrictor LoadRestrictionsNone \
-            --enable-helm \
-            -o "$manifests_dir/manifests.yaml" \
-            "$app_path"
-
-          # Run validations in parallel
-          validation_failed=0
-
-          # kubeconform (critical)
-          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
-            (
-              echo "=== kubeconform validation ===" > "$manifests_dir/__kubeconform.log"
-
-              # Build schema location args
-              schema_args=""
-              while IFS= read -r location; do
-                [[ -z "$location" ]] && continue
-                schema_args="$schema_args -schema-location $location"
-              done <<< "${{ inputs.kubeconform-schema-locations }}"
-
-              if kubeconform -strict $schema_args -summary "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kubeconform.log" 2>&1; then
-                echo "KUBECONFORM_SUCCESS" > "$manifests_dir/.kubeconform-status"
-              else
-                echo "KUBECONFORM_FAILED" > "$manifests_dir/.kubeconform-status"
-              fi
-            ) &
-            KUBECONFORM_PID=$!
-          fi
-
-          # kube-score (warnings only)
-          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
-            (
-              echo "=== kube-score validation ===" > "$manifests_dir/__kube-score.log"
-              if kube-score score "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kube-score.log" 2>&1; then
-                echo "KUBE_SCORE_SUCCESS" > "$manifests_dir/.kube-score-status"
-              else
-                echo "KUBE_SCORE_FAILED" > "$manifests_dir/.kube-score-status"
-              fi
-            ) &
-            KUBE_SCORE_PID=$!
-          fi
-
-          # Wait for validations
-          [[ -n "${KUBECONFORM_PID:-}" ]] && wait $KUBECONFORM_PID
-          [[ -n "${KUBE_SCORE_PID:-}" ]] && wait $KUBE_SCORE_PID
-
-          # Evaluate results
-          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
-            if [[ -f "$manifests_dir/.kubeconform-status" ]]; then
-              kubeconform_status=$(cat "$manifests_dir/.kubeconform-status")
-            else
-              echo "::error::kubeconform status file not found"
-              kubeconform_status="KUBECONFORM_FAILED"
-            fi
-
-            if [[ "$kubeconform_status" == "KUBECONFORM_FAILED" ]]; then
-              echo "::error::kubeconform validation failed - this is critical"
-              cat "$manifests_dir/__kubeconform.log"
-              validation_failed=1
-            else
-              echo "kubeconform validation passed"
-            fi
-          fi
-
-          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
-            if [[ -f "$manifests_dir/.kube-score-status" ]]; then
-              kube_score_status=$(cat "$manifests_dir/.kube-score-status")
-            else
-              kube_score_status="KUBE_SCORE_FAILED"
-            fi
-
-            if [[ "$kube_score_status" == "KUBE_SCORE_FAILED" ]]; then
-              echo "::warning::kube-score validation failed"
-              cat "$manifests_dir/__kube-score.log" || true
-              echo "::notice::kube-score failures won't block deployment"
-            else
-              echo "kube-score validation passed"
-            fi
-          fi
-
-          if [[ $validation_failed -eq 1 ]]; then
-            echo "validation_status=failure" >> $GITHUB_OUTPUT
-            exit 1
-          else
-            echo "validation_status=success" >> $GITHUB_OUTPUT
-          fi
-
-          echo "::endgroup::"
+      - *validate-application
 
       - name: Upload validation artifacts
         uses: actions/upload-artifact@v7
@@ -454,62 +517,8 @@ jobs:
           echo "application_name=$argocd_app" >> $GITHUB_OUTPUT
           echo "ArgoCD application: $argocd_app"
 
-      - name: Authenticate with ArgoCD (DEX)
-        if: inputs.auth-method == 'dex'
-        id: auth-dex
-        run: |
-          set -euo pipefail
-
-          # Get GitHub OIDC token
-          ID_TOKEN=$(curl -s \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=core-argocd-github-actions" \
-            | jq -r ".value")
-
-          if [[ -z "$ID_TOKEN" || "$ID_TOKEN" == "null" ]]; then
-            echo "::error::Failed to get GitHub OIDC token"
-            exit 1
-          fi
-
-          echo "::add-mask::$ID_TOKEN"
-
-          # Exchange with DEX
-          DEX_TOKEN_RESPONSE=$(curl -s \
-            ${{ secrets.DEX_ENDPOINT }}/token \
-            --user "${{ secrets.DEX_GITHUB_ACTIONS_CLIENT }}" \
-            --data-urlencode "connector_id=${{ secrets.DEX_GITHUB_ACTIONS_CONNECTOR }}" \
-            --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
-            --data-urlencode "scope=openid profile groups" \
-            --data-urlencode "requested_token_type=urn:ietf:params:oauth:token-type:id_token" \
-            --data-urlencode "subject_token=$ID_TOKEN" \
-            --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:id_token")
-
-          DEX_TOKEN=$(jq -r .access_token <<< "$DEX_TOKEN_RESPONSE")
-
-          if [[ -z "$DEX_TOKEN" || "$DEX_TOKEN" == "null" ]]; then
-            echo "::error::Failed to exchange token with DEX"
-            echo "Response: $DEX_TOKEN_RESPONSE"
-            exit 1
-          fi
-
-          echo "::add-mask::$DEX_TOKEN"
-
-          # Build CLI arguments
-          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${DEX_TOKEN}"
-          echo "::add-mask::$ARGOCD_CLI_ARGS"
-
-          echo "argocd_cli_args=$ARGOCD_CLI_ARGS" >> $GITHUB_OUTPUT
-          echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
-
-      - name: Authenticate with ArgoCD (Token)
-        if: inputs.auth-method == 'token'
-        id: auth-token
-        run: |
-          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${{ secrets.ARGOCD_TOKEN }}"
-          echo "::add-mask::$ARGOCD_CLI_ARGS"
-
-          echo "argocd_cli_args=$ARGOCD_CLI_ARGS" >> $GITHUB_OUTPUT
-          echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
+      - *auth-dex
+      - *auth-token
 
       # Perform ArgoCD diff
       - name: Perform ArgoCD diff
@@ -601,94 +610,7 @@ jobs:
           argocd: latest
 
       # Validate application (same as preview)
-      - name: Validate application
-        id: validate
-        run: |
-          set -euo pipefail
-
-          application="${{ matrix.application }}"
-          working_dir="${{ inputs.applications-directory }}"
-          app_path="$working_dir/$application"
-
-          echo "::group::Validating application: $application"
-
-          if [[ ! -d "$app_path" ]]; then
-            echo "::error::Application directory not found: $app_path"
-            exit 1
-          fi
-
-          # Create temporary directory and build manifests
-          manifests_dir=$(mktemp -d)
-          echo "MANIFESTS_DIR=$manifests_dir" >> $GITHUB_ENV
-
-          kustomize build \
-            --load-restrictor LoadRestrictionsNone \
-            --enable-helm \
-            -o "$manifests_dir/manifests.yaml" \
-            "$app_path"
-
-          validation_failed=0
-
-          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
-            (
-              echo "=== kubeconform validation ===" > "$manifests_dir/__kubeconform.log"
-
-              schema_args=""
-              while IFS= read -r location; do
-                [[ -z "$location" ]] && continue
-                schema_args="$schema_args -schema-location $location"
-              done <<< "${{ inputs.kubeconform-schema-locations }}"
-
-              if kubeconform -strict $schema_args -summary "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kubeconform.log" 2>&1; then
-                echo "KUBECONFORM_SUCCESS" > "$manifests_dir/.kubeconform-status"
-              else
-                echo "KUBECONFORM_FAILED" > "$manifests_dir/.kubeconform-status"
-              fi
-            ) &
-            KUBECONFORM_PID=$!
-          fi
-
-          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
-            (
-              echo "=== kube-score validation ===" > "$manifests_dir/__kube-score.log"
-              if kube-score score "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kube-score.log" 2>&1; then
-                echo "KUBE_SCORE_SUCCESS" > "$manifests_dir/.kube-score-status"
-              else
-                echo "KUBE_SCORE_FAILED" > "$manifests_dir/.kube-score-status"
-              fi
-            ) &
-            KUBE_SCORE_PID=$!
-          fi
-
-          [[ -n "${KUBECONFORM_PID:-}" ]] && wait $KUBECONFORM_PID
-          [[ -n "${KUBE_SCORE_PID:-}" ]] && wait $KUBE_SCORE_PID
-
-          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
-            kubeconform_status=$(cat "$manifests_dir/.kubeconform-status" 2>/dev/null || echo "KUBECONFORM_FAILED")
-            if [[ "$kubeconform_status" == "KUBECONFORM_FAILED" ]]; then
-              echo "::error::kubeconform validation failed"
-              cat "$manifests_dir/__kubeconform.log"
-              validation_failed=1
-            else
-              echo "kubeconform validation passed"
-            fi
-          fi
-
-          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
-            kube_score_status=$(cat "$manifests_dir/.kube-score-status" 2>/dev/null || echo "KUBE_SCORE_FAILED")
-            if [[ "$kube_score_status" == "KUBE_SCORE_FAILED" ]]; then
-              echo "::warning::kube-score validation failed (won't block deployment)"
-              cat "$manifests_dir/__kube-score.log" || true
-            else
-              echo "kube-score validation passed"
-            fi
-          fi
-
-          if [[ $validation_failed -eq 1 ]]; then
-            exit 1
-          fi
-
-          echo "::endgroup::"
+      - *validate-application
 
       - name: Upload validation artifacts
         uses: actions/upload-artifact@v7
@@ -713,49 +635,15 @@ jobs:
           argocd_app=$(cat "$argocd_app_file" | head -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
           if [[ -z "$argocd_app" ]]; then
-            echo "::error::ArgoCD application name is empty"
+            echo "::error::ArgoCD application name is empty in $argocd_app_file"
             exit 1
           fi
 
           echo "application_name=$argocd_app" >> $GITHUB_OUTPUT
           echo "ArgoCD application: $argocd_app"
 
-      - name: Authenticate with ArgoCD (DEX)
-        if: inputs.auth-method == 'dex'
-        run: |
-          set -euo pipefail
-
-          ID_TOKEN=$(curl -s \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=core-argocd-github-actions" \
-            | jq -r ".value")
-
-          echo "::add-mask::$ID_TOKEN"
-
-          DEX_TOKEN_RESPONSE=$(curl -s \
-            ${{ secrets.DEX_ENDPOINT }}/token \
-            --user "${{ secrets.DEX_GITHUB_ACTIONS_CLIENT }}" \
-            --data-urlencode "connector_id=${{ secrets.DEX_GITHUB_ACTIONS_CONNECTOR }}" \
-            --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
-            --data-urlencode "scope=openid profile groups" \
-            --data-urlencode "requested_token_type=urn:ietf:params:oauth:token-type:id_token" \
-            --data-urlencode "subject_token=$ID_TOKEN" \
-            --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:id_token")
-
-          DEX_TOKEN=$(jq -r .access_token <<< "$DEX_TOKEN_RESPONSE")
-          echo "::add-mask::$DEX_TOKEN"
-
-          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${DEX_TOKEN}"
-          echo "::add-mask::$ARGOCD_CLI_ARGS"
-
-          echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
-
-      - name: Authenticate with ArgoCD (Token)
-        if: inputs.auth-method == 'token'
-        run: |
-          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${{ secrets.ARGOCD_TOKEN }}"
-          echo "::add-mask::$ARGOCD_CLI_ARGS"
-          echo "ARGOCD_CLI_ARGS=$ARGOCD_CLI_ARGS" >> $GITHUB_ENV
+      - *auth-dex
+      - *auth-token
 
       # Check sync status
       - name: Check sync status
