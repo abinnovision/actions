@@ -322,6 +322,7 @@ jobs:
           kustomize: latest
           kubeconform: ${{ inputs.enable-kubeconform && 'latest' || '' }}
           kube-score: ${{ inputs.enable-kube-score && 'latest' || '' }}
+          argocd: latest
 
       # Validate application manifests
       - name: Validate application
@@ -446,13 +447,6 @@ jobs:
             ${{ env.MANIFESTS_DIR }}/__kube-score.log
             ${{ env.MANIFESTS_DIR }}/__kubeconform.log
           retention-days: 7
-
-      # Setup ArgoCD authentication
-      - name: Setup ArgoCD CLI
-        run: |
-          # Install ArgoCD CLI
-          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-          chmod +x /usr/local/bin/argocd
 
       - name: Read ArgoCD application name
         id: argocd-app
@@ -619,6 +613,7 @@ jobs:
           kustomize: latest
           kubeconform: ${{ inputs.enable-kubeconform && 'latest' || '' }}
           kube-score: ${{ inputs.enable-kube-score && 'latest' || '' }}
+          argocd: latest
 
       # Validate application (same as preview)
       - name: Validate application
@@ -720,12 +715,6 @@ jobs:
             ${{ env.MANIFESTS_DIR }}/__kube-score.log
             ${{ env.MANIFESTS_DIR }}/__kubeconform.log
           retention-days: 7
-
-      # Setup ArgoCD
-      - name: Setup ArgoCD CLI
-        run: |
-          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-          chmod +x /usr/local/bin/argocd
 
       - name: Read ArgoCD application name
         id: argocd-app
