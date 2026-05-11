@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.3...run-release-please-source-v1.1.4) (2026-05-11)
+
+
+### Bug Fixes
+
+* **run-release-please:** skip stale PR branch versions in prerelease computation ([#400](https://github.com/abinnovision/actions/issues/400)) ([526e9b2](https://github.com/abinnovision/actions/commit/526e9b25860c295fa34a949e976593a86479ed9f))
+
 ## [1.1.3](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.2...run-release-please-source-v1.1.3) (2026-04-28)
 
 
