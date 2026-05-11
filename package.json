@@ -1,0 +1,51 @@
+{
+  "name": "run-release-please",
+  "version": "1.1.4",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "abi group GmbH",
+    "email": "info@abigroup.io",
+    "url": "https://abigroup.io/"
+  },
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE.md",
+    "action.yml"
+  ],
+  "scripts": {
+    "build": "ncc build src/index.ts",
+    "build:watch": "ncc build --watch src/index.ts",
+    "format:check": "prettier --check 'src/**/*.{ts,js}' '*.{md,json,json5,yaml,yml}'",
+    "format:fix": "prettier --write 'src/**/*.{ts,js}' '*.{md,json,json5,yaml,yml}'",
+    "lint:check": "eslint 'src/**/*.{ts,js}'",
+    "lint:fix": "eslint --fix 'src/**/*.{ts,js}'"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,js}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{md,json,json5,yaml,yml}": [
+      "prettier --write"
+    ]
+  },
+  "prettier": "@abinnovision/prettier-config",
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "release-please": "patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch",
+    "semver": "^7.8.0"
+  },
+  "devDependencies": {
+    "@abinnovision/eslint-config-base": "^3.4.0",
+    "@abinnovision/prettier-config": "^2.2.0",
+    "@types/semver": "^7.7.1",
+    "@vercel/ncc": "^0.38.4",
+    "eslint": "^10.2.1",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
+  }
+}
