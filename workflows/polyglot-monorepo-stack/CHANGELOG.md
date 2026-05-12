@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.2.0...polyglot-monorepo-stack-source-v1.3.0) (2026-05-12)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** add GitHub Pages deployment support ([#402](https://github.com/abinnovision/actions/issues/402)) ([0d05700](https://github.com/abinnovision/actions/commit/0d0570030111e5ecbf7a74ce3cb492c232e6cbc7))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.5...polyglot-monorepo-stack-source-v1.2.0) (2026-04-12)
 
 
