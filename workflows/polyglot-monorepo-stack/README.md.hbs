@@ -6,6 +6,7 @@ This workflow provides a complete CI/CD pipeline for polyglot monorepos, handlin
 - Dependency validation and build checks
 - Package publishing (for Node.js packages)
 - Image builds for deployable apps
+- GitHub Pages deployment for static apps
 
 ## Makefile Requirements
 
@@ -83,18 +84,21 @@ your-repo/
 │   │   └── package.json
 │   └── package-c/        # Go package (with package.json for monorepo integration)
 │       └── package.json
-└── apps/                 # Deployable applications (Docker images)
+└── apps/                 # Deployable applications
     ├── api/
     │   ├── package.json
-    │   └── Dockerfile    # Required for Docker build
-    └── worker/
-        ├── package.json
-        └── Dockerfile
+    │   └── Dockerfile    # Required for Docker image builds
+    ├── worker/
+    │   ├── package.json
+    │   └── Dockerfile
+    └── docs/             # Static app for GitHub Pages (no Dockerfile needed)
+        └── package.json  # Must declare publishConfig.platform: "gh-pages"
 ```
 
 **Validation Rules:**
 - **Packages**: Must contain a `package.json` file
-- **Apps**: Must contain both a `package.json` AND a `Dockerfile` to be considered valid for deployment
+- **Docker apps**: Must contain both a `package.json` AND a `Dockerfile`
+- **Pages apps**: Must contain a `package.json` with `"publishConfig": { "platform": "gh-pages" }` — no `Dockerfile` required
 - **Private packages**: Packages with `"private": true` in package.json will not be published
 
 ### Required Scripts
@@ -214,6 +218,50 @@ Node.js packages are published based on their `publishConfig` in `package.json`.
 - Only packages with `"language": "nodejs"` (or no language specified) are eligible for npm publishing
 - GitHub Package Registry (ghpr) requires a scoped package name (e.g., `@your-org/package-name`)
 - Both workflow-level inputs AND package-level `publishConfig` must be enabled for publishing to occur
+
+## GitHub Pages Deployment
+
+Static apps can be deployed to GitHub Pages on each release by declaring `"platform": "gh-pages"` in the app's `publishConfig`. This opt-in convention is consistent with the `publishConfig.language` pattern used for packages.
+
+**Constraints:**
+- **One per repository** — only one app may declare `platform: "gh-pages"`. The `configure` job fails immediately if multiple apps are detected, preventing ambiguous release tracking.
+- **Release-gated** — deploys only when the app is part of a release (same gate as Docker image builds). Every Pages URL always reflects a tagged version.
+- **`github-pages` environment required** — the repository must have a `github-pages` environment configured in Settings → Environments, and GitHub Pages must be enabled for the repo.
+
+### App Configuration
+
+```json
+{
+  "name": "@your-org/docs",
+  "version": "1.0.0",
+  "publishConfig": {
+    "platform": "gh-pages"
+  },
+  "scripts": {
+    "build": "vitepress build"
+  }
+}
+```
+
+The workflow runs `turbo build --filter=./apps/<app>` and copies the contents of the build output directory (default: `dist`) to the Pages artifact. Set `gh-pages-build-output` if your tool writes to a different directory.
+
+### Enabling in Your Workflow
+
+```yaml
+jobs:
+  polyglot-monorepo-stack:
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v1
+    secrets: inherit
+    with:
+      enable-gh-pages: true
+      # Optional: override if your build outputs to a different directory
+      gh-pages-build-output: out
+```
+
+### Repository Setup
+
+1. Go to **Settings → Pages** and set the source to **GitHub Actions**.
+2. Go to **Settings → Environments** and create an environment named **`github-pages`**.
 
 ## Docker Build Details
 

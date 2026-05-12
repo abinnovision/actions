@@ -203,6 +203,23 @@ on:
         description: |-
           Prerelease channel name (e.g., "beta", "canary", "rc").
           When set, computes prerelease versions and publishes with corresponding dist-tags.
+      enable-gh-pages:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Enable building and deploying static apps to GitHub Pages.
+          **Default:** `false`
+          **Requirements:** App must have `"publishConfig": { "platform": "gh-pages" }` in its `package.json`.
+          The `github-pages` environment must exist in the repository settings.
+      gh-pages-build-output:
+        type: string
+        required: false
+        default: "dist"
+        description: |-
+          Relative path within the app directory where the static build output is written.
+          **Default:** `dist`
+          **Example:** `dist`, `build`, `out`, `.next`
 
     outputs:
       versions:
@@ -228,6 +245,9 @@ jobs:
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
       test-types-for-matrix: ${{ steps.evaluate.outputs.test_types_for_matrix }}
+
+      # Apps available for GitHub Pages deployment.
+      gh-pages-apps-available: ${{ steps.evaluate.outputs.gh_pages_apps_available }}
     steps:
       # Resolve the commit SHA based on event type:
       # pull_request_target: PR head (event runs in base branch context)
@@ -288,6 +308,17 @@ jobs:
             fi
           done
 
+          # Collect gh-pages apps — apps with publishConfig.platform === "gh-pages"
+          gh_pages_apps=()
+          for app_dir in apps/*/; do
+            if [ -d "$app_dir" ] && [ -f "$app_dir/package.json" ]; then
+              platform=$(jq -r '.publishConfig.platform // ""' "$app_dir/package.json")
+              if [ "$platform" = "gh-pages" ]; then
+                gh_pages_apps+=("$(basename "$app_dir")")
+              fi
+            fi
+          done
+
           # Parse and validate test types
           test_types=()
           test_types_for_matrix=()
@@ -321,14 +352,25 @@ jobs:
           test_types_json=$(printf '%s\n' "${test_types[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
           test_types_matrix_json=$(printf '%s\n' "${test_types_for_matrix[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
+          # Enforce at most one gh-pages app per repository
+          if [ "${#gh_pages_apps[@]}" -gt 1 ]; then
+            echo "::error::Multiple gh-pages apps detected: ${gh_pages_apps[*]}"
+            echo "::error::Only one app with publishConfig.platform === \"gh-pages\" is allowed per repository."
+            exit 1
+          fi
+
+          gh_pages_apps_json=$(printf '%s\n' "${gh_pages_apps[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
           echo "apps_available=$apps_json" >> $GITHUB_OUTPUT
           echo "packages_available=$packages_json" >> $GITHUB_OUTPUT
+          echo "gh_pages_apps_available=$gh_pages_apps_json" >> $GITHUB_OUTPUT
           echo "test_types=$test_types_json" >> $GITHUB_OUTPUT
           echo "test_types_for_matrix=$test_types_matrix_json" >> $GITHUB_OUTPUT
 
           # Debug output
           echo "Found ${#apps[@]} apps: $apps_json"
           echo "Found ${#packages[@]} packages: $packages_json"
+          echo "Found ${#gh_pages_apps[@]} gh-pages apps: $gh_pages_apps_json"
           echo ""
           echo "All test types: $test_types_json"
           echo "Test types for matrix: $test_types_matrix_json"
@@ -417,13 +459,15 @@ jobs:
     name: Publish / Prepare
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [release]
+    needs: [configure, release]
     if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.versions != '{}'
     outputs:
       released-apps: ${{ steps.extract.outputs.released_apps }}
       has-released-apps: ${{ steps.extract.outputs.has_released_apps }}
       released-packages: ${{ steps.extract.outputs.released_packages }}
       has-released-packages: ${{ steps.extract.outputs.has_released_packages }}
+      released-gh-pages-apps: ${{ steps.extract.outputs.released_gh_pages_apps }}
+      has-released-gh-pages-apps: ${{ steps.extract.outputs.has_released_gh_pages_apps }}
     steps:
       - name: Extract released apps and packages
         id: extract
@@ -436,6 +480,16 @@ jobs:
           released_packages=$(echo "$VERSIONS" | jq -c '[to_entries[] | select(.key | startswith("packages/")) | {package: (.key | ltrimstr("packages/")), version: .value.version, packageVersion: .value.packageVersion, type: .value.type}]')
           echo "released_packages=$released_packages" >> $GITHUB_OUTPUT
           echo "has_released_packages=$(echo "$released_packages" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
+
+          GH_PAGES_APPS='${{ needs.configure.outputs.gh-pages-apps-available }}'
+          released_gh_pages_apps=$(echo "$VERSIONS" | jq --argjson pages "$GH_PAGES_APPS" -c \
+            '[to_entries[]
+              | select(.key | startswith("apps/"))
+              | {app: (.key | ltrimstr("apps/")), version: .value.version, packageVersion: .value.packageVersion, type: .value.type, sha: .value.sha}
+              | select(.app as $a | $pages | index($a) != null)
+            ]')
+          echo "released_gh_pages_apps=$released_gh_pages_apps" >> $GITHUB_OUTPUT
+          echo "has_released_gh_pages_apps=$(echo "$released_gh_pages_apps" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
 
   publish_packages:
     name: Publish / Packages
@@ -949,3 +1003,64 @@ jobs:
           workflow: ${{ inputs.gitops-workflow-file }}
           workflow-inputs: |
             {"application": "${{ steps.gitops-config.outputs.DEPLOY_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
+
+  # Build and deploy static apps to GitHub Pages.
+  # Apps must declare `"publishConfig": { "platform": "gh-pages" }` in their package.json to be included.
+  publish_gh_pages:
+    name: Publish / GitHub Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - configure
+      - publish_prepare
+    if: >-
+      always() && !cancelled() && !contains(needs.*.result, 'failure')
+      && inputs.enable-gh-pages
+      && needs.publish_prepare.outputs.has-released-gh-pages-apps == 'true'
+    permissions:
+      contents: read
+      id-token: write
+      pages: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: ${{ inputs.checkout-submodules }}
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+
+      - name: Setup Tools
+        uses: abinnovision/actions@setup-tools-dev
+
+      - name: Install dependencies
+        run: make install-immutable
+
+      - name: Build and assemble gh-pages apps
+        id: build
+        run: |
+          RELEASED_GH_PAGES='${{ needs.publish_prepare.outputs.released-gh-pages-apps }}'
+          APP=$(echo "$RELEASED_GH_PAGES" | jq -r '.[0].app')
+          mkdir -p _site
+
+          echo "Building gh-pages app: $APP"
+          yarn turbo build --filter="./apps/$APP"
+
+          APP_OUTPUT="apps/$APP/${{ inputs.gh-pages-build-output }}"
+          if [ ! -d "$APP_OUTPUT" ]; then
+            echo "::error::Build output not found at $APP_OUTPUT for app $APP"
+            exit 1
+          fi
+
+          cp -r "$APP_OUTPUT/." _site/
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
