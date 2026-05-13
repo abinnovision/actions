@@ -352,11 +352,15 @@ jobs:
           test_types_json=$(printf '%s\n' "${test_types[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
           test_types_matrix_json=$(printf '%s\n' "${test_types_for_matrix[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
-          # Enforce at most one gh-pages app per repository
+          # Enforce at most one gh-pages app per repository (only when the feature is enabled)
           if [ "${#gh_pages_apps[@]}" -gt 1 ]; then
-            echo "::error::Multiple gh-pages apps detected: ${gh_pages_apps[*]}"
-            echo "::error::Only one app with publishConfig.platform === \"gh-pages\" is allowed per repository."
-            exit 1
+            if [ "${{ inputs.enable-gh-pages }}" = "true" ]; then
+              echo "::error::Multiple gh-pages apps detected: ${gh_pages_apps[*]}"
+              echo "::error::Only one app with publishConfig.platform === \"gh-pages\" is allowed per repository."
+              exit 1
+            else
+              echo "::warning::Multiple gh-pages apps detected: ${gh_pages_apps[*]}. This would fail CI if enable-gh-pages is set to true."
+            fi
           fi
 
           gh_pages_apps_json=$(printf '%s\n' "${gh_pages_apps[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
@@ -460,7 +464,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     needs: [configure, release]
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.versions != '{}'
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.result == 'success' && needs.release.outputs.versions != '{}'
     outputs:
       released-apps: ${{ steps.extract.outputs.released_apps }}
       has-released-apps: ${{ steps.extract.outputs.has_released_apps }}
@@ -1017,6 +1021,9 @@ jobs:
       always() && !cancelled() && !contains(needs.*.result, 'failure')
       && inputs.enable-gh-pages
       && needs.publish_prepare.outputs.has-released-gh-pages-apps == 'true'
+    concurrency:
+      group: pages-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -1038,12 +1045,11 @@ jobs:
       - name: Install dependencies
         run: make install-immutable
 
-      - name: Build and assemble gh-pages apps
+      - name: Build gh-pages app
         id: build
         run: |
           RELEASED_GH_PAGES='${{ needs.publish_prepare.outputs.released-gh-pages-apps }}'
           APP=$(echo "$RELEASED_GH_PAGES" | jq -r '.[0].app')
-          mkdir -p _site
 
           echo "Building gh-pages app: $APP"
           yarn turbo build --filter="./apps/$APP"
@@ -1054,12 +1060,12 @@ jobs:
             exit 1
           fi
 
-          cp -r "$APP_OUTPUT/." _site/
+          echo "app_output=$APP_OUTPUT" >> $GITHUB_OUTPUT
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: ${{ steps.build.outputs.app_output }}
 
       - name: Deploy to GitHub Pages
         id: deployment
