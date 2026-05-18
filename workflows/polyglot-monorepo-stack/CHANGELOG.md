@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.3.0...polyglot-monorepo-stack-source-v1.4.0) (2026-05-18)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** publish npm packages with provenance attestations ([#404](https://github.com/abinnovision/actions/issues/404)) ([b1d0707](https://github.com/abinnovision/actions/commit/b1d0707d9fc87c1fef3d3bc7a52b4841a23fb099))
+
 ## [1.3.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.2.0...polyglot-monorepo-stack-source-v1.3.0) (2026-05-12)
 
 
