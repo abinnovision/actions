@@ -90,10 +90,20 @@ on:
         required: false
         default: false
         description: |-
-          Enable publishing packages to NPM registry with provenance.
+          Enable publishing packages to NPM registry.
           **Default:** `false`
-          **Authentication:** Uses GitHub OIDC (no token required).
-          **Requirements:** Package must be linked to this GitHub repository on npmjs.org.
+          **Authentication:** Uses GitHub OIDC via [npm Trusted Publishers](https://docs.npmjs.com/trusted-publishers); register this reusable workflow for the package on npmjs.com.
+          **Provenance:** Controlled by `enable-packages-registry-npm-provenance` (default `true`).
+          **Requirements:** Yarn ≥ 4.10.3 in the consumer's `packageManager` field for OIDC support.
+      enable-packages-registry-npm-provenance:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Generate npm provenance attestations when publishing to the NPM registry.
+          **Default:** `true`
+          **Requires:** `enable-packages-registry-npm: true`, a public package, and the job's `id-token: write` permission (already set).
+          Disable only if the package can't meet npm's provenance requirements.
       enable-packages-registry-ghpr:
         type: boolean
         required: false
@@ -610,7 +620,12 @@ jobs:
                 yarn config set npmRegistryServer "https://registry.npmjs.org"
               fi
 
-              (cd "$path" && yarn npm publish --access "$npm_access" $NPM_TAG) || echo "::warning::Failed to publish $package_name to NPM"
+              npm_publish_args=(--access "$npm_access")
+              if [[ "${{ inputs.enable-packages-registry-npm-provenance }}" == "true" ]]; then
+                npm_publish_args+=(--provenance)
+              fi
+
+              (cd "$path" && yarn npm publish "${npm_publish_args[@]}" $NPM_TAG) || echo "::warning::Failed to publish $package_name to NPM"
             else
               echo "Skipping NPM publish for $package_name"
             fi
