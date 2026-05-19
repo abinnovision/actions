@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.4.0...polyglot-monorepo-stack-source-v1.4.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **polyglot-monorepo-stack:** only deploy gh-pages on stable releases ([#407](https://github.com/abinnovision/actions/issues/407)) ([ad364d5](https://github.com/abinnovision/actions/commit/ad364d5dca773407bf690840ae74631c75e324c0))
+
 ## [1.4.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.3.0...polyglot-monorepo-stack-source-v1.4.0) (2026-05-18)
 
 
