@@ -4,6 +4,7 @@ import { GitHub, Manifest } from "release-please";
 import { parseConventionalCommits } from "release-please/commit";
 import { BranchName } from "release-please/util/branch-name";
 import { filterCommits } from "release-please/util/filter-commits";
+import semver from "semver";
 
 import type { CreatedRelease, Strategy } from "release-please";
 
@@ -299,9 +300,17 @@ const fetchChangedManifestEntries = async (options: {
 			core.info(`  Found manifest on branch: ${branch}`);
 			for (const [path, version] of Object.entries(branchManifest)) {
 				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-				if (currentVersions[path]?.toString() !== version) {
-					changed[path] = version;
+				const current = currentVersions[path]?.toString();
+				if (!current || current === version) {
+					continue;
 				}
+				// Skip stale versions: a PR branch created before recent releases will
+				// carry an old snapshot of paths it doesn't own. Only accept versions
+				// that are strictly newer than what is currently released.
+				if (!semver.gt(version, current)) {
+					continue;
+				}
+				changed[path] = version;
 			}
 		} else {
 			core.info(`  No manifest on branch: ${branch}`);

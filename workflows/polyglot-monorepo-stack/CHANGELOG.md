@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.4.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.4.0...polyglot-monorepo-stack-source-v1.4.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **polyglot-monorepo-stack:** only deploy gh-pages on stable releases ([#407](https://github.com/abinnovision/actions/issues/407)) ([ad364d5](https://github.com/abinnovision/actions/commit/ad364d5dca773407bf690840ae74631c75e324c0))
+
+## [1.4.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.3.0...polyglot-monorepo-stack-source-v1.4.0) (2026-05-18)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** publish npm packages with provenance attestations ([#404](https://github.com/abinnovision/actions/issues/404)) ([b1d0707](https://github.com/abinnovision/actions/commit/b1d0707d9fc87c1fef3d3bc7a52b4841a23fb099))
+
+## [1.3.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.2.0...polyglot-monorepo-stack-source-v1.3.0) (2026-05-12)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** add GitHub Pages deployment support ([#402](https://github.com/abinnovision/actions/issues/402)) ([0d05700](https://github.com/abinnovision/actions/commit/0d0570030111e5ecbf7a74ce3cb492c232e6cbc7))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.1.5...polyglot-monorepo-stack-source-v1.2.0) (2026-04-12)
 
 
