@@ -120,8 +120,8 @@ jobs:
         run: |
           set -e
 
-          # Initialize commit messages collection
-          MESSAGES=""
+          # Initialize structured image=tag tracking
+          UPDATES=""
 
           # Function to retrieve commit hashes unique to the target branch
           get_unique_commits() {
@@ -145,13 +145,15 @@ jobs:
               echo "Found commits to cherry-pick:"
               echo "$UNIQUE_COMMITS"
 
-              # Cherry-pick each unique commit and collect messages
+              # Cherry-pick each unique commit and extract image=tag pairs
+              PATTERN='fix\([^/]+/([^)]+)\): update image tag to "([^"]+)"'
               for commit in $UNIQUE_COMMITS; do
                 echo "Cherry-picking commit $commit..."
 
-                # Collect commit message
                 msg=$(git log -1 --pretty=format:"%s" "$commit")
-                MESSAGES="${MESSAGES}${msg}"$'\n'
+                if [[ "$msg" =~ $PATTERN ]]; then
+                  UPDATES="${UPDATES}${BASH_REMATCH[1]}=${BASH_REMATCH[2]}"$'\n'
+                fi
 
                 if ! git cherry-pick "$commit"; then
                   echo "::warning::Cherry-pick failed for commit $commit, attempting to continue"
@@ -164,9 +166,9 @@ jobs:
             echo "Branch '$BRANCH_TARGET' does not exist. Starting fresh."
           fi
 
-          # Store collected commit messages for later steps
-          echo "COMMIT_MESSAGES<<EOF" >> "$GITHUB_ENV"
-          echo "$MESSAGES" >> "$GITHUB_ENV"
+          # Store structured updates for later steps
+          echo "UPDATES<<EOF" >> "$GITHUB_ENV"
+          echo "$UPDATES" >> "$GITHUB_ENV"
           echo "EOF" >> "$GITHUB_ENV"
 
       - name: Setup Node
@@ -177,7 +179,7 @@ jobs:
         with:
           kustomize: latest
 
-      - name: Validate application directory
+      - name: Validate application
         run: |
           app_dir="${{ inputs.applications-directory }}/${{ inputs.application }}"
 
@@ -195,14 +197,10 @@ jobs:
 
           echo "Application directory validated: $app_dir"
 
-      - name: Validate image name
-        working-directory: ${{ inputs.applications-directory }}/${{ inputs.application }}
-        run: |
-          # Check if the image exists in kustomization.yaml
-          if ! yq eval '.images[] | select(.name == "${{ inputs.image }}")' kustomization.yaml | grep -q .; then
+          if ! yq eval '.images[] | select(.name == "${{ inputs.image }}")' "$app_dir/kustomization.yaml" | grep -q .; then
             echo "::error::Image '${{ inputs.image }}' not found in kustomization.yaml"
             echo "::error::Available images:"
-            yq eval '.images[].name' kustomization.yaml || echo "  (none)"
+            yq eval '.images[].name' "$app_dir/kustomization.yaml" || echo "  (none)"
             exit 1
           fi
 
@@ -224,42 +222,28 @@ jobs:
 
       - name: Build commit message
         run: |
-          # Build commit message for current change
           COMMIT_MESSAGE='fix(${{ inputs.application }}/${{ inputs.image }}): update image tag to "${{ inputs.tag }}"'
-
           echo "COMMIT_MESSAGE=${COMMIT_MESSAGE}" >> "$GITHUB_ENV"
 
-          # Append to collected commit messages
-          echo "COMMIT_MESSAGES<<EOF" >> "$GITHUB_ENV"
-          echo "${COMMIT_MESSAGES}${COMMIT_MESSAGE}" >> "$GITHUB_ENV"
+          # Append current image=tag and deduplicate (last occurrence wins per image)
+          ALL_UPDATES="${UPDATES}${{ inputs.image }}=${{ inputs.tag }}"$'\n'
+          DEDUPED=$(echo "$ALL_UPDATES" | tac | awk -F= '!seen[$1]++' | tac)
+
+          echo "UPDATES<<EOF" >> "$GITHUB_ENV"
+          echo "$DEDUPED" >> "$GITHUB_ENV"
           echo "EOF" >> "$GITHUB_ENV"
 
       - name: Build PR description
         run: |
-          set -e
-
           CHANGES_LIST=""
 
-          # Parse all commit messages (including current change)
-          while IFS= read -r msg; do
-            if [[ -z "$msg" ]]; then
+          while IFS='=' read -r image tag; do
+            if [[ -z "$image" ]]; then
               continue
             fi
+            CHANGES_LIST="${CHANGES_LIST}- \`${image}\` -> \`${tag}\`"$'\n'
+          done <<< "$UPDATES"
 
-            # Extract image and tag from commit message
-            # Format: fix(<app>/<image>): update image tag to "<tag>"
-            PATTERN='fix\([^/]+/([^)]+)\):\ update\ image\ tag\ to\ \"([^\"]+)\"'
-            if [[ "$msg" =~ $PATTERN ]]; then
-              image="${BASH_REMATCH[1]}"
-              tag="${BASH_REMATCH[2]}"
-              CHANGES_LIST="${CHANGES_LIST}- \`${image}\` -> \`${tag}\`"$'\n'
-            fi
-          done <<< "$COMMIT_MESSAGES"
-
-          # Remove duplicate entries (keep last occurrence of each image)
-          CHANGES_LIST=$(echo "$CHANGES_LIST" | tac | awk -F'`' '!seen[$2]++' | tac)
-
-          # Store in environment variable for PR body
           echo "PR_CHANGES<<EOF" >> "$GITHUB_ENV"
           echo "$CHANGES_LIST" >> "$GITHUB_ENV"
           echo "EOF" >> "$GITHUB_ENV"
@@ -277,8 +261,8 @@ jobs:
             exit 0
           fi
 
-          # Extract updated image names from PR_CHANGES (format: - `image` -> `tag`)
-          UPDATED_IMAGES=$(echo "$PR_CHANGES" | sed -n 's/^- `\([^`]*\)`.*/\1/p' | sort -u)
+          # Extract updated image names from structured UPDATES (format: image=tag)
+          UPDATED_IMAGES=$(echo "$UPDATES" | cut -d= -f1 | sort -u | grep -v '^$')
 
           echo "::group::Automerge check"
           echo "Required images: ${{ inputs.automerge-images }}"
