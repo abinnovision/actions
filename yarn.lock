@@ -393,17 +393,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/format@npm:20.5.0":
-  version: 20.5.0
-  resolution: "@commitlint/format@npm:20.5.0"
-  dependencies:
-    "@commitlint/types": "npm:^20.5.0"
-    picocolors: "npm:^1.1.1"
-  checksum: 10/16c462f5d9fe1e65fb0029f4b9d5d0fa389de16783d78be7984f54779ce3f1bb047c7e8c46a475b44f21db2f725eb4656c4599d6843679372ce1745944376696
-  languageName: node
-  linkType: hard
-
-"@commitlint/format@npm:^21.0.1":
+"@commitlint/format@npm:21.0.1, @commitlint/format@npm:^21.0.1":
   version: 21.0.1
   resolution: "@commitlint/format@npm:21.0.1"
   dependencies:
@@ -4143,7 +4133,7 @@ __metadata:
     "@actions/core": "npm:^3.0.1"
     "@actions/github": "npm:^9.1.1"
     "@commitlint/execute-rule": "npm:20.0.0"
-    "@commitlint/format": "npm:20.5.0"
+    "@commitlint/format": "npm:21.0.1"
     "@commitlint/lint": "npm:21.0.2"
     "@commitlint/types": "npm:^20.5.0"
     "@vercel/ncc": "npm:^0.38.4"
