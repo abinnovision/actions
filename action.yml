@@ -1,0 +1,39 @@
+name: Setup Kubernetes Tools
+author: "abi group GmbH"
+description: |
+  Installs kubernetes tooling (kube-score, kubeconform, kustomize, argocd) with
+  GitHub Actions tool caching. Pass 'latest' or a pinned version per tool;
+  omit or leave empty to skip a tool.
+inputs:
+  github-token:
+    description: "GitHub token for authenticated API and asset download requests."
+    required: true
+    default: ${{ github.token }}
+  kube-score:
+    description: 'Version to install ("latest" or e.g. "v1.18.0"). Empty = skip.'
+    required: false
+    default: ""
+  kubeconform:
+    description: 'Version to install ("latest" or e.g. "v0.6.4"). Empty = skip.'
+    required: false
+    default: ""
+  kustomize:
+    description: 'Version to install ("latest" or e.g. "v5.4.3"). Empty = skip.'
+    required: false
+    default: ""
+  argocd:
+    description: 'Version to install ("latest" or e.g. "v2.13.0"). Empty = skip.'
+    required: false
+    default: ""
+outputs:
+  kube-score-version:
+    description: "Resolved kube-score version installed (empty if skipped)."
+  kubeconform-version:
+    description: "Resolved kubeconform version installed (empty if skipped)."
+  kustomize-version:
+    description: "Resolved kustomize version installed (empty if skipped)."
+  argocd-version:
+    description: "Resolved argocd version installed (empty if skipped)."
+runs:
+  using: node24
+  main: dist/index.js
