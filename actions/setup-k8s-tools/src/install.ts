@@ -81,7 +81,9 @@ export const installTool = async (
 		return;
 	}
 
-	// Download, extract, populate both cache layers.
+	// Download and materialize into restorePath, then populate both cache layers.
+	// The actions cache derives its version from the saved paths, so save and
+	// restore MUST use the same path (restorePath) for restore to ever hit.
 	core.info(`Downloading ${config.name} ${version}`);
 	const downloaded = await tc.downloadTool(
 		downloadUrl,
@@ -89,38 +91,28 @@ export const installTool = async (
 		`Bearer ${ctx.token}`,
 	);
 
-	let extractedPath: string;
+	await fs.mkdir(restorePath, { recursive: true });
 	if (config.archiveType === "binary") {
 		const binName = platform === "windows" ? `${config.name}.exe` : config.name;
-		const binDir = path.join(
-			process.env["RUNNER_TEMP"] ?? os.tmpdir(),
-			"setup-k8s-tools",
-			config.name,
-			version,
-			"bin",
-		);
-		await fs.mkdir(binDir, { recursive: true });
-		const dest = path.join(binDir, binName);
+		const dest = path.join(restorePath, binName);
 		await fs.copyFile(downloaded, dest);
 		if (platform !== "windows") {
 			await fs.chmod(dest, 0o755);
 		}
-		extractedPath = binDir;
+	} else if (config.archiveType === "tar") {
+		await tc.extractTar(downloaded, restorePath);
 	} else {
-		extractedPath =
-			config.archiveType === "tar"
-				? await tc.extractTar(downloaded)
-				: await tc.extractZip(downloaded);
+		await tc.extractZip(downloaded, restorePath);
 	}
 
 	try {
-		await cache.saveCache([extractedPath], cacheKey);
+		await cache.saveCache([restorePath], cacheKey);
 	} catch (err) {
 		core.warning(
 			err instanceof Error ? err.message : "Failed to save to actions cache",
 		);
 	}
 
-	await activate(extractedPath);
+	await activate(restorePath);
 	core.info(`${config.name} ${version} installed`);
 };
