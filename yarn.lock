@@ -1713,7 +1713,7 @@ __metadata:
     js-yaml: "npm:^4.1.1"
     lint-staged: "npm:^17.0.7"
     prettier: "npm:^3.8.3"
-    sort-package-json: "npm:^3.6.1"
+    sort-package-json: "npm:^4.0.0"
     tablemark: "npm:^4.1.0"
     tsx: "npm:^4.21.0"
     turbo: "npm:^2.9.18"
@@ -4271,9 +4271,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sort-package-json@npm:^3.6.1":
-  version: 3.6.1
-  resolution: "sort-package-json@npm:3.6.1"
+"sort-package-json@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "sort-package-json@npm:4.0.0"
   dependencies:
     detect-indent: "npm:^7.0.2"
     detect-newline: "npm:^4.0.1"
@@ -4284,7 +4284,7 @@ __metadata:
     tinyglobby: "npm:^0.2.15"
   bin:
     sort-package-json: cli.js
-  checksum: 10/e4bcf8432b570143e94b6b302fc941fd0b564e8f9f423bc55ae469c81e6f84c35e456f024d8d186a2ec6ca120407444e6ceb5a5f0feb7c877c159ef716f651ed
+  checksum: 10/82c1fea3d4cfdc4cbba794fcff189e1f1b969840b4d6fe32b4b6e5442862882227e5ae9e285cc4436b0be5c9ad96c96d79b5c7d8d126eec5860ee9596f585fed
   languageName: node
   linkType: hard
 
