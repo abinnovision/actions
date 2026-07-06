@@ -46,7 +46,7 @@
 	"devDependencies": {
 		"@abinnovision/eslint-config-base": "^3.4.0",
 		"@abinnovision/prettier-config": "^2.2.0",
-		"@commitlint/types": "^20.5.0",
+		"@commitlint/types": "^21.2.0",
 		"@vercel/ncc": "^0.38.4",
 		"eslint": "^10.2.1",
 		"prettier": "^3.8.3",

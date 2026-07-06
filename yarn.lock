@@ -516,13 +516,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/types@npm:^21.0.1, @commitlint/types@npm:^21.1.0":
-  version: 21.1.0
-  resolution: "@commitlint/types@npm:21.1.0"
+"@commitlint/types@npm:^21.0.1, @commitlint/types@npm:^21.1.0, @commitlint/types@npm:^21.2.0":
+  version: 21.2.0
+  resolution: "@commitlint/types@npm:21.2.0"
   dependencies:
-    conventional-commits-parser: "npm:^6.3.0"
+    conventional-commits-parser: "npm:^7.0.0"
     picocolors: "npm:^1.1.1"
-  checksum: 10/f2ce1870beaaa2de74278ea7a526844623da4c6a7d12dd39a42a2eba451b9c85a397100908eb7f4746efa1e6748fd97fb705ce8dfb99f7ef52a464e70b2b07a9
+  checksum: 10/e5dff2c90290c53f6fd23e7f547fd7ee6e20880c40a4be4f5cdb36f31541aa15e7b9dc1337243cbeaed0a4dd17ba6c6b9f09d438f49c0cf8ea49078744ad634a
   languageName: node
   linkType: hard
 
@@ -1206,6 +1206,13 @@ __metadata:
   version: 1.2.0
   resolution: "@simple-libs/stream-utils@npm:1.2.0"
   checksum: 10/80a2602f0e96515cab1f4ab054dccd0ee570b0a0b1722189d29fe2625e96a63b83c87486259268101b8b15a77a129aaca22bf480cf111e0910650af0820d26ee
+  languageName: node
+  linkType: hard
+
+"@simple-libs/stream-utils@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@simple-libs/stream-utils@npm:2.0.0"
+  checksum: 10/012fddda038a0657e62ae2cbb4f89c9ac56d0d2c611b695695ddaabf70cfc9c5207e6b88a9cb3497b9ff05fc74fbe75296cb70f1d1cf9c015efff197b06ee481
   languageName: node
   linkType: hard
 
@@ -2159,6 +2166,18 @@ __metadata:
   bin:
     conventional-commits-parser: dist/cli/index.js
   checksum: 10/0caf5e3595cace090ab7724c1442de6b2e00d82faf90762331b5421cd8a056407f0ce99a6c4b4eb47833a26bd8ad25ac5a331e2ebbce2a819143450053ef6d0d
+  languageName: node
+  linkType: hard
+
+"conventional-commits-parser@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "conventional-commits-parser@npm:7.0.0"
+  dependencies:
+    "@simple-libs/stream-utils": "npm:^2.0.0"
+    meow: "npm:^14.0.0"
+  bin:
+    conventional-commits-parser: ./dist/cli/index.js
+  checksum: 10/a45a7f0ad640017748f828f0a376e5f452e9317b179c3b8c0d8c35e77df951268137dd26012643d457860bd9cf7b31a33c34f4bf00a04ca0478141ed108c18d6
   languageName: node
   linkType: hard
 
@@ -3473,6 +3492,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"meow@npm:^14.0.0":
+  version: 14.1.0
+  resolution: "meow@npm:14.1.0"
+  checksum: 10/c6a22b3912a6bc849dee0d6475cd8bb63b9307e26919ca3ace28dc1aaf3d30257071de32bba496f7b5eec3e62b03a6b7731e3d04d18efb3c3103b829aad52ca5
+  languageName: node
+  linkType: hard
+
 "meow@npm:^8.1.2":
   version: 8.1.2
   resolution: "meow@npm:8.1.2"
@@ -4115,7 +4141,7 @@ __metadata:
     "@commitlint/execute-rule": "npm:21.0.1"
     "@commitlint/format": "npm:21.0.1"
     "@commitlint/lint": "npm:21.1.0"
-    "@commitlint/types": "npm:^20.5.0"
+    "@commitlint/types": "npm:^21.2.0"
     "@vercel/ncc": "npm:^0.38.4"
     chalk: "npm:^5.6.2"
     conventional-changelog-conventionalcommits: "npm:9.3.1"
