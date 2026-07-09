@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.4...gitops-update-tags-source-v1.1.5) (2026-07-09)
+
+
+### Bug Fixes
+
+* **gitops-update-tags:** track updates as structured pairs and merge validation steps ([#414](https://github.com/abinnovision/actions/issues/414)) ([2cffa42](https://github.com/abinnovision/actions/commit/2cffa423e62d03639c3f2eff87b01ba2dcbc7723))
+
 ## [1.1.4](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.3...gitops-update-tags-source-v1.1.4) (2026-04-28)
 
 

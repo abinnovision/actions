@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.2.2...run-commitlint-source-v1.3.0) (2026-07-09)
+
+
+### Features
+
+* **run-commitlint:** lint pull request titles ([#435](https://github.com/abinnovision/actions/issues/435)) ([89c8b03](https://github.com/abinnovision/actions/commit/89c8b03141e2975d08e25d3adae40e7386698bb9))
+
+
+### Bug Fixes
+
+* **deps:** bump @commitlint/execute-rule from 20.0.0 to 21.0.1 ([#429](https://github.com/abinnovision/actions/issues/429)) ([8143ff2](https://github.com/abinnovision/actions/commit/8143ff2159175ab133089d7f43e70cf95c3b0caf))
+* **deps:** bump @commitlint/format from 20.5.0 to 21.0.1 ([#419](https://github.com/abinnovision/actions/issues/419)) ([0291241](https://github.com/abinnovision/actions/commit/0291241e24a07ead9fd41c72a5109bda4341d449))
+* **deps:** bump @commitlint/lint from 20.5.0 to 21.0.2 ([#411](https://github.com/abinnovision/actions/issues/411)) ([014b7ca](https://github.com/abinnovision/actions/commit/014b7ca2dc48668d509044010e92647f84ec9e10))
+* **deps:** bump @commitlint/lint from 21.0.2 to 21.1.0 ([#430](https://github.com/abinnovision/actions/issues/430)) ([2fab296](https://github.com/abinnovision/actions/commit/2fab296169526a957b12ea44bf132a54ce933c4e))
+* **deps:** bump @commitlint/lint from 21.1.0 to 21.2.0 ([#434](https://github.com/abinnovision/actions/issues/434)) ([db1aae6](https://github.com/abinnovision/actions/commit/db1aae6c770fac2c388bef3c34a5d73dceaeec81))
+
 ## [1.2.2](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.2.1...run-commitlint-source-v1.2.2) (2026-04-28)
 
 
