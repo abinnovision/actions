@@ -21,6 +21,7 @@ type OctokitType = ReturnType<typeof getOctokit>;
 interface CommitRange {
 	from?: string;
 	to: string;
+	pullRequestTitle?: string;
 }
 
 interface CommitInfo {
@@ -79,6 +80,7 @@ async function getCommitRange(octokit: OctokitType): Promise<CommitRange> {
 		return {
 			from: pullRequest.data.base.sha,
 			to: pullRequest.data.head.sha,
+			pullRequestTitle: pullRequest.data.title,
 		};
 	} else {
 		let fromSha: string | undefined;
@@ -155,6 +157,21 @@ async function fetchCommits(
 }
 
 /**
+ * Lints a single message (a commit message or a pull request title) against the given rules.
+ * @param message The message to lint.
+ * @param rules Rules to validate against.
+ */
+async function lintMessage(
+	message: string,
+	rules: QualifiedRules,
+): Promise<LintOutcome> {
+	return await lint(message, rules, {
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
+		parserOpts: (await createParserOpts())["parser"],
+	});
+}
+
+/**
  * Will validate the given commits based on the given rules.
  * @param rules Rules to validate against.
  * @param commits The commits to lint.
@@ -166,10 +183,7 @@ async function lintCommits(
 	return await Promise.all(
 		commits.map(async (commit) => ({
 			...commit,
-			result: await lint(commit.message, rules, {
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
-				parserOpts: (await createParserOpts())["parser"],
-			}),
+			result: await lintMessage(commit.message, rules),
 		})),
 	);
 }
@@ -183,6 +197,22 @@ function hasLintWarnings(results: CommitLintResult[]): boolean {
 
 function hasLintErrors(results: CommitLintResult[]): boolean {
 	return results.some((it) => !it.result.valid && it.result.errors.length > 0);
+}
+
+/**
+ * Will validate the given pull request title based on the given rules.
+ * @param rules Rules to validate against.
+ * @param title The pull request title to lint.
+ */
+async function lintPullRequestTitle(
+	rules: QualifiedRules,
+	title: string,
+): Promise<CommitLintResult> {
+	return {
+		sha: "PR title",
+		message: title,
+		result: await lintMessage(title, rules),
+	};
 }
 
 (async function () {
@@ -205,8 +235,26 @@ function hasLintErrors(results: CommitLintResult[]): boolean {
 		);
 	});
 
+	const rules = await resolveConfigRules();
+
 	// Lint all commits which have been fetched previously.
-	const result = await lintCommits(await resolveConfigRules(), commits);
+	const result = await lintCommits(rules, commits);
+
+	// Optionally also lint the pull request title, using the same rules.
+	const pullRequestTitle = range.pullRequestTitle;
+
+	if (
+		pullRequestTitle !== undefined &&
+		PULL_REQUEST_EVENT_NAMES.includes(context.eventName) &&
+		core.getBooleanInput("enable-pr-title-lint")
+	) {
+		core.info(`Pull request title to lint: ${pullRequestTitle}`);
+		result.push(await lintPullRequestTitle(rules, pullRequestTitle));
+	} else {
+		core.debug(
+			"Skipping pull request title lint (not a pull request event or disabled via input)",
+		);
+	}
 
 	if (hasLintErrors(result)) {
 		const output = format(
