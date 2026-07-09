@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/setup-k8s-tools-source-v1.1.0...setup-k8s-tools-source-v1.1.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* **deps:** bump @actions/cache from 6.0.0 to 6.1.0 ([#432](https://github.com/abinnovision/actions/issues/432)) ([3d6a204](https://github.com/abinnovision/actions/commit/3d6a2045ed95d79a74b7217b2f9953d79bb2e2dc))
+* **setup-k8s-tools:** use a stable cache path so restores hit across runs ([#428](https://github.com/abinnovision/actions/issues/428)) ([25fb28a](https://github.com/abinnovision/actions/commit/25fb28a05f8cd49a693f559f47c35386fe332278))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/setup-k8s-tools-source-v1.0.1...setup-k8s-tools-source-v1.1.0) (2026-05-06)
 
 
