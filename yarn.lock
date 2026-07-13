@@ -1680,14 +1680,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@vercel/ncc@npm:^0.38.4":
-  version: 0.38.4
-  resolution: "@vercel/ncc@npm:0.38.4"
+"@vercel/ncc@npm:^0.44.1":
+  version: 0.44.1
+  resolution: "@vercel/ncc@npm:0.44.1"
   dependencies:
     node-gyp: "npm:latest"
   bin:
     ncc: dist/ncc/cli.js
-  checksum: 10/06561fb3fd46c4db525ea1c9f39b7982e449e9a1995e94d8f5b876c939147c31dba0ca5ffaed4b30ebc6782ffbde531b3f01658996bdaaecb3928df5b1aec155
+  checksum: 10/c362588870220b6cb03ca3c773f51eaa2c75f16fe45d7c6e4ba5e83d88b0c13b1b33a5f80e3c64c973478d91a9ca153ced4efd2fe55b501889d54c1563b2eb4d
   languageName: node
   linkType: hard
 
@@ -4167,7 +4167,7 @@ __metadata:
     "@commitlint/format": "npm:21.0.1"
     "@commitlint/lint": "npm:21.2.0"
     "@commitlint/types": "npm:^21.2.0"
-    "@vercel/ncc": "npm:^0.38.4"
+    "@vercel/ncc": "npm:^0.44.1"
     chalk: "npm:^5.6.2"
     conventional-changelog-conventionalcommits: "npm:10.2.1"
     eslint: "npm:^10.2.1"
@@ -4185,7 +4185,7 @@ __metadata:
     "@actions/core": "npm:^3.0.1"
     "@actions/github": "npm:^9.1.1"
     "@types/semver": "npm:^7.7.1"
-    "@vercel/ncc": "npm:^0.38.4"
+    "@vercel/ncc": "npm:^0.44.1"
     eslint: "npm:^10.2.1"
     prettier: "npm:^3.8.3"
     release-please: "patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch"
@@ -4240,7 +4240,7 @@ __metadata:
     "@actions/core": "npm:^3.0.1"
     "@actions/github": "npm:^9.1.1"
     "@actions/tool-cache": "npm:^4.0.0"
-    "@vercel/ncc": "npm:^0.38.4"
+    "@vercel/ncc": "npm:^0.44.1"
     eslint: "npm:^10.2.1"
     prettier: "npm:^3.8.3"
     typescript: "npm:^6.0.3"
