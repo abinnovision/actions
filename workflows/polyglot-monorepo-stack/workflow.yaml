@@ -470,7 +470,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     needs: [configure, release]
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.outputs.versions != '{}'
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.result == 'success' && needs.release.outputs.versions != '{}'
     outputs:
       released-apps: ${{ steps.extract.outputs.released_apps }}
       has-released-apps: ${{ steps.extract.outputs.has_released_apps }}
