@@ -28,7 +28,7 @@ This action can be used with different version ranges. The following ranges are 
 
 | Input            | Description                                                                                  | Required | Default |
 | :--------------- | :------------------------------------------------------------------------------------------- | :------- | :------ |
-| `identification` | Identification value of the GitHub App. Secret: 'GH*APP_IDENTIFICATION*<UPPERCASE APP NAME>' | Yes      |         |
+| `identification` | Identification value of the GitHub App. Secret: 'GH_APP_IDENTIFICATION_<UPPERCASE APP NAME>' | Yes      |         |
 
 ## Outputs
 
