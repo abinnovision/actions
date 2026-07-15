@@ -1,0 +1,103 @@
+# Changelog
+
+## [1.3.1](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.3.0...run-commitlint-source-v1.3.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* **deps:** bump conventional-changelog-conventionalcommits from 9.3.1 to 10.2.1 ([#436](https://github.com/abinnovision/actions/issues/436)) ([81b24c2](https://github.com/abinnovision/actions/commit/81b24c22733ef653941a772d75d564dd5abbd277))
+
+## [1.3.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.2.2...run-commitlint-source-v1.3.0) (2026-07-09)
+
+
+### Features
+
+* **run-commitlint:** lint pull request titles ([#435](https://github.com/abinnovision/actions/issues/435)) ([89c8b03](https://github.com/abinnovision/actions/commit/89c8b03141e2975d08e25d3adae40e7386698bb9))
+
+
+### Bug Fixes
+
+* **deps:** bump @commitlint/execute-rule from 20.0.0 to 21.0.1 ([#429](https://github.com/abinnovision/actions/issues/429)) ([8143ff2](https://github.com/abinnovision/actions/commit/8143ff2159175ab133089d7f43e70cf95c3b0caf))
+* **deps:** bump @commitlint/format from 20.5.0 to 21.0.1 ([#419](https://github.com/abinnovision/actions/issues/419)) ([0291241](https://github.com/abinnovision/actions/commit/0291241e24a07ead9fd41c72a5109bda4341d449))
+* **deps:** bump @commitlint/lint from 20.5.0 to 21.0.2 ([#411](https://github.com/abinnovision/actions/issues/411)) ([014b7ca](https://github.com/abinnovision/actions/commit/014b7ca2dc48668d509044010e92647f84ec9e10))
+* **deps:** bump @commitlint/lint from 21.0.2 to 21.1.0 ([#430](https://github.com/abinnovision/actions/issues/430)) ([2fab296](https://github.com/abinnovision/actions/commit/2fab296169526a957b12ea44bf132a54ce933c4e))
+* **deps:** bump @commitlint/lint from 21.1.0 to 21.2.0 ([#434](https://github.com/abinnovision/actions/issues/434)) ([db1aae6](https://github.com/abinnovision/actions/commit/db1aae6c770fac2c388bef3c34a5d73dceaeec81))
+
+## [1.2.2](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.2.1...run-commitlint-source-v1.2.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* upgrade GitHub Action dependencies to latest versions ([#380](https://github.com/abinnovision/actions/issues/380)) ([a95663b](https://github.com/abinnovision/actions/commit/a95663bbd9220d7fd39e1914f81eb2c31680e113))
+
+## [1.2.1](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.2.0...run-commitlint-source-v1.2.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* upgrade GitHub actions to latest versions ([#365](https://github.com/abinnovision/actions/issues/365)) ([01d818a](https://github.com/abinnovision/actions/commit/01d818a9115747dbaf4e7b54fd3a3a64f94e1305))
+
+## [1.2.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.1.0...run-commitlint-source-v1.2.0) (2026-02-18)
+
+
+### Features
+
+* upgrade commitlint dependencies to latest versions ([#308](https://github.com/abinnovision/actions/issues/308)) ([d796e73](https://github.com/abinnovision/actions/commit/d796e73e1bdfaabaef33f9cddc63891f1e568d62))
+
+
+### Bug Fixes
+
+* add patch for commitlint dependency with legacy file resolution ([#312](https://github.com/abinnovision/actions/issues/312)) ([b3bc58b](https://github.com/abinnovision/actions/commit/b3bc58b73a26e3927d3688540234535ea1c52279))
+* align dependency resolution for conventional-changelog-angular ([#313](https://github.com/abinnovision/actions/issues/313)) ([5a61180](https://github.com/abinnovision/actions/commit/5a611808f8403dcb5144a8418ee189d90156bc10))
+* patch commitlint dependency for compatibility ([#311](https://github.com/abinnovision/actions/issues/311)) ([7d28098](https://github.com/abinnovision/actions/commit/7d28098f57aa8f4dc92842fb6038e447b987679c))
+
+## [1.1.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.5...run-commitlint-source-v1.1.0) (2025-10-22)
+
+
+### Features
+
+* update author and LICENSE files ([#255](https://github.com/abinnovision/actions/issues/255)) ([01ae229](https://github.com/abinnovision/actions/commit/01ae229ceab3629ecbc163e393d6135b5bb35de2))
+
+## [1.0.5](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.4...run-commitlint-source-v1.0.5) (2024-08-05)
+
+
+### Bug Fixes
+
+* migrate to esm ([#133](https://github.com/abinnovision/actions/issues/133)) ([8b76208](https://github.com/abinnovision/actions/commit/8b762088d98c5a0f24967dadf4d553c5f7230308))
+
+## [1.0.4](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.3...run-commitlint-source-v1.0.4) (2024-08-03)
+
+
+### Bug Fixes
+
+* upgrade for new version of commitlint api ([#131](https://github.com/abinnovision/actions/issues/131)) ([9455071](https://github.com/abinnovision/actions/commit/945507129969769d33191b6599cd34ed71e8e234))
+
+## [1.0.3](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.2...run-commitlint-source-v1.0.3) (2024-08-03)
+
+
+### Bug Fixes
+
+* patch external package to support ncc build ([#129](https://github.com/abinnovision/actions/issues/129)) ([43b550d](https://github.com/abinnovision/actions/commit/43b550d648b3eb36da06b3af277d84ff129991e2))
+
+## [1.0.2](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.1...run-commitlint-source-v1.0.2) (2024-08-03)
+
+
+### Bug Fixes
+
+* use default export of conventional-changelog-conventionalcommits ([#127](https://github.com/abinnovision/actions/issues/127)) ([0e9ccf7](https://github.com/abinnovision/actions/commit/0e9ccf7f11c40b79ba478b8d69248bf9ae4ea257))
+
+## [1.0.1](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.0.0...run-commitlint-source-v1.0.1) (2024-08-03)
+
+
+### Bug Fixes
+
+* bump commitlint config ([#125](https://github.com/abinnovision/actions/issues/125)) ([154c0d3](https://github.com/abinnovision/actions/commit/154c0d342cacbca318260cce79cc11fcbbb8ca01))
+
+## 1.0.0 (2023-11-09)
+
+
+### Bug Fixes
+
+* explicitly include parser preset ([80fb3ad](https://github.com/abinnovision/actions/commit/80fb3ad67d1b3c0868a2a5607d358d6f469817d4))
+* no use repo info from issue context ([8260743](https://github.com/abinnovision/actions/commit/8260743564af8bfe072829eefa21a5b6fd82c032))
+* rename 'packages' to 'actions' directory ([1b7df70](https://github.com/abinnovision/actions/commit/1b7df70789258cbd45420e9064022b93b8ef359d))
