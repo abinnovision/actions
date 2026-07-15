@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.3.0...run-commitlint-source-v1.3.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* **deps:** bump conventional-changelog-conventionalcommits from 9.3.1 to 10.2.1 ([#436](https://github.com/abinnovision/actions/issues/436)) ([81b24c2](https://github.com/abinnovision/actions/commit/81b24c22733ef653941a772d75d564dd5abbd277))
+
 ## [1.3.0](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.2.2...run-commitlint-source-v1.3.0) (2026-07-09)
 
 

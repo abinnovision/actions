@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.4.1...polyglot-monorepo-stack-source-v1.4.2) (2026-07-15)
+
+
+### Bug Fixes
+
+* **polyglot:** skip Publish / Prepare job on pull requests ([#441](https://github.com/abinnovision/actions/issues/441)) ([124a990](https://github.com/abinnovision/actions/commit/124a9902bb0aa257c18fcd33627b17e61cf355d5))
+
 ## [1.4.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.4.0...polyglot-monorepo-stack-source-v1.4.1) (2026-05-19)
 
 
