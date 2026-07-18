@@ -28,8 +28,8 @@
 		"prettier": "^3.9.5"
 	},
 	"actionDependencies": {
+		"exchange-github-token": "^1.0.0",
 		"release": "^2.0.0",
-		"run-workflow-dispatch": "^1.0.0",
 		"setup-gcp": "^1.0.0",
 		"setup-tools": "^1.0.0"
 	}

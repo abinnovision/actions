@@ -52,15 +52,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Setup GCP Authentication
-        uses: abinnovision/actions@setup-gcp-dev
-        with:
-          auth: ${{ inputs.gcp-auth }}
       - id: token
         name: Generate GitHub App token
-        uses: abinnovision/actions@get-github-app-token-dev
+        uses: abinnovision/actions@exchange-github-token-dev
         with:
-          identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
+          broker-url: ${{ secrets.GTB_URL }}
       - id: release
         name: Run release-please
         uses: abinnovision/actions@run-release-please-dev

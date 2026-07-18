@@ -4,7 +4,7 @@
 	"release-type": "node",
 	"tag-separator": "-source-",
 	"packages": {
-		"actions/get-github-app-token": {
+		"actions/exchange-github-token": {
 			"extra-files": ["README.md"]
 		},
 		"actions/run-commitlint": {
@@ -26,9 +26,6 @@
 			"extra-files": ["README.md"]
 		},
 		"actions/setup-tools": {
-			"extra-files": ["README.md"]
-		},
-		"actions/run-workflow-dispatch": {
 			"extra-files": ["README.md"]
 		},
 		"workflows/release": {

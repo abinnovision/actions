@@ -28,7 +28,7 @@
 		"prettier": "^3.9.5"
 	},
 	"actionDependencies": {
-		"get-github-app-token": "^1.0.0",
+		"exchange-github-token": "^1.0.0",
 		"setup-gcp": "^1.0.0",
 		"setup-k8s-tools": "^1.0.0",
 		"setup-node": "^1.0.0"
