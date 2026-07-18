@@ -1,4 +1,7 @@
-import { resolveLatestTagCached } from "@internal/action-tool-installer";
+import {
+	buildDownloadUrl,
+	resolveVersion,
+} from "@internal/action-tool-installer";
 
 import type {
 	OctokitType,
@@ -14,20 +17,19 @@ export const TOOLS: ToolConfig[] = [
 		name: "kube-score",
 		archiveType: "tar",
 		async resolve(input, { octokit, platform, arch }) {
-			const tag =
-				input === "latest"
-					? await resolveLatestTagCached(octokit, {
-							cacheId: "kube-score",
-							owner: "zegl",
-							repo: "kube-score",
-							namespace: "setup-k8s-tools",
-						})
-					: input;
+			const owner = "zegl";
+			const repo = "kube-score";
+			const version = await resolveVersion(octokit, input, { owner, repo });
 
-			const version = tag.replace(/^v/, "");
+			const tag = `v${version}`;
 			return {
-				version: tag,
-				downloadUrl: `https://github.com/zegl/kube-score/releases/download/${tag}/kube-score_${version}_${platform}_${arch}.tar.gz`,
+				version,
+				downloadUrl: buildDownloadUrl({
+					owner,
+					repo,
+					tag,
+					file: `kube-score_${version}_${platform}_${arch}.tar.gz`,
+				}),
 			};
 		},
 	},
@@ -35,19 +37,19 @@ export const TOOLS: ToolConfig[] = [
 		name: "kubeconform",
 		archiveType: "tar",
 		async resolve(input, { octokit, platform, arch }) {
-			const tag =
-				input === "latest"
-					? await resolveLatestTagCached(octokit, {
-							cacheId: "kubeconform",
-							owner: "yannh",
-							repo: "kubeconform",
-							namespace: "setup-k8s-tools",
-						})
-					: input;
+			const owner = "yannh";
+			const repo = "kubeconform";
+			const version = await resolveVersion(octokit, input, { owner, repo });
 
+			const tag = `v${version}`;
 			return {
-				version: tag,
-				downloadUrl: `https://github.com/yannh/kubeconform/releases/download/${tag}/kubeconform-${platform}-${arch}.tar.gz`,
+				version,
+				downloadUrl: buildDownloadUrl({
+					owner,
+					repo,
+					tag,
+					file: `kubeconform-${platform}-${arch}.tar.gz`,
+				}),
 			};
 		},
 	},
@@ -55,21 +57,24 @@ export const TOOLS: ToolConfig[] = [
 		name: "kustomize",
 		archiveType: "tar",
 		async resolve(input, { octokit, platform, arch }) {
-			const tag =
-				input === "latest"
-					? await resolveLatestTagCached(octokit, {
-							cacheId: "kustomize",
-							owner: "kubernetes-sigs",
-							repo: "kustomize",
-							namespace: "setup-k8s-tools",
-							tagFilter: (tag) => tag.startsWith("kustomize/v"),
-						})
-					: `kustomize/${input}`;
+			const owner = "kubernetes-sigs";
+			const repo = "kustomize";
+			const version = await resolveVersion(octokit, input, {
+				owner,
+				repo,
+				tagFilter: (tag) => tag.startsWith("kustomize/v"),
+				fromTag: (tag) => tag.replace(/^kustomize\/v/, ""),
+			});
 
-			const version = tag.replace("kustomize/", "");
+			const tag = `kustomize/v${version}`;
 			return {
 				version,
-				downloadUrl: `https://github.com/kubernetes-sigs/kustomize/releases/download/${encodeURIComponent(tag)}/kustomize_${version}_${platform}_${arch}.tar.gz`,
+				downloadUrl: buildDownloadUrl({
+					owner,
+					repo,
+					tag,
+					file: `kustomize_v${version}_${platform}_${arch}.tar.gz`,
+				}),
 			};
 		},
 	},
@@ -77,20 +82,20 @@ export const TOOLS: ToolConfig[] = [
 		name: "argocd",
 		archiveType: "binary",
 		async resolve(input, { octokit, platform, arch }) {
-			const tag =
-				input === "latest"
-					? await resolveLatestTagCached(octokit, {
-							cacheId: "argocd",
-							owner: "argoproj",
-							repo: "argo-cd",
-							namespace: "setup-k8s-tools",
-						})
-					: input;
+			const owner = "argoproj";
+			const repo = "argo-cd";
+			const version = await resolveVersion(octokit, input, { owner, repo });
 
+			const tag = `v${version}`;
 			const suffix = platform === "windows" ? ".exe" : "";
 			return {
-				version: tag,
-				downloadUrl: `https://github.com/argoproj/argo-cd/releases/download/${tag}/argocd-${platform}-${arch}${suffix}`,
+				version,
+				downloadUrl: buildDownloadUrl({
+					owner,
+					repo,
+					tag,
+					file: `argocd-${platform}-${arch}${suffix}`,
+				}),
 			};
 		},
 	},

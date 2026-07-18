@@ -10,19 +10,19 @@ inputs:
     required: true
     default: ${{ github.token }}
   kube-score:
-    description: 'Version to install ("latest" or e.g. "v1.18.0"). Empty = skip.'
+    description: 'Version to install ("latest" or e.g. "1.18.0"). Empty = skip.'
     required: false
     default: ""
   kubeconform:
-    description: 'Version to install ("latest" or e.g. "v0.6.4"). Empty = skip.'
+    description: 'Version to install ("latest" or e.g. "0.6.4"). Empty = skip.'
     required: false
     default: ""
   kustomize:
-    description: 'Version to install ("latest" or e.g. "v5.4.3"). Empty = skip.'
+    description: 'Version to install ("latest" or e.g. "5.4.3"). Empty = skip.'
     required: false
     default: ""
   argocd:
-    description: 'Version to install ("latest" or e.g. "v2.13.0"). Empty = skip.'
+    description: 'Version to install ("latest" or e.g. "2.13.0"). Empty = skip.'
     required: false
     default: ""
 outputs:
