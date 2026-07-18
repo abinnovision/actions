@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0](https://github.com/abinnovision/actions/compare/setup-k8s-tools-source-v1.1.1...setup-k8s-tools-source-v2.0.0) (2026-07-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* rework version resolution (bare semver, no cache) ([#448](https://github.com/abinnovision/actions/issues/448))
+
+### Features
+
+* **action-tool-installer:** shared binary-fetching package ([#444](https://github.com/abinnovision/actions/issues/444)) ([cb9b2e0](https://github.com/abinnovision/actions/commit/cb9b2e091bf04fd98bcd3b48c4282d4e454fb455))
+* rework version resolution (bare semver, no cache) ([#448](https://github.com/abinnovision/actions/issues/448)) ([b42f309](https://github.com/abinnovision/actions/commit/b42f309ac69be3f314a969bb7ee15a5355242c66))
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/setup-k8s-tools-source-v1.1.0...setup-k8s-tools-source-v1.1.1) (2026-07-09)
 
 
