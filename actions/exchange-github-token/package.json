@@ -24,6 +24,9 @@
 		]
 	},
 	"prettier": "@abinnovision/prettier-config",
+	"actionDependencies": {
+		"setup-oidc-token-cli": "^1.0.0"
+	},
 	"devDependencies": {
 		"@abinnovision/prettier-config": "^2.2.0",
 		"prettier": "^3.9.5"
