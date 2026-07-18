@@ -905,8 +905,10 @@ __metadata:
     "@actions/core": "npm:^3.0.1"
     "@actions/github": "npm:^9.1.1"
     "@actions/tool-cache": "npm:^4.0.0"
+    "@types/semver": "npm:^7.7.1"
     eslint: "npm:^10.7.0"
     prettier: "npm:^3.9.5"
+    semver: "npm:^7.8.5"
     typescript: "npm:^6.0.3"
   languageName: unknown
   linkType: soft
