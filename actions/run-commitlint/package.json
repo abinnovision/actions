@@ -34,22 +34,22 @@
 	},
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
-		"@abinnovision/commitlint-config": "^2.3.0",
+		"@abinnovision/commitlint-config": "^2.3.1",
 		"@actions/core": "^3.0.1",
 		"@actions/github": "^9.1.1",
 		"@commitlint/execute-rule": "21.0.1",
-		"@commitlint/format": "21.0.1",
+		"@commitlint/format": "21.2.0",
 		"@commitlint/lint": "21.2.0",
 		"chalk": "^5.6.2",
 		"conventional-changelog-conventionalcommits": "10.2.1"
 	},
 	"devDependencies": {
-		"@abinnovision/eslint-config-base": "^3.4.0",
+		"@abinnovision/eslint-config-base": "^3.4.2",
 		"@abinnovision/prettier-config": "^2.2.0",
 		"@commitlint/types": "^21.2.0",
 		"@vercel/ncc": "^0.44.1",
-		"eslint": "^10.2.1",
-		"prettier": "^3.8.3",
+		"eslint": "^10.7.0",
+		"prettier": "^3.9.5",
 		"typescript": "^6.0.3"
 	}
 }

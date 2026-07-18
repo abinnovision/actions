@@ -2,7 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import yaml from "js-yaml";
+import { load as loadYaml } from "js-yaml";
 import Handlebars from "handlebars";
 import { tablemark } from "tablemark";
 
@@ -314,7 +314,7 @@ function extractActionContext(
 ): ActionTemplateContext {
 	const yamlFile = path.join(basePath, "action.yml");
 	const yamlContent = fs.readFileSync(yamlFile, "utf8");
-	const yamlData = yaml.load(yamlContent) as ActionMetadata;
+	const yamlData = loadYaml(yamlContent) as ActionMetadata;
 
 	return {
 		type: "action",
@@ -335,7 +335,7 @@ function extractWorkflowContext(
 ): WorkflowTemplateContext {
 	const yamlFile = path.join(basePath, "workflow.yaml");
 	const yamlContent = fs.readFileSync(yamlFile, "utf8");
-	const yamlData = yaml.load(yamlContent) as WorkflowMetadata;
+	const yamlData = loadYaml(yamlContent) as WorkflowMetadata;
 
 	return {
 		type: "workflow",
