@@ -971,7 +971,7 @@ jobs:
         if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
         uses: abinnovision/actions@exchange-github-token-dev
         with:
-          broker-url: ${{ secrets.GH_TOKEN_BROKER_URL }}
+          broker-url: ${{ secrets.GTB_URL }}
           repositories: ${{ steps.gitops-config.outputs.TARGET_REPO }}
           scope: actions:write
 

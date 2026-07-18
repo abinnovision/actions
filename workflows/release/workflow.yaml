@@ -56,7 +56,7 @@ jobs:
         name: Generate GitHub App token
         uses: abinnovision/actions@exchange-github-token-dev
         with:
-          broker-url: ${{ secrets.GH_TOKEN_BROKER_URL }}
+          broker-url: ${{ secrets.GTB_URL }}
       - id: release
         name: Run release-please
         uses: abinnovision/actions@run-release-please-dev

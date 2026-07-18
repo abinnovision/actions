@@ -97,7 +97,7 @@ jobs:
         name: Generate GitHub App token
         uses: abinnovision/actions@exchange-github-token-dev
         with:
-          broker-url: ${{ secrets.GH_TOKEN_BROKER_URL }}
+          broker-url: ${{ secrets.GTB_URL }}
 
       - name: Checkout
         uses: actions/checkout@v6
