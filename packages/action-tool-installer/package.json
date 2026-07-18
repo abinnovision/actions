@@ -1,6 +1,7 @@
 {
-	"name": "setup-k8s-tools",
-	"version": "1.1.1",
+	"name": "@internal/action-tool-installer",
+	"version": "1.0.0",
+	"private": true,
 	"license": "Apache-2.0",
 	"author": {
 		"name": "abi group GmbH",
@@ -8,16 +9,19 @@
 		"url": "https://abigroup.io/"
 	},
 	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"files": [
-		"dist",
-		"README.md",
-		"CHANGELOG.md",
-		"LICENSE.md",
-		"action.yml"
+		"dist"
 	],
 	"scripts": {
-		"build": "ncc build src/main.ts",
-		"build:watch": "ncc build --watch src/main.ts",
+		"build": "tsc -p tsconfig.json",
 		"format:check": "prettier --check 'src/**/*.{ts,js}' '*.{md,json,json5,yaml,yml}'",
 		"format:fix": "prettier --write 'src/**/*.{ts,js}' '*.{md,json,json5,yaml,yml}'",
 		"lint:check": "eslint 'src/**/*.{ts,js}'",
@@ -34,14 +38,14 @@
 	},
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
+		"@actions/cache": "^6.1.0",
 		"@actions/core": "^3.0.1",
 		"@actions/github": "^9.1.1",
-		"@internal/action-tool-installer": "workspace:^"
+		"@actions/tool-cache": "^4.0.0"
 	},
 	"devDependencies": {
 		"@abinnovision/eslint-config-base": "^3.4.0",
 		"@abinnovision/prettier-config": "^2.2.0",
-		"@vercel/ncc": "^0.44.1",
 		"eslint": "^10.2.1",
 		"prettier": "^3.8.3",
 		"typescript": "^6.0.3"

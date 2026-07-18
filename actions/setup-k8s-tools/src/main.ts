@@ -1,7 +1,7 @@
 import * as core from "@actions/core";
 import { getOctokit } from "@actions/github";
+import { installTool } from "@internal/action-tool-installer";
 
-import { installTool } from "./install.js";
 import { TOOLS } from "./tools.js";
 
 (async () => {
@@ -11,7 +11,11 @@ import { TOOLS } from "./tools.js";
 	// Install all enabled tools.
 	await Promise.all(
 		TOOLS.map((tool) =>
-			installTool(tool, core.getInput(tool.name), { octokit, token }),
+			installTool(tool, core.getInput(tool.name), {
+				octokit,
+				token,
+				namespace: "setup-k8s-tools",
+			}),
 		),
 	);
 })().catch((error: unknown) => {

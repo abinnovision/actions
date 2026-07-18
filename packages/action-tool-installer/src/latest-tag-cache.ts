@@ -6,12 +6,11 @@ import * as path from "node:path";
 
 import type { OctokitType } from "./tools.js";
 
-const CACHE_KEY_PREFIX = "setup-k8s-tools-latest";
-
 interface ResolveLatestTagInput {
 	cacheId: string;
 	owner: string;
 	repo: string;
+	namespace: string;
 	tagFilter?: (tag: string) => boolean;
 }
 
@@ -36,10 +35,10 @@ const resolveLatestTagFresh = async (
 // UTC date bucket → cache rotates at most once per day.
 const computeBucket = (): string => new Date().toISOString().slice(0, 10);
 
-const buildCacheFilePath = (cacheId: string): string =>
+const buildCacheFilePath = (namespace: string, cacheId: string): string =>
 	path.join(
 		process.env["RUNNER_TEMP"] ?? os.tmpdir(),
-		"setup-k8s-tools",
+		namespace,
 		"latest",
 		`${cacheId}.json`,
 	);
@@ -49,9 +48,10 @@ const resolveLatestTagCached = async (
 	input: ResolveLatestTagInput,
 ): Promise<string> => {
 	const bucket = computeBucket();
-	const primaryKey = `${CACHE_KEY_PREFIX}-${input.cacheId}-${bucket}`;
-	const restorePrefix = `${CACHE_KEY_PREFIX}-${input.cacheId}-`;
-	const filePath = buildCacheFilePath(input.cacheId);
+	const cacheKeyPrefix = `${input.namespace}-latest`;
+	const primaryKey = `${cacheKeyPrefix}-${input.cacheId}-${bucket}`;
+	const restorePrefix = `${cacheKeyPrefix}-${input.cacheId}-`;
+	const filePath = buildCacheFilePath(input.namespace, input.cacheId);
 
 	await fs.mkdir(path.dirname(filePath), { recursive: true });
 
@@ -84,11 +84,17 @@ const resolveLatestTagCached = async (
 		);
 		await cache.saveCache([filePath], primaryKey);
 	} catch (err) {
-		core.warning(
-			err instanceof Error
-				? `Failed to save latest-tag cache for ${input.cacheId}: ${err.message}`
-				: `Failed to save latest-tag cache for ${input.cacheId}`,
-		);
+		if (err instanceof cache.CacheWriteDeniedError) {
+			core.info(
+				`Skipped caching latest tag for ${input.cacheId}: actions cache is read-only for this trigger`,
+			);
+		} else {
+			core.warning(
+				err instanceof Error
+					? `Failed to save latest-tag cache for ${input.cacheId}: ${err.message}`
+					: `Failed to save latest-tag cache for ${input.cacheId}`,
+			);
+		}
 	}
 
 	return tag;
