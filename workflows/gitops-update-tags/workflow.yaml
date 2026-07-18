@@ -93,17 +93,11 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Setup GCP Authentication
-        if: inputs.use-gcp-auth
-        uses: abinnovision/actions@setup-gcp-dev
-        with:
-          auth: ${{ secrets.GCP_AUTH }}
-
       - id: token
         name: Generate GitHub App token
-        uses: abinnovision/actions@get-github-app-token-dev
+        uses: abinnovision/actions@exchange-github-token-dev
         with:
-          identification: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
+          broker-url: ${{ secrets.GH_TOKEN_BROKER_URL }}
 
       - name: Checkout
         uses: actions/checkout@v6
@@ -112,8 +106,8 @@ jobs:
 
       - name: Setup Git config
         run: |
-          git config --global user.name '${{ steps.token.outputs.app-commiter-name }}'
-          git config --global user.email '${{ steps.token.outputs.app-commiter-email }}'
+          git config --global user.name '${{ steps.token.outputs.committer-name }}'
+          git config --global user.email '${{ steps.token.outputs.committer-email }}'
 
       # Cherry-pick existing commits from the target branch to group multiple updates
       - name: Sync existing changes

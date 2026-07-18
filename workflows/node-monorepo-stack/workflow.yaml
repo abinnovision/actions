@@ -966,22 +966,33 @@ jobs:
           echo "IMAGE_NAME=$image_name" >> $GITHUB_OUTPUT
           echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
 
+      - id: gitops-token
+        name: Exchange token for GitOps dispatch
+        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
+        uses: abinnovision/actions@exchange-github-token-dev
+        with:
+          broker-url: ${{ secrets.GH_TOKEN_BROKER_URL }}
+          repositories: ${{ steps.gitops-config.outputs.TARGET_REPO }}
+          scope: actions:write
+
       - name: Update Release Deployment
         if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'true'
-        uses: abinnovision/actions@run-workflow-dispatch-dev
-        with:
-          proxy: ${{ secrets.GITOPS_PROXY_URL }}
-          target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
-          workflow: ${{ inputs.gitops-workflow-file }}
-          workflow-inputs: |
-            {"application": "${{ steps.gitops-config.outputs.RELEASE_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
+        env:
+          GH_TOKEN: ${{ steps.gitops-token.outputs.token }}
+        run: |
+          gh workflow run ${{ inputs.gitops-workflow-file }} \
+            --repo ${{ steps.gitops-config.outputs.TARGET_REPO }} \
+            --field application=${{ steps.gitops-config.outputs.RELEASE_APP }} \
+            --field tag=${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }} \
+            --field image=${{ steps.gitops-config.outputs.IMAGE_NAME }}
 
       - name: Update Dev Deployment
         if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != '' && steps.release-check.outputs.IS_RELEASE == 'false'
-        uses: abinnovision/actions@run-workflow-dispatch-dev
-        with:
-          proxy: ${{ secrets.GITOPS_PROXY_URL }}
-          target: ${{ steps.gitops-config.outputs.TARGET_REPO }}
-          workflow: ${{ inputs.gitops-workflow-file }}
-          workflow-inputs: |
-            {"application": "${{ steps.gitops-config.outputs.DEV_APP }}","tag": "${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }}","image": "${{ steps.gitops-config.outputs.IMAGE_NAME }}"}
+        env:
+          GH_TOKEN: ${{ steps.gitops-token.outputs.token }}
+        run: |
+          gh workflow run ${{ inputs.gitops-workflow-file }} \
+            --repo ${{ steps.gitops-config.outputs.TARGET_REPO }} \
+            --field application=${{ steps.gitops-config.outputs.DEV_APP }} \
+            --field tag=${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }} \
+            --field image=${{ steps.gitops-config.outputs.IMAGE_NAME }}
