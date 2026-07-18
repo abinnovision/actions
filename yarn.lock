@@ -4244,6 +4244,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"setup-oidc-token-cli@workspace:actions/setup-oidc-token-cli":
+  version: 0.0.0-use.local
+  resolution: "setup-oidc-token-cli@workspace:actions/setup-oidc-token-cli"
+  dependencies:
+    "@abinnovision/eslint-config-base": "npm:^3.4.2"
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    "@actions/core": "npm:^3.0.1"
+    "@actions/github": "npm:^9.1.1"
+    "@internal/action-tool-installer": "workspace:^"
+    "@vercel/ncc": "npm:^0.44.1"
+    eslint: "npm:^10.7.0"
+    prettier: "npm:^3.9.5"
+    typescript: "npm:^6.0.3"
+  languageName: unknown
+  linkType: soft
+
 "setup-tools@workspace:actions/setup-tools":
   version: 0.0.0-use.local
   resolution: "setup-tools@workspace:actions/setup-tools"
