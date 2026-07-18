@@ -36,10 +36,10 @@ export const installTool = async (
 	config: ToolConfig,
 	input: string,
 	ctx: InstallContext,
-): Promise<void> => {
+): Promise<string | undefined> => {
 	if (!input) {
 		core.setOutput(`${config.name}-version`, "");
-		return;
+		return undefined;
 	}
 
 	const platform = mapPlatform(process.platform);
@@ -57,7 +57,7 @@ export const installTool = async (
 		core.info(`${config.name} ${version} restored from tool cache`);
 		core.addPath(tcPath);
 		core.setOutput(`${config.name}-version`, version);
-		return;
+		return version;
 	}
 
 	// Layer 2: actions cache - persists across runs on all runner types.
@@ -79,7 +79,7 @@ export const installTool = async (
 	if (restoredKey) {
 		core.info(`${config.name} ${version} restored from actions cache`);
 		await activate(restorePath);
-		return;
+		return version;
 	}
 
 	// Download and materialize into restorePath, then populate both cache layers.
@@ -122,4 +122,5 @@ export const installTool = async (
 
 	await activate(restorePath);
 	core.info(`${config.name} ${version} installed`);
+	return version;
 };

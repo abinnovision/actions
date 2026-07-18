@@ -22,6 +22,9 @@
 		"actions/setup-k8s-tools": {
 			"extra-files": ["README.md"]
 		},
+		"actions/setup-oidc-token-cli": {
+			"extra-files": ["README.md"]
+		},
 		"actions/setup-tools": {
 			"extra-files": ["README.md"]
 		},
