@@ -6,12 +6,12 @@
 
 | Tool | Repository | Version format | Example pin |
 | :--- | :--------- | :------------- | :---------- |
-| `kube-score` | [zegl/kube-score](https://github.com/zegl/kube-score) | `vX.Y.Z` | `v1.18.0` |
-| `kubeconform` | [yannh/kubeconform](https://github.com/yannh/kubeconform) | `vX.Y.Z` | `v0.6.4` |
-| `kustomize` | [kubernetes-sigs/kustomize](https://github.com/kubernetes-sigs/kustomize) | `vX.Y.Z` | `v5.4.3` |
-| `argocd` | [argoproj/argo-cd](https://github.com/argoproj/argo-cd) | `vX.Y.Z` | `v2.13.0` |
+| `kube-score` | [zegl/kube-score](https://github.com/zegl/kube-score) | `X.Y.Z` | `1.18.0` |
+| `kubeconform` | [yannh/kubeconform](https://github.com/yannh/kubeconform) | `X.Y.Z` | `0.6.4` |
+| `kustomize` | [kubernetes-sigs/kustomize](https://github.com/kubernetes-sigs/kustomize) | `X.Y.Z` | `5.4.3` |
+| `argocd` | [argoproj/argo-cd](https://github.com/argoproj/argo-cd) | `X.Y.Z` | `2.13.0` |
 
-Each tool input accepts `"latest"` to resolve and install the newest release at runtime, a pinned version string (e.g. `"v5.4.3"`) for reproducible builds, or an empty string to skip that tool entirely. The resolved version is written to the corresponding output and used as the tool-cache key, so re-runs on the same runner skip redundant downloads.
+Each tool input accepts `"latest"` to resolve and install the newest release at runtime, a pinned version string (e.g. `"5.4.3"`) for reproducible builds, or an empty string to skip that tool entirely. The resolved version is written to the corresponding output and used as the tool-cache key, so re-runs on the same runner skip redundant downloads.
 
 ## Usage
 
@@ -28,3 +28,5 @@ Each tool input accepts `"latest"` to resolve and install the newest release at 
 ## Outputs
 
 {{> outputs-table outputs}}
+
+Each `<tool>-version` output is the resolved bare semver (e.g. `5.4.3`, without a `v` prefix).
