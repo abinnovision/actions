@@ -19,9 +19,11 @@
 			"cache": false
 		},
 		"lint:fix": {
+			"dependsOn": ["^build"],
 			"cache": false
 		},
 		"lint:check": {
+			"dependsOn": ["^build"],
 			"cache": false
 		}
 	}

@@ -1,25 +1,13 @@
-import { resolveLatestTagCached } from "./latest-tag-cache.js";
+import { resolveLatestTagCached } from "@internal/action-tool-installer";
 
-import type { getOctokit } from "@actions/github";
+import type {
+	OctokitType,
+	ToolConfig,
+	ToolResolution,
+	ResolveContext,
+} from "@internal/action-tool-installer";
 
-export type OctokitType = ReturnType<typeof getOctokit>;
-
-export interface ToolResolution {
-	version: string;
-	downloadUrl: string;
-}
-
-export interface ResolveContext {
-	octokit: OctokitType;
-	platform: string;
-	arch: string;
-}
-
-export interface ToolConfig {
-	name: string;
-	archiveType: "tar" | "zip" | "binary";
-	resolve: (input: string, ctx: ResolveContext) => Promise<ToolResolution>;
-}
+export type { OctokitType, ToolConfig, ToolResolution, ResolveContext };
 
 export const TOOLS: ToolConfig[] = [
 	{
@@ -32,6 +20,7 @@ export const TOOLS: ToolConfig[] = [
 							cacheId: "kube-score",
 							owner: "zegl",
 							repo: "kube-score",
+							namespace: "setup-k8s-tools",
 						})
 					: input;
 
@@ -52,6 +41,7 @@ export const TOOLS: ToolConfig[] = [
 							cacheId: "kubeconform",
 							owner: "yannh",
 							repo: "kubeconform",
+							namespace: "setup-k8s-tools",
 						})
 					: input;
 
@@ -71,6 +61,7 @@ export const TOOLS: ToolConfig[] = [
 							cacheId: "kustomize",
 							owner: "kubernetes-sigs",
 							repo: "kustomize",
+							namespace: "setup-k8s-tools",
 							tagFilter: (tag) => tag.startsWith("kustomize/v"),
 						})
 					: `kustomize/${input}`;
@@ -92,6 +83,7 @@ export const TOOLS: ToolConfig[] = [
 							cacheId: "argocd",
 							owner: "argoproj",
 							repo: "argo-cd",
+							namespace: "setup-k8s-tools",
 						})
 					: input;
 

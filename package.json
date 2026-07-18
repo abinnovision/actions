@@ -11,7 +11,8 @@
 	},
 	"workspaces": [
 		"actions/*",
-		"workflows/*"
+		"workflows/*",
+		"packages/*"
 	],
 	"scripts": {
 		"build": "turbo build",
@@ -21,8 +22,8 @@
 		"format:fix": "prettier --ignore-path .gitignore --write '{*,.github/**/*}.{json,json5,yaml,yml,md}'",
 		"postinstall": "husky install",
 		"readme:generate": "tsx scripts/generate-readme.ts && yarn turbo format:fix",
-		"sort:check": "sort-package-json '{actions,workflows}/**!(node_modules)/package.json' 'package.json' --check",
-		"sort:fix": "sort-package-json '{actions,workflows}/**!(node_modules)/package.json' 'package.json'"
+		"sort:check": "sort-package-json '{actions,workflows,packages}/**!(node_modules)/package.json' 'package.json' --check",
+		"sort:fix": "sort-package-json '{actions,workflows,packages}/**!(node_modules)/package.json' 'package.json'"
 	},
 	"commitlint": {
 		"extends": [

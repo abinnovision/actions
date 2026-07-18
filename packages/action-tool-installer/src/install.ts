@@ -10,6 +10,7 @@ import type { OctokitType, ToolConfig } from "./tools.js";
 interface InstallContext {
 	octokit: OctokitType;
 	token: string;
+	namespace: string;
 }
 
 const mapPlatform = (platform: string): string => {
@@ -60,10 +61,10 @@ export const installTool = async (
 	}
 
 	// Layer 2: actions cache - persists across runs on all runner types.
-	const cacheKey = `setup-k8s-tools-${config.name}-${version}-${platform}-${arch}`;
+	const cacheKey = `${ctx.namespace}-${config.name}-${version}-${platform}-${arch}`;
 	const restorePath = path.join(
 		process.env["RUNNER_TEMP"] ?? os.tmpdir(),
-		"setup-k8s-tools",
+		ctx.namespace,
 		config.name,
 		version,
 	);
@@ -108,9 +109,15 @@ export const installTool = async (
 	try {
 		await cache.saveCache([restorePath], cacheKey);
 	} catch (err) {
-		core.warning(
-			err instanceof Error ? err.message : "Failed to save to actions cache",
-		);
+		if (err instanceof cache.CacheWriteDeniedError) {
+			core.info(
+				`Skipped caching ${config.name} ${version}: actions cache is read-only for this trigger`,
+			);
+		} else {
+			core.warning(
+				err instanceof Error ? err.message : "Failed to save to actions cache",
+			);
+		}
 	}
 
 	await activate(restorePath);

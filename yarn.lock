@@ -925,6 +925,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@internal/action-tool-installer@workspace:^, @internal/action-tool-installer@workspace:packages/action-tool-installer":
+  version: 0.0.0-use.local
+  resolution: "@internal/action-tool-installer@workspace:packages/action-tool-installer"
+  dependencies:
+    "@abinnovision/eslint-config-base": "npm:^3.4.0"
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    "@actions/cache": "npm:^6.1.0"
+    "@actions/core": "npm:^3.0.1"
+    "@actions/github": "npm:^9.1.1"
+    "@actions/tool-cache": "npm:^4.0.0"
+    eslint: "npm:^10.2.1"
+    prettier: "npm:^3.8.3"
+    typescript: "npm:^6.0.3"
+  languageName: unknown
+  linkType: soft
+
 "@isaacs/fs-minipass@npm:^4.0.0":
   version: 4.0.1
   resolution: "@isaacs/fs-minipass@npm:4.0.1"
@@ -4269,10 +4285,9 @@ __metadata:
   dependencies:
     "@abinnovision/eslint-config-base": "npm:^3.4.0"
     "@abinnovision/prettier-config": "npm:^2.2.0"
-    "@actions/cache": "npm:^6.1.0"
     "@actions/core": "npm:^3.0.1"
     "@actions/github": "npm:^9.1.1"
-    "@actions/tool-cache": "npm:^4.0.0"
+    "@internal/action-tool-installer": "workspace:^"
     "@vercel/ncc": "npm:^0.44.1"
     eslint: "npm:^10.2.1"
     prettier: "npm:^3.8.3"
