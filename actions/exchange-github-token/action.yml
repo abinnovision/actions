@@ -10,7 +10,7 @@ inputs:
     required: false
   scope:
     description: "Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)"
-    required: false
+    required: true
   repositories:
     description: "Repositories the token should access, whitespace-separated (defaults to current repo)"
     required: false
@@ -62,10 +62,8 @@ runs:
         )
 
         # Add scope (whitespace-separated scope:level tokens)
-        if [ -n "$SCOPE" ]; then
-          SCOPE_VALUE=$(echo "$SCOPE" | tr '\n' ' ' | xargs)
-          ARGS+=(--scope "$SCOPE_VALUE")
-        fi
+        SCOPE_VALUE=$(echo "$SCOPE" | tr '\n' ' ' | xargs)
+        ARGS+=(--scope "$SCOPE_VALUE")
 
         # Add repositories as repeated --resource flags
         if [ -n "$REPOSITORIES" ]; then
