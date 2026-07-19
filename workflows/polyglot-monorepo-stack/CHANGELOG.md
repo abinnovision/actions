@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.1...polyglot-monorepo-stack-source-v1.5.2) (2026-07-19)
+
+
+### Bug Fixes
+
+* prefix gitops target repo with org in polyglot workflow ([#482](https://github.com/abinnovision/actions/issues/482)) ([f6e4850](https://github.com/abinnovision/actions/commit/f6e4850c3c0b46f615b3e78d8ed50c9122a97bcd))
+
 ## [1.5.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.0...polyglot-monorepo-stack-source-v1.5.1) (2026-07-19)
 
 
