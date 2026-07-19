@@ -10,10 +10,12 @@ interface PackageJson {
 }
 
 /**
- * Discovers all internal package names from workspace directories.
+ * Discovers all internal package names and their versions from workspace directories.
  */
-function discoverInternalPackages(rootDir: string): Set<string> {
-	const names = new Set<string>();
+function discoverInternalPackages(
+	rootDir: string,
+): Map<string, string> {
+	const packages = new Map<string, string>();
 
 	for (const dir of ["actions", "workflows"]) {
 		const base = path.join(rootDir, dir);
@@ -26,12 +28,12 @@ function discoverInternalPackages(rootDir: string): Set<string> {
 				const pkg = JSON.parse(
 					fs.readFileSync(pkgPath, "utf8"),
 				) as PackageJson;
-				names.add(pkg.name);
+				packages.set(pkg.name, pkg.version);
 			}
 		}
 	}
 
-	return names;
+	return packages;
 }
 
 /**
@@ -103,7 +105,8 @@ function getActionDependencies(
 
 function main() {
 	const rootDir = process.cwd();
-	const internalNames = discoverInternalPackages(rootDir);
+	const internalPackages = discoverInternalPackages(rootDir);
+	const internalNames = new Set(internalPackages.keys());
 	const files = findYamlFilesToCheck(rootDir);
 	const errors: string[] = [];
 
@@ -145,12 +148,33 @@ function main() {
 						`${relative}: References internal action '${name}' but it is not declared in actionDependencies`,
 					);
 				} else {
-					// Validate the range format
-					const rangePattern = /^(\^|~)?\d+\.\d+\.\d+$/;
-					if (!rangePattern.test(actionDeps[name])) {
+					// Validate the range format and version compatibility
+					const rangePattern = /^(\^|~)?(\d+)\.(\d+)\.\d+$/;
+					const rangeMatch = actionDeps[name].match(rangePattern);
+					if (!rangeMatch) {
 						errors.push(
 							`${relative}: actionDependencies['${name}'] has invalid range '${actionDeps[name]}'. Expected '^X.Y.Z', '~X.Y.Z', or 'X.Y.Z'.`,
 						);
+					} else {
+						const [, prefix, major, minor] = rangeMatch;
+						const actualVersion = internalPackages.get(name);
+						if (actualVersion) {
+							const [actualMajor, actualMinor] =
+								actualVersion.split(".");
+							if (prefix === "^" && actualMajor !== major) {
+								errors.push(
+									`${relative}: actionDependency '${name}' declares range '${actionDeps[name]}' but workspace version is ${actualVersion} (major version mismatch)`,
+								);
+							} else if (
+								prefix === "~" &&
+								(actualMajor !== major ||
+									actualMinor !== minor)
+							) {
+								errors.push(
+									`${relative}: actionDependency '${name}' declares range '${actionDeps[name]}' but workspace version is ${actualVersion} (major.minor mismatch)`,
+								);
+							}
+						}
 					}
 				}
 			}
