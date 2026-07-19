@@ -2,18 +2,14 @@ name: Update Tags
 
 on:
   workflow_call:
-    secrets:
-      GH_APP_IDENTIFICATION_RELEASER:
-        required: true
-        description: |-
-          GitHub App identification for creating PRs.
-          **Required:** Always
-      GCP_AUTH:
-        required: false
-        description: |-
-          GCP authentication configuration (if needed for accessing resources).
-          **Required:** When using GCP services
     inputs:
+      token-broker-url:
+        type: string
+        required: false
+        default: ${{ vars.TOKEN_BROKER_URL }}
+        description: |-
+          URL of the token broker for OIDC token exchange.
+          **Default:** `${{ vars.TOKEN_BROKER_URL }}`
       application:
         type: string
         required: true
@@ -54,14 +50,6 @@ on:
           Default branch name for the repository.
           **Default:** `main`
 
-      use-gcp-auth:
-        type: boolean
-        required: false
-        default: false
-        description: |-
-          Whether to setup GCP authentication.
-          **Default:** `false`
-
       automerge-images:
         type: string
         required: false
@@ -97,7 +85,7 @@ jobs:
         name: Generate GitHub App token
         uses: abinnovision/actions@exchange-github-token-dev
         with:
-          broker-url: ${{ secrets.GTB_URL }}
+          broker-url: ${{ inputs.token-broker-url }}
 
       - name: Checkout
         uses: actions/checkout@v6

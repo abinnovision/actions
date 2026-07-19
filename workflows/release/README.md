@@ -10,10 +10,6 @@ Automate releases using release-please with GitHub App authentication and option
 jobs:
   release:
     uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v2
-    secrets:
-      GH_APP_IDENTIFICATION_RELEASER: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
-    # Or to inherit the secrets from the caller:
-    secrets: inherit
 ```
 
 [//]: # "x-release-please-end"
@@ -33,12 +29,6 @@ This workflow can be used with different version ranges. The following ranges ar
 | `target-branch`      | Branch to release from. Defaults to the repository default branch.                                                                                                                                                                   | No       | _empty_                |
 | `prerelease-channel` | Prerelease channel name (e.g., "beta", "canary", "rc").<br>When set, computes prerelease versions for packages with pending changes.<br>Format: {next-version}-{channel}.{commit-count}+{short-sha}<br>Example: 1.4.0-beta.5+a3f2c1d | No       | _empty_                |
 
-## Secrets
-
-| Secret                           | Description | Required |
-| :------------------------------- | :---------- | :------- |
-| `GH_APP_IDENTIFICATION_RELEASER` |             | Yes      |
-
 ## Outputs
 
 | Output     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -51,8 +41,6 @@ This workflow can be used with different version ranges. The following ranges ar
 jobs:
   release:
     uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
-    secrets:
-      GH_APP_IDENTIFICATION_RELEASER: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
 
   publish:

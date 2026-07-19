@@ -13,7 +13,7 @@ Updates image tags in kustomization files and creates pull requests.
 
 ## Usage
 
-{{{usage-example type="workflow" name=name inputs=inputs secrets=secrets version=version}}}
+{{{usage-example type="workflow" name=name inputs=inputs version=version}}}
 
 ### Latest versions
 
@@ -30,15 +30,6 @@ with:
   automerge-images: app-backend,app-frontend,app-worker
 ```
 
-### GCP Authentication
-
-```yaml
-with:
-  use-gcp-auth: true
-secrets:
-  GCP_AUTH: $\{{ vars.GCP_AUTH }}
-```
-
 ### Custom Applications Directory
 
 ```yaml
@@ -50,6 +41,3 @@ with:
 
 {{> inputs-table inputs}}
 
-## Secrets
-
-{{> secrets-table secrets}}
