@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.1.2...exchange-github-token-source-v1.2.0) (2026-07-19)
+
+
+### Features
+
+* **exchange-github-token:** populate committer outputs from oidc-token --all ([#468](https://github.com/abinnovision/actions/issues/468)) ([655e0f2](https://github.com/abinnovision/actions/commit/655e0f2458e4be2c42a0d13426ae6f7a31ee13a0))
+
 ## [1.1.2](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.1.1...exchange-github-token-source-v1.1.2) (2026-07-19)
 
 
