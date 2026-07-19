@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.2.0...exchange-github-token-source-v1.2.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* make scope input required for exchange-github-token ([#479](https://github.com/abinnovision/actions/issues/479)) ([8df1b4a](https://github.com/abinnovision/actions/commit/8df1b4a55e887813776e83327cdd17ced2fed7e5))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.1.2...exchange-github-token-source-v1.2.0) (2026-07-19)
 
 
