@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.1.0...exchange-github-token-source-v1.1.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **exchange-github-token:** fall back audience to broker URL ([#463](https://github.com/abinnovision/actions/issues/463)) ([01b9711](https://github.com/abinnovision/actions/commit/01b97113234f157917c9505c33b53f8ac053a0ac))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.0.0...exchange-github-token-source-v1.1.0) (2026-07-19)
 
 
