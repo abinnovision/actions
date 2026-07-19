@@ -18,7 +18,12 @@ export const TOOL: ToolConfig = {
 	async resolve(input, { octokit, platform, arch }) {
 		const owner = "abinnovision";
 		const repo = "oidc-token-cli";
-		const version = await resolveVersion(octokit, input, { owner, repo });
+		const version = await resolveVersion(octokit, input, {
+			owner,
+			repo,
+			excludeDrafts: true,
+			excludePreReleases: true,
+		});
 
 		const tag = `v${version}`;
 		return {

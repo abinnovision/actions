@@ -19,7 +19,12 @@ export const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const owner = "zegl";
 			const repo = "kube-score";
-			const version = await resolveVersion(octokit, input, { owner, repo });
+			const version = await resolveVersion(octokit, input, {
+				owner,
+				repo,
+				excludeDrafts: true,
+				excludePreReleases: true,
+			});
 
 			const tag = `v${version}`;
 			return {
@@ -39,7 +44,12 @@ export const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const owner = "yannh";
 			const repo = "kubeconform";
-			const version = await resolveVersion(octokit, input, { owner, repo });
+			const version = await resolveVersion(octokit, input, {
+				owner,
+				repo,
+				excludeDrafts: true,
+				excludePreReleases: true,
+			});
 
 			const tag = `v${version}`;
 			return {
@@ -62,6 +72,8 @@ export const TOOLS: ToolConfig[] = [
 			const version = await resolveVersion(octokit, input, {
 				owner,
 				repo,
+				excludeDrafts: true,
+				excludePreReleases: true,
 				tagFilter: (tag) => tag.startsWith("kustomize/v"),
 				fromTag: (tag) => tag.replace(/^kustomize\/v/, ""),
 			});
@@ -84,7 +96,12 @@ export const TOOLS: ToolConfig[] = [
 		async resolve(input, { octokit, platform, arch }) {
 			const owner = "argoproj";
 			const repo = "argo-cd";
-			const version = await resolveVersion(octokit, input, { owner, repo });
+			const version = await resolveVersion(octokit, input, {
+				owner,
+				repo,
+				excludeDrafts: true,
+				excludePreReleases: true,
+			});
 
 			const tag = `v${version}`;
 			const suffix = platform === "windows" ? ".exe" : "";
