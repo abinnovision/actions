@@ -6,9 +6,8 @@ inputs:
     description: "Base URL of the token broker service (used as OIDC issuer for discovery)"
     required: true
   audience:
-    description: "OIDC audience for the token broker (defaults to 'gh-token-broker')"
+    description: "OIDC audience for the token broker (defaults to broker-url)"
     required: false
-    default: "gh-token-broker"
   scope:
     description: "Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)"
     required: false
@@ -59,7 +58,7 @@ runs:
           --client-id gh-token-broker
           --grant-type token-exchange
           --subject-token-source github-actions
-          --audience "$AUDIENCE"
+          --audience "${AUDIENCE:-$BROKER_URL}"
         )
 
         # Add scope (whitespace-separated scope:level tokens)
