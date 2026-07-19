@@ -41,8 +41,6 @@
 		"workflows/polyglot-monorepo-stack": {
 			"extra-files": ["README.md"]
 		},
-		"packages/action-tool-installer": {
-			"skip-github-release": true
-		}
+		"packages/action-tool-installer": {}
 	}
 }
