@@ -18,7 +18,9 @@ const resolveLatestTag = async (
 		per_page: 50,
 	});
 
-	const release = data.find((r) => input.tagFilter?.(r.tag_name) ?? true);
+	const release = data.find(
+		(r) => !r.draft && !r.prerelease && (input.tagFilter?.(r.tag_name) ?? true),
+	);
 	if (release) {
 		return release.tag_name;
 	}
