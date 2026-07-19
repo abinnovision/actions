@@ -264,6 +264,10 @@ jobs:
           if [[ "${{ needs.release.outputs.releases-created }}" == "true" ]]; then
             echo "==> Publishing versioned releases..."
             echo '${{ needs.release.outputs.paths-released }}' | jq -cr '.[]' | while read path; do
+              if [[ "$path" == "packages/"* ]]; then
+                echo "Skipping non-publishable path: $path"
+                continue
+              fi
               publish_item "$path" "release"
             done
           else
