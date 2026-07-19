@@ -30,7 +30,7 @@
 	"actionDependencies": {
 		"exchange-github-token": "^1.0.0",
 		"setup-gcp": "^1.0.0",
-		"setup-k8s-tools": "^1.0.0",
+		"setup-k8s-tools": "^2.0.0",
 		"setup-node": "^1.0.0"
 	}
 }
