@@ -10,5 +10,6 @@
 	"workflows/release": "2.1.1",
 	"workflows/gitops-deploy": "1.0.9",
 	"workflows/gitops-update-tags": "1.2.1",
-	"workflows/polyglot-monorepo-stack": "1.5.1"
+	"workflows/polyglot-monorepo-stack": "1.5.1",
+	"packages/action-tool-installer": "1.0.0"
 }
