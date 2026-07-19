@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.0...polyglot-monorepo-stack-source-v1.5.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* move vars context from workflow_call defaults to job-level fallbacks ([#465](https://github.com/abinnovision/actions/issues/465)) ([9a3c4ae](https://github.com/abinnovision/actions/commit/9a3c4aebe511feda932ea3f2aca590688454e4fc))
+
 ## [1.5.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.4.2...polyglot-monorepo-stack-source-v1.5.0) (2026-07-19)
 
 

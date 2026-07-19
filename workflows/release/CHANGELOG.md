@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/abinnovision/actions/compare/release-source-v2.1.0...release-source-v2.1.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* move vars context from workflow_call defaults to job-level fallbacks ([#465](https://github.com/abinnovision/actions/issues/465)) ([9a3c4ae](https://github.com/abinnovision/actions/commit/9a3c4aebe511feda932ea3f2aca590688454e4fc))
+
 ## [2.1.0](https://github.com/abinnovision/actions/compare/release-source-v2.0.2...release-source-v2.1.0) (2026-07-19)
 
 

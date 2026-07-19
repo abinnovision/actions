@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.0...gitops-update-tags-source-v1.2.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* move vars context from workflow_call defaults to job-level fallbacks ([#465](https://github.com/abinnovision/actions/issues/465)) ([9a3c4ae](https://github.com/abinnovision/actions/commit/9a3c4aebe511feda932ea3f2aca590688454e4fc))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.5...gitops-update-tags-source-v1.2.0) (2026-07-19)
 
 
