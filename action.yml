@@ -1,0 +1,105 @@
+name: "Exchange GitHub Token"
+description: "Exchange a GitHub Actions OIDC token for a GitHub App installation token via a compatible token broker"
+
+inputs:
+  broker-url:
+    description: "Base URL of the token broker service (used as OIDC issuer for discovery)"
+    required: true
+  audience:
+    description: "OIDC audience for the token broker (defaults to 'gh-token-broker')"
+    required: false
+    default: "gh-token-broker"
+  scope:
+    description: "Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)"
+    required: false
+  repositories:
+    description: "Repositories the token should access, whitespace-separated (defaults to current repo)"
+    required: false
+  github-token:
+    description: "Token for downloading oidc-token-cli from GitHub releases"
+    required: false
+    default: "${{ github.token }}"
+  oidc-token-cli-version:
+    description: "Version of oidc-token-cli to install"
+    required: false
+    default: "latest"
+
+outputs:
+  token:
+    description: "GitHub App installation token"
+    value: ${{ steps.exchange.outputs.token }}
+  committer-name:
+    description: "Bot committer name (e.g. app-name[bot])"
+    value: ${{ steps.bot-info.outputs.name }}
+  committer-email:
+    description: "Bot committer email"
+    value: ${{ steps.bot-info.outputs.email }}
+
+runs:
+  using: composite
+  steps:
+    - uses: abinnovision/actions@setup-oidc-token-cli-v1
+      with:
+        github-token: ${{ inputs.github-token }}
+        version: ${{ inputs.oidc-token-cli-version }}
+
+    - id: exchange
+      shell: bash
+      env:
+        BROKER_URL: ${{ inputs.broker-url }}
+        AUDIENCE: ${{ inputs.audience }}
+        SCOPE: ${{ inputs.scope }}
+        REPOSITORIES: ${{ inputs.repositories }}
+      run: |
+        set -euo pipefail
+
+        # Build oidc-token arguments
+        ARGS=(
+          --issuer "$BROKER_URL"
+          --client-id gh-token-broker
+          --grant-type token-exchange
+          --subject-token-source github-actions
+          --audience "$AUDIENCE"
+        )
+
+        # Add scope (whitespace-separated scope:level tokens)
+        if [ -n "$SCOPE" ]; then
+          SCOPE_VALUE=$(echo "$SCOPE" | tr '\n' ' ' | xargs)
+          ARGS+=(--scope "$SCOPE_VALUE")
+        fi
+
+        # Add repositories as repeated --resource flags
+        if [ -n "$REPOSITORIES" ]; then
+          for repo in $(echo "$REPOSITORIES" | tr '\n' ' ' | xargs -n1); do
+            ARGS+=(--resource "$repo")
+          done
+        else
+          ARGS+=(--resource "$GITHUB_REPOSITORY")
+        fi
+
+        # Exchange token via oidc-token-cli
+        TOKEN=$(oidc-token "${ARGS[@]}")
+
+        # Mask the token
+        echo "::add-mask::$TOKEN"
+
+        echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+    - id: bot-info
+      shell: bash
+      env:
+        TOKEN: ${{ steps.exchange.outputs.token }}
+      run: |
+        set -euo pipefail
+
+        # Get authenticated app info
+        APP_SLUG=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+          https://api.github.com/app | jq -r '.slug')
+
+        # Get bot user ID
+        USER_INFO=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+          "https://api.github.com/users/${APP_SLUG}[bot]")
+        USER_ID=$(echo "$USER_INFO" | jq -r '.id')
+
+        echo "name=${APP_SLUG}[bot]" >> "$GITHUB_OUTPUT"
+        echo "email=${USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
