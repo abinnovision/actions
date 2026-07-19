@@ -33,7 +33,7 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@setup-oidc-token-cli-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@setup-oidc-token-cli-v1.1.2`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@setup-oidc-token-cli-v1.1.3`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
