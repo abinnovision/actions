@@ -49,7 +49,7 @@ This action can be used with different version ranges. The following ranges are 
 | :----------------------- | :------------------------------------------------------------------------------------ | :------- | :-------------------- |
 | `broker-url`             | Base URL of the token broker service (used as OIDC issuer for discovery)              | Yes      |                       |
 | `audience`               | OIDC audience for the token broker (defaults to broker-url)                           | No       | _empty_               |
-| `scope`                  | Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)     | No       | _empty_               |
+| `scope`                  | Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)     | Yes      |                       |
 | `repositories`           | Repositories the token should access, whitespace-separated (defaults to current repo) | No       | _empty_               |
 | `github-token`           | Token for downloading oidc-token-cli from GitHub releases                             | No       | `${{ github.token }}` |
 | `oidc-token-cli-version` | Version of oidc-token-cli to install                                                  | No       | `latest`              |
