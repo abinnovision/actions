@@ -29,10 +29,10 @@ outputs:
     value: ${{ steps.exchange.outputs.token }}
   committer-name:
     description: "Bot committer name (e.g. app-name[bot])"
-    value: ${{ steps.bot-info.outputs.name }}
+    value: ""
   committer-email:
     description: "Bot committer email"
-    value: ${{ steps.bot-info.outputs.email }}
+    value: ""
 
 runs:
   using: composite
@@ -83,22 +83,3 @@ runs:
         echo "::add-mask::$TOKEN"
 
         echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
-
-    - id: bot-info
-      shell: bash
-      env:
-        TOKEN: ${{ steps.exchange.outputs.token }}
-      run: |
-        set -euo pipefail
-
-        # Get authenticated app info
-        APP_SLUG=$(curl -sf -H "Authorization: Bearer $TOKEN" \
-          https://api.github.com/app | jq -r '.slug')
-
-        # Get bot user ID
-        USER_INFO=$(curl -sf -H "Authorization: Bearer $TOKEN" \
-          "https://api.github.com/users/${APP_SLUG}[bot]")
-        USER_ID=$(echo "$USER_INFO" | jq -r '.id')
-
-        echo "name=${APP_SLUG}[bot]" >> "$GITHUB_OUTPUT"
-        echo "email=${USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
