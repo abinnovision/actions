@@ -1,13 +1,5 @@
 # Changelog
 
-## [2.1.0](https://github.com/abinnovision/actions/compare/release-source-v2.0.2...release-source-v2.1.0) (2026-07-19)
-
-
-### Features
-
-* **exchange-github-token:** add OIDC token exchange action, remove deprecated actions ([#453](https://github.com/abinnovision/actions/issues/453)) ([d7c6155](https://github.com/abinnovision/actions/commit/d7c6155a11f312d9923e6a245a167099e942f0df))
-* use token broker ([#456](https://github.com/abinnovision/actions/issues/456)) ([a8dc1ac](https://github.com/abinnovision/actions/commit/a8dc1ace2551c90fa1b258ae0e75fc0e616bf95e))
-
 ## [2.0.2](https://github.com/abinnovision/actions/compare/release-source-v2.0.1...release-source-v2.0.2) (2026-02-22)
 
 

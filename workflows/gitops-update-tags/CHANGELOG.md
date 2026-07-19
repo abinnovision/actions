@@ -1,13 +1,5 @@
 # Changelog
 
-## [1.2.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.5...gitops-update-tags-source-v1.2.0) (2026-07-19)
-
-
-### Features
-
-* **exchange-github-token:** add OIDC token exchange action, remove deprecated actions ([#453](https://github.com/abinnovision/actions/issues/453)) ([d7c6155](https://github.com/abinnovision/actions/commit/d7c6155a11f312d9923e6a245a167099e942f0df))
-* use token broker ([#456](https://github.com/abinnovision/actions/issues/456)) ([a8dc1ac](https://github.com/abinnovision/actions/commit/a8dc1ace2551c90fa1b258ae0e75fc0e616bf95e))
-
 ## [1.1.5](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.1.4...gitops-update-tags-source-v1.1.5) (2026-07-09)
 
 
