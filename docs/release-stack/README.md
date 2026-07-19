@@ -133,8 +133,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    secrets:
-      GH_APP_IDENTIFICATION_RELEASER: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
 ```
 
 ### release.yaml with prerelease channel
@@ -157,8 +155,6 @@ jobs:
       id-token: write
     with:
       prerelease-channel: ${{ github.ref_name != 'main' && github.ref_name || '' }}
-    secrets:
-      GH_APP_IDENTIFICATION_RELEASER: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
 ```
 
 ### Consuming version output

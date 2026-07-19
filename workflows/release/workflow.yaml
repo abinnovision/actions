@@ -4,10 +4,14 @@ name: Release
 
 on:
   workflow_call:
-    secrets:
-      GH_APP_IDENTIFICATION_RELEASER:
-        required: true
     inputs:
+      token-broker-url:
+        type: string
+        required: false
+        default: ${{ vars.TOKEN_BROKER_URL }}
+        description: |-
+          URL of the token broker for OIDC token exchange.
+          **Default:** `${{ vars.TOKEN_BROKER_URL }}`
       gcp-auth:
         type: string
         required: false
@@ -56,7 +60,7 @@ jobs:
         name: Generate GitHub App token
         uses: abinnovision/actions@exchange-github-token-dev
         with:
-          broker-url: ${{ secrets.GTB_URL }}
+          broker-url: ${{ inputs.token-broker-url }}
       - id: release
         name: Run release-please
         uses: abinnovision/actions@run-release-please-dev

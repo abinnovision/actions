@@ -28,8 +28,6 @@ Automate releases using release-please with GitHub App authentication and option
 jobs:
   release:
     uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v1
-    secrets:
-      GH_APP_IDENTIFICATION_RELEASER: $\{{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
 
   publish:

@@ -180,6 +180,4 @@ jobs:
       image: ${{ github.event.inputs.image }}
       # Auto-merge staging when all images are updated
       automerge-images: ${{ github.event.inputs.application == 'staging' && 'app-backend,app-frontend' || '' }}
-    secrets:
-      GH_APP_IDENTIFICATION_RELEASER: ${{ secrets.GH_APP_IDENTIFICATION_RELEASER }}
 ```
