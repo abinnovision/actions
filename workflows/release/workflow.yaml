@@ -61,6 +61,8 @@ jobs:
         uses: abinnovision/actions@exchange-github-token-dev
         with:
           broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          scope: contents:write pull_requests:write
+          repositories: ${{ github.repository }}
       - id: release
         name: Run release-please
         uses: abinnovision/actions@run-release-please-dev
