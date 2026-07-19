@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.9](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.8...gitops-deploy-source-v1.0.9) (2026-07-19)
+
+
+### Bug Fixes
+
+* bump setup-k8s-tools actionDependency to ^2.0.0 and add version check to CI ([#458](https://github.com/abinnovision/actions/issues/458)) ([c0db043](https://github.com/abinnovision/actions/commit/c0db043019e67fd1d317223fb281f7202187ca1a))
+
 ## [1.0.8](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.7...gitops-deploy-source-v1.0.8) (2026-05-06)
 
 
