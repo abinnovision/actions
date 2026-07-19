@@ -35,10 +35,10 @@ on:
       token-broker-url:
         type: string
         required: false
-        default: ${{ vars.TOKEN_BROKER_URL }}
+        default: ""
         description: |-
           URL of the token broker for OIDC token exchange.
-          **Default:** `${{ vars.TOKEN_BROKER_URL }}`
+          **Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.
       default-branch:
         type: string
         required: false
@@ -658,7 +658,7 @@ jobs:
       - name: Validate GitOps configuration
         if: inputs.gitops-app-config != ''
         run: |
-          if [[ -z "${{ inputs.token-broker-url }}" ]]; then
+          if [[ -z "${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}" ]]; then
             echo "::error::token-broker-url is required when gitops-app-config is provided"
             exit 1
           fi
@@ -1011,7 +1011,7 @@ jobs:
         if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
         uses: abinnovision/actions@exchange-github-token-dev
         with:
-          broker-url: ${{ inputs.token-broker-url }}
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
           repositories: ${{ steps.gitops-config.outputs.TARGET_REPO }}
           scope: actions:write
 
