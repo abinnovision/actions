@@ -25,12 +25,6 @@ on:
           Each secret is passed to Docker BuildKit as an individual secret mount with its own ID.
 
           **Usage in Dockerfile:** `--mount=type=secret,id=NPM_TOKEN` (available at `/run/secrets/NPM_TOKEN`)
-      GITOPS_PROXY_URL:
-        required: false
-        description: |-
-          GitHub Workflow Dispatch Proxy URL for triggering GitOps workflows.
-          **Required:** When `gitops-app-config` is provided
-          **Example:** `https://gwdp.example.com`
       CHECKOUT_TOKEN:
         required: false
         description: |-
@@ -664,8 +658,8 @@ jobs:
       - name: Validate GitOps configuration
         if: inputs.gitops-app-config != ''
         run: |
-          if [[ -z "${{ secrets.GITOPS_PROXY_URL }}" ]]; then
-            echo "::error::GITOPS_PROXY_URL secret is required when gitops-app-config is provided"
+          if [[ -z "${{ inputs.token-broker-url }}" ]]; then
+            echo "::error::token-broker-url is required when gitops-app-config is provided"
             exit 1
           fi
 
