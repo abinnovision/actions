@@ -3,6 +3,7 @@
 	"changelog-path": "CHANGELOG.md",
 	"release-type": "node",
 	"tag-separator": "-source-",
+	"plugins": [{ "type": "node-workspace" }],
 	"packages": {
 		"actions/exchange-github-token": {
 			"extra-files": ["README.md"]
@@ -39,6 +40,9 @@
 		},
 		"workflows/polyglot-monorepo-stack": {
 			"extra-files": ["README.md"]
+		},
+		"packages/action-tool-installer": {
+			"skip-github-release": true
 		}
 	}
 }
