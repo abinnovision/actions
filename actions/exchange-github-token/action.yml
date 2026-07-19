@@ -29,10 +29,10 @@ outputs:
     value: ${{ steps.exchange.outputs.token }}
   committer-name:
     description: "Bot committer name (e.g. app-name[bot])"
-    value: ""
+    value: ${{ steps.exchange.outputs.committer-name }}
   committer-email:
     description: "Bot committer email"
-    value: ""
+    value: ${{ steps.exchange.outputs.committer-email }}
 
 runs:
   using: composite
@@ -76,10 +76,20 @@ runs:
           ARGS+=(--resource "$GITHUB_REPOSITORY")
         fi
 
-        # Exchange token via oidc-token-cli
-        TOKEN=$(oidc-token "${ARGS[@]}")
+        # Exchange token via oidc-token-cli (JSON mode)
+        RESPONSE=$(oidc-token --all "${ARGS[@]}")
 
-        # Mask the token
+        TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+        COMMITTER_NAME=$(echo "$RESPONSE" | jq -r '.app_name // empty')
+        COMMITTER_EMAIL=$(echo "$RESPONSE" | jq -r '.app_email // empty')
+
+        if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+          echo "::error::oidc-token --all did not return an access_token"
+          exit 1
+        fi
+
         echo "::add-mask::$TOKEN"
 
         echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+        echo "committer-name=$COMMITTER_NAME" >> "$GITHUB_OUTPUT"
+        echo "committer-email=$COMMITTER_EMAIL" >> "$GITHUB_OUTPUT"
