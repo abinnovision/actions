@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.3](https://github.com/abinnovision/actions/compare/setup-k8s-tools-source-v2.0.2...setup-k8s-tools-source-v2.0.3) (2026-07-19)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @internal/action-tool-installer bumped to 3.0.0
+
 ## [2.0.2](https://github.com/abinnovision/actions/compare/setup-k8s-tools-source-v2.0.1...setup-k8s-tools-source-v2.0.2) (2026-07-19)
 
 
