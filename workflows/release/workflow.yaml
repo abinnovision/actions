@@ -8,14 +8,14 @@ on:
       token-broker-url:
         type: string
         required: false
-        default: ${{ vars.TOKEN_BROKER_URL }}
+        default: ""
         description: |-
           URL of the token broker for OIDC token exchange.
-          **Default:** `${{ vars.TOKEN_BROKER_URL }}`
+          **Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.
       gcp-auth:
         type: string
         required: false
-        default: ${{ vars.GCP_AUTH }}
+        default: ""
       target-branch:
         type: string
         required: false
@@ -60,7 +60,7 @@ jobs:
         name: Generate GitHub App token
         uses: abinnovision/actions@exchange-github-token-dev
         with:
-          broker-url: ${{ inputs.token-broker-url }}
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
       - id: release
         name: Run release-please
         uses: abinnovision/actions@run-release-please-dev
