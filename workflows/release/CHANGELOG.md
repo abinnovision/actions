@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/abinnovision/actions/compare/release-source-v2.1.1...release-source-v2.1.2) (2026-07-19)
+
+
+### Bug Fixes
+
+* pass scope and repositories to exchange-github-token in workflows ([#473](https://github.com/abinnovision/actions/issues/473)) ([b5e3c0a](https://github.com/abinnovision/actions/commit/b5e3c0a7a1723cc1d55b1ab254e5ec5c2b6a1aa7))
+
 ## [2.1.1](https://github.com/abinnovision/actions/compare/release-source-v2.1.0...release-source-v2.1.1) (2026-07-19)
 
 

@@ -35,7 +35,7 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@setup-k8s-tools-v2`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@setup-k8s-tools-v2.0.1`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@setup-k8s-tools-v2.0.2`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
