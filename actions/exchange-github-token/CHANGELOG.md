@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.1.1...exchange-github-token-source-v1.1.2) (2026-07-19)
+
+
+### Bug Fixes
+
+* **exchange-github-token:** export committer outputs as empty strings ([#466](https://github.com/abinnovision/actions/issues/466)) ([5adc3df](https://github.com/abinnovision/actions/commit/5adc3df09b0e9181eff29283d03b8848368616cc))
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.1.0...exchange-github-token-source-v1.1.1) (2026-07-19)
 
 
