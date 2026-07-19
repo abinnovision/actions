@@ -23,12 +23,12 @@ This workflow can be used with different version ranges. The following ranges ar
 
 ## Inputs
 
-| Input                | Description                                                                                                                                                                                                                          | Required | Default                        |
-| :------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :----------------------------- |
-| `token-broker-url`   | URL of the token broker for OIDC token exchange.<br>**Default:** `${{ vars.TOKEN_BROKER_URL }}`                                                                                                                                      | No       | `${{ vars.TOKEN_BROKER_URL }}` |
-| `gcp-auth`           |                                                                                                                                                                                                                                      | No       | `${{ vars.GCP_AUTH }}`         |
-| `target-branch`      | Branch to release from. Defaults to the repository default branch.                                                                                                                                                                   | No       | _empty_                        |
-| `prerelease-channel` | Prerelease channel name (e.g., "beta", "canary", "rc").<br>When set, computes prerelease versions for packages with pending changes.<br>Format: {next-version}-{channel}.{commit-count}+{short-sha}<br>Example: 1.4.0-beta.5+a3f2c1d | No       | _empty_                        |
+| Input                | Description                                                                                                                                                                                                                          | Required | Default |
+| :------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :------ |
+| `token-broker-url`   | URL of the token broker for OIDC token exchange.<br>**Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.                                                                                                              | No       | _empty_ |
+| `gcp-auth`           |                                                                                                                                                                                                                                      | No       | _empty_ |
+| `target-branch`      | Branch to release from. Defaults to the repository default branch.                                                                                                                                                                   | No       | _empty_ |
+| `prerelease-channel` | Prerelease channel name (e.g., "beta", "canary", "rc").<br>When set, computes prerelease versions for packages with pending changes.<br>Format: {next-version}-{channel}.{commit-count}+{short-sha}<br>Example: 1.4.0-beta.5+a3f2c1d | No       | _empty_ |
 
 ## Secrets
 
