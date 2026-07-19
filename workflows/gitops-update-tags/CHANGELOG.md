@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.3](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.2...gitops-update-tags-source-v1.2.3) (2026-07-19)
+
+
+### Bug Fixes
+
+* remove redundant repositories property from exchange-github-token consumers ([#481](https://github.com/abinnovision/actions/issues/481)) ([37b0628](https://github.com/abinnovision/actions/commit/37b06289698b94fe97f6ce018eac38dd53cc1944))
+
 ## [1.2.2](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.1...gitops-update-tags-source-v1.2.2) (2026-07-19)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.3](https://github.com/abinnovision/actions/compare/release-source-v2.1.2...release-source-v2.1.3) (2026-07-19)
+
+
+### Bug Fixes
+
+* remove redundant repositories property from exchange-github-token consumers ([#481](https://github.com/abinnovision/actions/issues/481)) ([37b0628](https://github.com/abinnovision/actions/commit/37b06289698b94fe97f6ce018eac38dd53cc1944))
+
 ## [2.1.2](https://github.com/abinnovision/actions/compare/release-source-v2.1.1...release-source-v2.1.2) (2026-07-19)
 
 
