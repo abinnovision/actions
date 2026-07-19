@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.4.2...polyglot-monorepo-stack-source-v1.5.0) (2026-07-19)
+
+
+### Features
+
+* **exchange-github-token:** add OIDC token exchange action, remove deprecated actions ([#453](https://github.com/abinnovision/actions/issues/453)) ([d7c6155](https://github.com/abinnovision/actions/commit/d7c6155a11f312d9923e6a245a167099e942f0df))
+* use token broker ([#456](https://github.com/abinnovision/actions/issues/456)) ([a8dc1ac](https://github.com/abinnovision/actions/commit/a8dc1ace2551c90fa1b258ae0e75fc0e616bf95e))
+
+
+### Bug Fixes
+
+* **polyglot-monorepo-stack:** remove dead GITOPS_PROXY_URL secret ([#461](https://github.com/abinnovision/actions/issues/461)) ([71eccce](https://github.com/abinnovision/actions/commit/71eccce56f5fdc79c46c2d880c7a429124c7a950))
+
+
+### Reverts
+
+* failed release ([#454](https://github.com/abinnovision/actions/issues/454)), fix setup-k8s-tools dependency ([#459](https://github.com/abinnovision/actions/issues/459)) ([12c7a1d](https://github.com/abinnovision/actions/commit/12c7a1d86d305e42744342af4dd4171d4aac0cc8))
+
 ## [1.4.2](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.4.1...polyglot-monorepo-stack-source-v1.4.2) (2026-07-15)
 
 
