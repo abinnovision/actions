@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.1...gitops-update-tags-source-v1.2.2) (2026-07-19)
+
+
+### Bug Fixes
+
+* pass scope and repositories to exchange-github-token in workflows ([#473](https://github.com/abinnovision/actions/issues/473)) ([b5e3c0a](https://github.com/abinnovision/actions/commit/b5e3c0a7a1723cc1d55b1ab254e5ec5c2b6a1aa7))
+
 ## [1.2.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.0...gitops-update-tags-source-v1.2.1) (2026-07-19)
 
 

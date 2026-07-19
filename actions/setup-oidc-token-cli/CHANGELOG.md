@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.2](https://github.com/abinnovision/actions/compare/setup-oidc-token-cli-source-v1.1.1...setup-oidc-token-cli-source-v1.1.2) (2026-07-19)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @internal/action-tool-installer bumped to 2.0.0
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/setup-oidc-token-cli-source-v1.1.0...setup-oidc-token-cli-source-v1.1.1) (2026-07-19)
 
 
