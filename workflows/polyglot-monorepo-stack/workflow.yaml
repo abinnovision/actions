@@ -996,6 +996,9 @@ jobs:
           # Use version tag from release output directly
           deployment_tag="${{ matrix.entry.packageVersion }}"
 
+          if [[ "$target_repo" != *"/"* ]]; then
+            target_repo="${{ github.repository_owner }}/$target_repo"
+          fi
           echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
           # Resolve deployment app based on release type
           if [[ "${{ matrix.entry.type }}" == "release" ]]; then
