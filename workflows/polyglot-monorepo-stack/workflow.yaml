@@ -1016,7 +1016,7 @@ jobs:
         with:
           broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
           repositories: ${{ steps.gitops-config.outputs.TARGET_REPO }}
-          scope: actions:write
+          scope: contents:read actions:write
 
       - name: Update GitOps Deployment (${{ steps.gitops-config.outputs.DEPLOY_APP }})
         if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
