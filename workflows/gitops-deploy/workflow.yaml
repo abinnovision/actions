@@ -120,6 +120,14 @@ on:
         description: |-
           Skip deployment if application is already in sync.
 
+      sync-prune:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Enable pruning of resources that are no longer defined in the source.
+          **Note:** When enabled, resources removed from manifests will be deleted during sync
+
       # PR comment configuration
       enable-pr-comments:
         type: boolean
@@ -687,7 +695,7 @@ jobs:
 
           echo "::group::Syncing ArgoCD application: $ARGOCD_APP"
 
-          if argocd $ARGOCD_CLI_ARGS app sync $ARGOCD_APP --timeout ${{ inputs.sync-timeout }}; then
+          if argocd $ARGOCD_CLI_ARGS app sync $ARGOCD_APP --timeout ${{ inputs.sync-timeout }}${{ inputs.sync-prune && ' --prune' || '' }}; then
             echo "::notice::Sync operation completed successfully"
 
             # Wait for application to become healthy
