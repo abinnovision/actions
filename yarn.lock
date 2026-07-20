@@ -2978,6 +2978,7 @@ __metadata:
     prettier: "npm:^3.9.5"
     setup-k8s-tools: "workspace:^"
     setup-node: "workspace:^"
+    setup-oidc-token-cli: "workspace:^"
   languageName: unknown
   linkType: soft
 

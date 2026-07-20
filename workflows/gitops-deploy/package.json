@@ -25,7 +25,8 @@
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
 		"setup-k8s-tools": "workspace:^",
-		"setup-node": "workspace:^"
+		"setup-node": "workspace:^",
+		"setup-oidc-token-cli": "workspace:^"
 	},
 	"devDependencies": {
 		"@abinnovision/prettier-config": "^2.2.0",
