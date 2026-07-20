@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.9...gitops-deploy-source-v1.1.0) (2026-07-20)
+
+
+### Features
+
+* **gitops-deploy:** add optional sync-prune input ([#491](https://github.com/abinnovision/actions/issues/491)) ([580a7b0](https://github.com/abinnovision/actions/commit/580a7b0ec53a1af551c83dad9b40d29dd5608df7))
+* **gitops-deploy:** use oidc-token-cli for DEX token exchange ([#493](https://github.com/abinnovision/actions/issues/493)) ([707ab2b](https://github.com/abinnovision/actions/commit/707ab2bc541f2f566517f404876b6fd89900361f))
+
 ## [1.0.9](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.8...gitops-deploy-source-v1.0.9) (2026-07-19)
 
 

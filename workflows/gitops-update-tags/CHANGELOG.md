@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.4](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.3...gitops-update-tags-source-v1.2.4) (2026-07-20)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.3.0
+
 ## [1.2.3](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.2...gitops-update-tags-source-v1.2.3) (2026-07-19)
 
 

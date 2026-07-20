@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.2.1...exchange-github-token-source-v1.3.0) (2026-07-20)
+
+
+### Features
+
+* **exchange-github-token:** add resources input aligned with broker prefixes ([#494](https://github.com/abinnovision/actions/issues/494)) ([3a21483](https://github.com/abinnovision/actions/commit/3a214834442e95a3ca6bdc706818d066e0259979))
+
 ## [1.2.1](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.2.0...exchange-github-token-source-v1.2.1) (2026-07-19)
 
 

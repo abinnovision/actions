@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.4](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.3...polyglot-monorepo-stack-source-v1.5.4) (2026-07-20)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.3.0
+    * release bumped to 2.1.4
+
 ## [1.5.3](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.2...polyglot-monorepo-stack-source-v1.5.3) (2026-07-20)
 
 
