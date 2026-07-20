@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.4](https://github.com/abinnovision/actions/compare/release-source-v2.1.3...release-source-v2.1.4) (2026-07-20)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.3.0
+
 ## [2.1.3](https://github.com/abinnovision/actions/compare/release-source-v2.1.2...release-source-v2.1.3) (2026-07-19)
 
 
