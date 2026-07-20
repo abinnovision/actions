@@ -463,49 +463,51 @@ jobs:
           echo "application_name=$argocd_app" >> $GITHUB_OUTPUT
           echo "ArgoCD application: $argocd_app"
 
+      - &setup-oidc-token-cli
+        name: Setup oidc-token-cli
+        if: inputs.auth-method == 'dex'
+        uses: abinnovision/actions@setup-oidc-token-cli-dev
+
       - &auth-dex
         name: Authenticate with ArgoCD (DEX)
         if: inputs.auth-method == 'dex'
         id: auth-dex
+        env:
+          DEX_ENDPOINT: ${{ secrets.DEX_ENDPOINT }}
+          DEX_CLIENT: ${{ secrets.DEX_GITHUB_ACTIONS_CLIENT }}
+          DEX_CONNECTOR: ${{ secrets.DEX_GITHUB_ACTIONS_CONNECTOR }}
+          ARGOCD_SERVER: ${{ inputs.argocd-server }}
         run: |
           set -euo pipefail
 
-          # Get GitHub OIDC token
-          ID_TOKEN=$(curl -s \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=core-argocd-github-actions" \
-            | jq -r ".value")
+          # DEX_GITHUB_ACTIONS_CLIENT is a combined "client_id:client_secret"
+          CLIENT_ID="${DEX_CLIENT%%:*}"
+          CLIENT_SECRET="${DEX_CLIENT#*:}"
 
-          echo "::add-mask::$ID_TOKEN"
+          # Exchange the GitHub Actions OIDC token for a DEX token (RFC 8693).
+          # oidc-token fetches the GitHub OIDC token itself via
+          # --subject-token-source github-actions (requires id-token: write).
+          DEX_TOKEN=$(OIDC_TOKEN_CLIENT_SECRET="$CLIENT_SECRET" oidc-token \
+            --issuer "$DEX_ENDPOINT" \
+            --client-id "$CLIENT_ID" \
+            --client-auth-method client_secret_basic \
+            --grant-type token-exchange \
+            --subject-token-source github-actions \
+            --subject-token-type urn:ietf:params:oauth:token-type:id_token \
+            --requested-token-type urn:ietf:params:oauth:token-type:id_token \
+            --audience core-argocd-github-actions \
+            --scope "openid profile groups" \
+            --extra "connector_id=$DEX_CONNECTOR")
 
-          if [[ -z "$ID_TOKEN" || "$ID_TOKEN" == "null" ]]; then
-            echo "::error::Failed to get GitHub OIDC token"
-            exit 1
-          fi
-
-          # Exchange with DEX
-          DEX_TOKEN_RESPONSE=$(curl -s \
-            ${{ secrets.DEX_ENDPOINT }}/token \
-            --user "${{ secrets.DEX_GITHUB_ACTIONS_CLIENT }}" \
-            --data-urlencode "connector_id=${{ secrets.DEX_GITHUB_ACTIONS_CONNECTOR }}" \
-            --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
-            --data-urlencode "scope=openid profile groups" \
-            --data-urlencode "requested_token_type=urn:ietf:params:oauth:token-type:id_token" \
-            --data-urlencode "subject_token=$ID_TOKEN" \
-            --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:id_token")
-
-          DEX_TOKEN=$(jq -r .access_token <<< "$DEX_TOKEN_RESPONSE")
-
-          if [[ -z "$DEX_TOKEN" || "$DEX_TOKEN" == "null" ]]; then
+          if [[ -z "$DEX_TOKEN" ]]; then
             echo "::error::Failed to exchange token with DEX"
-            echo "Response: $DEX_TOKEN_RESPONSE"
             exit 1
           fi
 
           echo "::add-mask::$DEX_TOKEN"
 
           # Build CLI arguments
-          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${DEX_TOKEN}"
+          ARGOCD_CLI_ARGS="--grpc-web --server $ARGOCD_SERVER --auth-token $DEX_TOKEN"
           echo "::add-mask::$ARGOCD_CLI_ARGS"
 
           echo "argocd_cli_args=$ARGOCD_CLI_ARGS" >> $GITHUB_OUTPUT
@@ -644,6 +646,7 @@ jobs:
           echo "application_name=$argocd_app" >> $GITHUB_OUTPUT
           echo "ArgoCD application: $argocd_app"
 
+      - *setup-oidc-token-cli
       - *auth-dex
       - *auth-token
 
