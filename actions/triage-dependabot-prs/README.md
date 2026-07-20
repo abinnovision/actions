@@ -19,6 +19,7 @@ jobs:
   dependabot:
     name: Dependabot automations
     runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
     permissions:
       pull-requests: write
       contents: write
@@ -27,13 +28,9 @@ jobs:
       - uses: abinnovision/actions@triage-dependabot-prs-v1
 ```
 
-> **Tip:** The action includes a built-in gate that skips execution when the
-> actor is not `dependabot[bot]`. If you want to avoid spinning up the job
-> entirely, add an `if` condition to the job:
->
-> ```yaml
-> if: ${{ github.actor == 'dependabot[bot]' }}
-> ```
+> **Note:** The `if` condition is optional. The action includes a built-in
+> gate that skips execution when the actor is not `dependabot[bot]`. Adding
+> the `if` avoids spinning up the job entirely.
 
 ## Latest versions
 
