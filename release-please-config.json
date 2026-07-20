@@ -29,6 +29,9 @@
 		"actions/setup-tools": {
 			"extra-files": ["README.md"]
 		},
+		"actions/triage-dependabot-prs": {
+			"extra-files": ["README.md"]
+		},
 		"workflows/release": {
 			"extra-files": ["README.md"]
 		},
