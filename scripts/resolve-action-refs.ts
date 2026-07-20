@@ -6,65 +6,7 @@ import path from "node:path";
 interface PackageJson {
 	name: string;
 	version: string;
-	actionDependencies?: Record<string, string>;
-}
-
-interface ResolvedDep {
-	name: string;
-	version: string;
-	tag: string;
-}
-
-/**
- * Parses a semver range from actionDependencies and resolves it to the
- * appropriate Git tag level based on the actual workspace version.
- *
- * - `^X.Y.Z` → `vX` (major floating tag)
- * - `~X.Y.Z` → `vX.Y` (minor floating tag)
- * - `X.Y.Z`  → `vX.Y.Z` (exact tag)
- */
-function resolveTagFromRange(
-	depName: string,
-	range: string,
-	actualVersion: string,
-): string {
-	const semverPattern = /^(\^|~)?(\d+)\.(\d+)\.(\d+)$/;
-	const match = range.match(semverPattern);
-
-	if (!match) {
-		console.error(
-			`Error: Invalid actionDependencies range '${range}' for '${depName}'. Expected '^X.Y.Z', '~X.Y.Z', or 'X.Y.Z'.`,
-		);
-		process.exit(1);
-	}
-
-	const [, prefix, major, minor] = match;
-	const actualParts = actualVersion.split(".");
-	const actualMajor = actualParts[0];
-	const actualMinor = actualParts[1];
-
-	if (prefix === "^") {
-		if (actualMajor !== major) {
-			console.error(
-				`Error: actionDependency '${depName}' declares range '${range}' but workspace version is ${actualVersion} (major version mismatch).`,
-			);
-			process.exit(1);
-		}
-		return `v${major}`;
-	}
-
-	if (prefix === "~") {
-		if (actualMajor !== major || actualMinor !== minor) {
-			console.error(
-				`Error: actionDependency '${depName}' declares range '${range}' but workspace version is ${actualVersion} (major.minor mismatch).`,
-			);
-			process.exit(1);
-		}
-		return `v${major}.${minor}`;
-	}
-
-	// Exact version
-	return `v${actualVersion}`;
+	dependencies?: Record<string, string>;
 }
 
 function parseArgs(): { stagingDir: string; workspaceRoot: string } {
@@ -106,7 +48,7 @@ function findPackageInWorkspace(
 	}
 
 	console.error(
-		`Error: actionDependency '${depName}' not found in workspace. Checked actions/${depName}/ and workflows/${depName}/`,
+		`Error: dependency '${depName}' not found in workspace. Checked actions/${depName}/ and workflows/${depName}/`,
 	);
 	process.exit(1);
 }
@@ -169,31 +111,32 @@ function main() {
 	const pkgJson = JSON.parse(
 		fs.readFileSync(pkgJsonPath, "utf8"),
 	) as PackageJson;
-	const actionDeps = pkgJson.actionDependencies ?? {};
 
-	if (Object.keys(actionDeps).length === 0) {
+	const internalNames = discoverInternalPackages(workspaceRoot);
+	const allDeps = pkgJson.dependencies ?? {};
+	const actionDepNames = Object.keys(allDeps).filter(name =>
+		internalNames.has(name),
+	);
+
+	if (actionDepNames.length === 0) {
 		console.log(
-			`[${pkgJson.name}] No actionDependencies declared, skipping resolution.`,
+			`[${pkgJson.name}] No dependencies declared, skipping resolution.`,
 		);
 		return;
 	}
 
 	// Resolve each dependency's version and tag from workspace
-	const resolvedDeps: ResolvedDep[] = Object.entries(actionDeps).map(
-		([name, range]) => {
-			const depPkg = findPackageInWorkspace(workspaceRoot, name);
-			const tag = resolveTagFromRange(name, range, depPkg.version);
-			return { name, version: depPkg.version, tag };
-		},
-	);
+	const resolvedDeps = actionDepNames.map(name => {
+		const depPkg = findPackageInWorkspace(workspaceRoot, name);
+		return { name, version: depPkg.version, tag: `v${depPkg.version}` };
+	});
 
 	console.log(
 		`[${pkgJson.name}] Resolving ${resolvedDeps.length} action dependency reference(s)...`,
 	);
 
 	// Discover all internal package names for undeclared-ref detection
-	const internalNames = discoverInternalPackages(workspaceRoot);
-	const declaredNames = new Set(Object.keys(actionDeps));
+	const declaredNames = new Set(actionDepNames);
 
 	// Find all YAML files in staging dir
 	const yamlFiles = findYamlFiles(stagingDir);
@@ -233,7 +176,7 @@ function main() {
 			const refName = match[1];
 			if (internalNames.has(refName) && !declaredNames.has(refName)) {
 				undeclaredRefs.push(
-					`${path.relative(stagingDir, filePath)}: references internal action '${refName}' not declared in actionDependencies`,
+					`${path.relative(stagingDir, filePath)}: references internal action '${refName}' not declared in dependencies`,
 				);
 			}
 		}
@@ -246,7 +189,7 @@ function main() {
 	// Error on undeclared refs
 	if (undeclaredRefs.length > 0) {
 		console.error(
-			"Error: Found references to internal actions not declared in actionDependencies:",
+			"Error: Found references to internal actions not declared in dependencies:",
 		);
 		for (const ref of undeclaredRefs) {
 			console.error(`  - ${ref}`);
@@ -258,7 +201,7 @@ function main() {
 	for (const dep of resolvedDeps) {
 		if (!usedDeps.has(dep.name)) {
 			console.warn(
-				`Warning: actionDependency '${dep.name}' is declared but no matching -dev reference found in YAML files`,
+				`Warning: dependency '${dep.name}' is declared but no matching -dev reference found in YAML files`,
 			);
 		}
 	}

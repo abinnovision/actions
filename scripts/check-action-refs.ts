@@ -6,7 +6,7 @@ import path from "node:path";
 interface PackageJson {
 	name: string;
 	version: string;
-	actionDependencies?: Record<string, string>;
+	dependencies?: Record<string, string>;
 }
 
 /**
@@ -80,12 +80,13 @@ function findYamlFilesToCheck(rootDir: string): string[] {
 }
 
 /**
- * Reads actionDependencies from a package's package.json, if it belongs to
- * the actions/ or workflows/ directories.
+ * Reads dependencies from a package's package.json, if it belongs to
+ * the actions/ or workflows/ directories, filtered to internal packages.
  */
 function getActionDependencies(
 	rootDir: string,
 	filePath: string,
+	internalNames: Set<string>,
 ): Record<string, string> | null {
 	const relative = path.relative(rootDir, filePath);
 	const parts = relative.split(path.sep);
@@ -100,7 +101,14 @@ function getActionDependencies(
 	if (!fs.existsSync(pkgPath)) return null;
 
 	const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as PackageJson;
-	return pkg.actionDependencies ?? {};
+	const deps = pkg.dependencies ?? {};
+	const filtered: Record<string, string> = {};
+	for (const [name, version] of Object.entries(deps)) {
+		if (internalNames.has(name)) {
+			filtered[name] = version;
+		}
+	}
+	return filtered;
 }
 
 function main() {
@@ -120,8 +128,8 @@ function main() {
 		const content = fs.readFileSync(filePath, "utf8");
 		const relative = path.relative(rootDir, filePath);
 
-		// Get actionDependencies if this is a published package
-		const actionDeps = getActionDependencies(rootDir, filePath);
+		// Get dependencies if this is a published package
+		const actionDeps = getActionDependencies(rootDir, filePath, internalNames);
 
 		let match;
 		// Reset lastIndex since we reuse the regex
@@ -141,41 +149,12 @@ function main() {
 				);
 			}
 
-			// Check 2: If this is a published package, the dep must be declared in actionDependencies
+			// Check 2: If this is a published package, the dep must be declared in dependencies
 			if (actionDeps !== null && tag === "dev") {
 				if (!actionDeps[name]) {
 					errors.push(
-						`${relative}: References internal action '${name}' but it is not declared in actionDependencies`,
+						`${relative}: References internal action '${name}' but it is not declared in dependencies`,
 					);
-				} else {
-					// Validate the range format and version compatibility
-					const rangePattern = /^(\^|~)?(\d+)\.(\d+)\.\d+$/;
-					const rangeMatch = actionDeps[name].match(rangePattern);
-					if (!rangeMatch) {
-						errors.push(
-							`${relative}: actionDependencies['${name}'] has invalid range '${actionDeps[name]}'. Expected '^X.Y.Z', '~X.Y.Z', or 'X.Y.Z'.`,
-						);
-					} else {
-						const [, prefix, major, minor] = rangeMatch;
-						const actualVersion = internalPackages.get(name);
-						if (actualVersion) {
-							const [actualMajor, actualMinor] =
-								actualVersion.split(".");
-							if (prefix === "^" && actualMajor !== major) {
-								errors.push(
-									`${relative}: actionDependency '${name}' declares range '${actionDeps[name]}' but workspace version is ${actualVersion} (major version mismatch)`,
-								);
-							} else if (
-								prefix === "~" &&
-								(actualMajor !== major ||
-									actualMinor !== minor)
-							) {
-								errors.push(
-									`${relative}: actionDependency '${name}' declares range '${actionDeps[name]}' but workspace version is ${actualVersion} (major.minor mismatch)`,
-								);
-							}
-						}
-					}
 				}
 			}
 		}
@@ -193,7 +172,7 @@ function main() {
 			"Version pinning happens automatically during publish.",
 		);
 		console.error(
-			"Published packages must declare internal deps in 'actionDependencies' in package.json.",
+			"Published packages must declare internal deps in 'dependencies' in package.json.",
 		);
 		process.exit(1);
 	}

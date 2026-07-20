@@ -23,13 +23,13 @@
 		]
 	},
 	"prettier": "@abinnovision/prettier-config",
+	"dependencies": {
+		"exchange-github-token": "workspace:^",
+		"run-release-please": "workspace:^",
+		"setup-gcp": "workspace:^"
+	},
 	"devDependencies": {
 		"@abinnovision/prettier-config": "^2.2.0",
 		"prettier": "^3.9.5"
-	},
-	"actionDependencies": {
-		"exchange-github-token": "^1.0.0",
-		"run-release-please": "^1.0.0",
-		"setup-gcp": "^1.0.0"
 	}
 }
