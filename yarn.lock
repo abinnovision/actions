@@ -2762,12 +2762,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"exchange-github-token@workspace:actions/exchange-github-token":
+"exchange-github-token@workspace:^, exchange-github-token@workspace:actions/exchange-github-token":
   version: 0.0.0-use.local
   resolution: "exchange-github-token@workspace:actions/exchange-github-token"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     prettier: "npm:^3.9.5"
+    setup-oidc-token-cli: "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -2975,6 +2976,8 @@ __metadata:
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     prettier: "npm:^3.9.5"
+    setup-k8s-tools: "workspace:^"
+    setup-node: "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -2983,7 +2986,11 @@ __metadata:
   resolution: "gitops-update-tags@workspace:workflows/gitops-update-tags"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
+    exchange-github-token: "workspace:^"
     prettier: "npm:^3.9.5"
+    setup-gcp: "workspace:^"
+    setup-k8s-tools: "workspace:^"
+    setup-node: "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -3882,7 +3889,11 @@ __metadata:
   resolution: "polyglot-monorepo-stack@workspace:workflows/polyglot-monorepo-stack"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
+    exchange-github-token: "workspace:^"
     prettier: "npm:^3.9.5"
+    release: "workspace:^"
+    setup-gcp: "workspace:^"
+    setup-tools: "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -4038,12 +4049,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"release@workspace:workflows/release":
+"release@workspace:^, release@workspace:workflows/release":
   version: 0.0.0-use.local
   resolution: "release@workspace:workflows/release"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
+    exchange-github-token: "workspace:^"
     prettier: "npm:^3.9.5"
+    run-release-please: "workspace:^"
+    setup-gcp: "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -4156,7 +4170,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"run-release-please@workspace:actions/run-release-please":
+"run-release-please@workspace:^, run-release-please@workspace:actions/run-release-please":
   version: 0.0.0-use.local
   resolution: "run-release-please@workspace:actions/run-release-please"
   dependencies:
@@ -4192,7 +4206,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"setup-gcp@workspace:actions/setup-gcp":
+"setup-gcp@workspace:^, setup-gcp@workspace:actions/setup-gcp":
   version: 0.0.0-use.local
   resolution: "setup-gcp@workspace:actions/setup-gcp"
   dependencies:
@@ -4201,7 +4215,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"setup-k8s-tools@workspace:actions/setup-k8s-tools":
+"setup-k8s-tools@workspace:^, setup-k8s-tools@workspace:actions/setup-k8s-tools":
   version: 0.0.0-use.local
   resolution: "setup-k8s-tools@workspace:actions/setup-k8s-tools"
   dependencies:
@@ -4217,7 +4231,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"setup-node@workspace:actions/setup-node":
+"setup-node@workspace:^, setup-node@workspace:actions/setup-node":
   version: 0.0.0-use.local
   resolution: "setup-node@workspace:actions/setup-node"
   dependencies:
@@ -4226,7 +4240,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"setup-oidc-token-cli@workspace:actions/setup-oidc-token-cli":
+"setup-oidc-token-cli@workspace:^, setup-oidc-token-cli@workspace:actions/setup-oidc-token-cli":
   version: 0.0.0-use.local
   resolution: "setup-oidc-token-cli@workspace:actions/setup-oidc-token-cli"
   dependencies:
@@ -4242,12 +4256,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"setup-tools@workspace:actions/setup-tools":
+"setup-tools@workspace:^, setup-tools@workspace:actions/setup-tools":
   version: 0.0.0-use.local
   resolution: "setup-tools@workspace:actions/setup-tools"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     prettier: "npm:^3.9.5"
+    setup-node: "workspace:^"
   languageName: unknown
   linkType: soft
 
