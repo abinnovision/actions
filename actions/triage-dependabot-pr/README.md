@@ -36,8 +36,8 @@ jobs:
 
 This action can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions@triage-dependabot-pr-v0`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@triage-dependabot-pr-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@triage-dependabot-pr-v1`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions@triage-dependabot-pr-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
