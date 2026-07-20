@@ -1,0 +1,43 @@
+# {{name}}
+
+{{description}}
+
+Triages Dependabot pull requests by automatically enabling auto-merge and
+approving dependency updates. The action validates its context on entry and
+skips gracefully when the actor is not `dependabot[bot]`.
+
+## Usage
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  dependabot:
+    name: Dependabot automations
+    runs-on: ubuntu-latest
+    if: $\{{ github.actor == 'dependabot[bot]' }}
+    permissions:
+      pull-requests: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: abinnovision/actions@triage-dependabot-prs-v1
+```
+
+> **Note:** The `if` condition is optional. The action includes a built-in
+> gate that skips execution when the actor is not `dependabot[bot]`. Adding
+> the `if` avoids spinning up the job entirely.
+
+## Latest versions
+
+{{{version-examples type="action" name=name version=version}}}
+
+## Inputs
+
+{{> inputs-table inputs}}
+
+## Outputs
+
+{{> outputs-table outputs}}
