@@ -11,9 +11,16 @@ inputs:
   scope:
     description: "Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)"
     required: true
-  repositories:
-    description: "Repositories the token should access, whitespace-separated (defaults to current repo)"
+  resources:
+    description: >-
+      Resources the token should access, whitespace-separated, using typed prefixes:
+      repo:owner/name, org:name, or enterprise:slug. Passed through to the broker as
+      --resource. Defaults to the current repository when neither resources nor repositories is set.
     required: false
+  repositories:
+    description: "Deprecated: use `resources`. Repositories the token should access, whitespace-separated."
+    required: false
+    deprecationMessage: "The 'repositories' input is deprecated; use 'resources' with typed prefixes (repo:/org:/enterprise:) instead."
   github-token:
     description: "Token for downloading oidc-token-cli from GitHub releases"
     required: false
@@ -48,6 +55,7 @@ runs:
         BROKER_URL: ${{ inputs.broker-url }}
         AUDIENCE: ${{ inputs.audience }}
         SCOPE: ${{ inputs.scope }}
+        RESOURCES: ${{ inputs.resources }}
         REPOSITORIES: ${{ inputs.repositories }}
       run: |
         set -euo pipefail
@@ -65,12 +73,24 @@ runs:
         SCOPE_VALUE=$(echo "$SCOPE" | tr '\n' ' ' | xargs)
         ARGS+=(--scope "$SCOPE_VALUE")
 
-        # Add repositories as repeated --resource flags
+        # Emit a deprecation warning if the legacy repositories input is used
         if [ -n "$REPOSITORIES" ]; then
-          for repo in $(echo "$REPOSITORIES" | tr '\n' ' ' | xargs -n1); do
-            ARGS+=(--resource "$repo")
-          done
-        else
+          echo "::warning::The 'repositories' input is deprecated; use 'resources' with typed prefixes (repo:/org:/enterprise:) instead."
+        fi
+
+        # Collect resources: resources (prefixed) first, then legacy repositories
+        RESOURCE_COUNT=0
+        for res in $(echo "$RESOURCES" | tr '\n' ' ' | xargs -n1); do
+          ARGS+=(--resource "$res")
+          RESOURCE_COUNT=$((RESOURCE_COUNT + 1))
+        done
+        for repo in $(echo "$REPOSITORIES" | tr '\n' ' ' | xargs -n1); do
+          ARGS+=(--resource "$repo")
+          RESOURCE_COUNT=$((RESOURCE_COUNT + 1))
+        done
+
+        # Default to the current repository only when neither input was provided
+        if [ "$RESOURCE_COUNT" -eq 0 ]; then
           ARGS+=(--resource "$GITHUB_REPOSITORY")
         fi
 

@@ -25,9 +25,11 @@ steps:
       scope: |
         contents:write
         pull_requests:write
-      repositories: |
-        my-org/repo-a
-        my-org/repo-b
+      resources: |
+        repo:my-org/repo-a
+        repo:my-org/repo-b
+        # or an org-wide token: org:my-org
+        # or an enterprise-wide token: enterprise:my-enterprise
 
   - name: Use the token
     env:
