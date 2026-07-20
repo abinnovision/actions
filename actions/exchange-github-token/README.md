@@ -25,9 +25,11 @@ steps:
       scope: |
         contents:write
         pull_requests:write
-      repositories: |
-        my-org/repo-a
-        my-org/repo-b
+      resources: |
+        repo:my-org/repo-a
+        repo:my-org/repo-b
+        # or an org-wide token: org:my-org
+        # or an enterprise-wide token: enterprise:my-enterprise
 
   - name: Use the token
     env:
@@ -45,14 +47,15 @@ This action can be used with different version ranges. The following ranges are 
 
 ## Inputs
 
-| Input                    | Description                                                                           | Required | Default               |
-| :----------------------- | :------------------------------------------------------------------------------------ | :------- | :-------------------- |
-| `broker-url`             | Base URL of the token broker service (used as OIDC issuer for discovery)              | Yes      |                       |
-| `audience`               | OIDC audience for the token broker (defaults to broker-url)                           | No       | _empty_               |
-| `scope`                  | Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)     | Yes      |                       |
-| `repositories`           | Repositories the token should access, whitespace-separated (defaults to current repo) | No       | _empty_               |
-| `github-token`           | Token for downloading oidc-token-cli from GitHub releases                             | No       | `${{ github.token }}` |
-| `oidc-token-cli-version` | Version of oidc-token-cli to install                                                  | No       | `latest`              |
+| Input                    | Description                                                                                                                                                                                                                                                  | Required | Default               |
+| :----------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :-------------------- |
+| `broker-url`             | Base URL of the token broker service (used as OIDC issuer for discovery)                                                                                                                                                                                     | Yes      |                       |
+| `audience`               | OIDC audience for the token broker (defaults to broker-url)                                                                                                                                                                                                  | No       | _empty_               |
+| `scope`                  | Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)                                                                                                                                                                            | Yes      |                       |
+| `resources`              | Resources the token should access, whitespace-separated, using typed prefixes: repo:owner/name, org:name, or enterprise:slug. Passed through to the broker as --resource. Defaults to the current repository when neither resources nor repositories is set. | No       | _empty_               |
+| `repositories`           | Deprecated: use `resources`. Repositories the token should access, whitespace-separated.                                                                                                                                                                     | No       | _empty_               |
+| `github-token`           | Token for downloading oidc-token-cli from GitHub releases                                                                                                                                                                                                    | No       | `${{ github.token }}` |
+| `oidc-token-cli-version` | Version of oidc-token-cli to install                                                                                                                                                                                                                         | No       | `latest`              |
 
 ## Outputs
 
