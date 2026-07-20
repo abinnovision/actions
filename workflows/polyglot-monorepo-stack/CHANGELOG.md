@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.2...polyglot-monorepo-stack-source-v1.5.3) (2026-07-20)
+
+
+### Bug Fixes
+
+* add contents:read scope to GitOps dispatch token in polyglot workflow ([#484](https://github.com/abinnovision/actions/issues/484)) ([e965f4f](https://github.com/abinnovision/actions/commit/e965f4f465f2b76b132bc898352080f615975b8b))
+
 ## [1.5.2](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.1...polyglot-monorepo-stack-source-v1.5.2) (2026-07-19)
 
 
