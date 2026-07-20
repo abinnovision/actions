@@ -4540,9 +4540,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"triage-dependabot-prs@workspace:actions/triage-dependabot-prs":
+"triage-dependabot-pr@workspace:actions/triage-dependabot-pr":
   version: 0.0.0-use.local
-  resolution: "triage-dependabot-prs@workspace:actions/triage-dependabot-prs"
+  resolution: "triage-dependabot-pr@workspace:actions/triage-dependabot-pr"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     prettier: "npm:^3.9.5"
