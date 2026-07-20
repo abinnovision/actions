@@ -1,4 +1,4 @@
-name: Triage Dependabot PRs
+name: Triage Dependabot PR
 author: "abi group GmbH"
 description: |
   Automatically approve and enable auto-merge for Dependabot pull requests.
@@ -51,7 +51,7 @@ runs:
         set -euo pipefail
 
         if [[ "$EVENT_NAME" != "pull_request" && "$EVENT_NAME" != "pull_request_target" ]]; then
-          echo "::error::triage-dependabot-prs requires a pull_request or pull_request_target trigger (got '$EVENT_NAME')."
+          echo "::error::triage-dependabot-pr requires a pull_request or pull_request_target trigger (got '$EVENT_NAME')."
           exit 1
         fi
 

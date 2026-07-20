@@ -1,4 +1,4 @@
-# triage-dependabot-prs
+# triage-dependabot-pr
 
 Automatically approve and enable auto-merge for Dependabot pull requests.
 By default, all update types (major, minor, patch) are auto-approved and
@@ -25,7 +25,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
-      - uses: abinnovision/actions@triage-dependabot-prs-v1
+      - uses: abinnovision/actions@triage-dependabot-pr-v1
 ```
 
 > **Note:** The `if` condition is optional. The action includes a built-in
@@ -36,8 +36,8 @@ jobs:
 
 This action can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions@triage-dependabot-prs-v0`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@triage-dependabot-prs-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@triage-dependabot-pr-v0`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions@triage-dependabot-pr-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
