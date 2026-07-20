@@ -4525,6 +4525,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"triage-dependabot-prs@workspace:actions/triage-dependabot-prs":
+  version: 0.0.0-use.local
+  resolution: "triage-dependabot-prs@workspace:actions/triage-dependabot-prs"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    prettier: "npm:^3.9.5"
+  languageName: unknown
+  linkType: soft
+
 "trim-newlines@npm:^3.0.0":
   version: 3.0.1
   resolution: "trim-newlines@npm:3.0.1"
