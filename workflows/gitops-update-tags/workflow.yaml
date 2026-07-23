@@ -255,21 +255,27 @@ jobs:
           # Check if all required images are present
           IFS=',' read -ra REQUIRED <<< "${{ inputs.automerge-images }}"
           ALL_PRESENT=true
+          MISSING=""
           for img in "${REQUIRED[@]}"; do
             # Trim whitespace
             img=$(echo "$img" | xargs)
             if ! echo "$UPDATED_IMAGES" | grep -qx "$img"; then
               echo "Missing required image: $img"
               ALL_PRESENT=false
+              MISSING="${MISSING}${img}, "
             else
               echo "Found required image: $img"
             fi
           done
 
+          # Trim trailing ", " for reporting
+          MISSING="${MISSING%, }"
+
           echo "All required images present: $ALL_PRESENT"
           echo "::endgroup::"
 
           echo "AUTOMERGE_ENABLED=$ALL_PRESENT" >> "$GITHUB_ENV"
+          echo "AUTOMERGE_MISSING=$MISSING" >> "$GITHUB_ENV"
 
       - name: Create Pull Request
         id: create-pull-request
@@ -305,12 +311,30 @@ jobs:
           pull-request-number: ${{ steps.create-pull-request.outputs.pull-request-number }}
           merge-method: squash
 
-      - name: Display PR information
+      - name: Write job summary
         if: steps.create-pull-request.outputs.pull-request-number != ''
         run: |
-          echo "::notice::Pull Request Created/Updated"
-          echo "PR Number: ${{ steps.create-pull-request.outputs.pull-request-number }}"
-          echo "PR URL: ${{ steps.create-pull-request.outputs.pull-request-url }}"
-          if [[ "$AUTOMERGE_ENABLED" == "true" ]]; then
-            echo "::notice::Automerge enabled (all required images updated)"
-          fi
+          {
+            echo "## 🔄 Image Tag Update — \`${{ inputs.application }}\`"
+            echo ""
+            echo "**This run:** \`${{ inputs.image }}\` -> \`${{ inputs.tag }}\`"
+            echo ""
+            echo "All tag updates included in the pull request:"
+            echo ""
+            echo "| Image | New Tag |"
+            echo "| :---- | :------ |"
+            while IFS='=' read -r image tag; do
+              [[ -z "$image" ]] && continue
+              echo "| \`${image}\` | \`${tag}\` |"
+            done <<< "$UPDATES"
+            echo ""
+            echo "**Pull Request:** [#${{ steps.create-pull-request.outputs.pull-request-number }}](${{ steps.create-pull-request.outputs.pull-request-url }})"
+            echo ""
+            if [[ "$AUTOMERGE_ENABLED" == "true" ]]; then
+              echo "**Automerge:** ✅ enabled — all required images updated"
+            elif [[ -n "${{ inputs.automerge-images }}" ]]; then
+              echo "**Automerge:** ⏳ pending — waiting for: ${AUTOMERGE_MISSING:-unknown}"
+            else
+              echo "**Automerge:** not configured"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
