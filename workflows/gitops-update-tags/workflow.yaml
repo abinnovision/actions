@@ -338,3 +338,6 @@ jobs:
               echo "**Automerge:** not configured"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # Headline annotation, surfaced in the run list and the PR checks tab
+          echo "::notice title=Tag Update::${{ inputs.application }}: ${{ inputs.image }} -> ${{ inputs.tag }} (PR #${{ steps.create-pull-request.outputs.pull-request-number }})"
