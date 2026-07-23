@@ -10,6 +10,7 @@ Updates image tags in kustomization files and creates pull requests.
 - Groups multiple updates into single PR per application
 - Formats files with prettier before committing
 - Optional automerge when all specified images are updated
+- Writes a job summary with the applied `image -> tag` updates, the pull request link, and automerge status
 
 ## Usage
 
