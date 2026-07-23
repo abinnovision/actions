@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.4...gitops-update-tags-source-v1.3.0) (2026-07-23)
+
+
+### Features
+
+* **gitops-update-tags:** report run details via job summary ([#495](https://github.com/abinnovision/actions/issues/495)) ([3b33b38](https://github.com/abinnovision/actions/commit/3b33b3803b372218b3ad5aea7e1a0cf807efea8c))
+
 ## [1.2.4](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.3...gitops-update-tags-source-v1.2.4) (2026-07-20)
 
 
