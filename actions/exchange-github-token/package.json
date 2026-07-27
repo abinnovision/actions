@@ -29,6 +29,6 @@
 	},
 	"devDependencies": {
 		"@abinnovision/prettier-config": "^2.2.0",
-		"prettier": "^3.9.5"
+		"prettier": "^3.9.6"
 	}
 }
