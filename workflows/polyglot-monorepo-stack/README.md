@@ -384,7 +384,7 @@ To migrate from `node-monorepo-stack` to `polyglot-monorepo-stack`:
 ```yaml
 jobs:
   polyglot-monorepo-stack:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v2
 ```
 
 [//]: # "x-release-please-end"
@@ -393,8 +393,8 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v1.5.4`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v2`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@polyglot-monorepo-stack-v2.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
