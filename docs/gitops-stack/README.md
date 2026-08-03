@@ -159,25 +159,20 @@ on:
       application:
         description: "Application to update"
         required: true
-      tag:
-        description: "Tag to update the image to"
+      updates:
+        description: "Image updates as CSV (image:tag,image2:tag2)"
         required: true
-      image:
-        description: "Name of the image to update"
-        required: false
-        default: "image"
 
 jobs:
   update:
     name: Update Tags
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v2
     permissions:
       contents: read
       id-token: write
     with:
       application: ${{ github.event.inputs.application }}
-      tag: ${{ github.event.inputs.tag }}
-      image: ${{ github.event.inputs.image }}
+      updates: ${{ github.event.inputs.updates }}
       # Auto-merge staging when all images are updated
       automerge-images: ${{ github.event.inputs.application == 'staging' && 'app-backend,app-frontend' || '' }}
 ```
