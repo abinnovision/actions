@@ -19,7 +19,7 @@ Updates image tags in kustomization files and creates pull requests.
 ```yaml
 jobs:
   gitops-update-tags:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v2
     with:
       application: ${{ <application> }}
       updates: ${{ <updates> }}
@@ -31,8 +31,8 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1.2.4`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v2`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v2.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Advanced Configuration
 

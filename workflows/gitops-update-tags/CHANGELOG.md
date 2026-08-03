@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.4...gitops-update-tags-source-v2.0.0) (2026-08-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **gitops:** batch image tag dispatch per release (v2) ([#504](https://github.com/abinnovision/actions/issues/504))
+
+### Features
+
+* **gitops-update-tags:** report run details via job summary ([#495](https://github.com/abinnovision/actions/issues/495)) ([3b33b38](https://github.com/abinnovision/actions/commit/3b33b3803b372218b3ad5aea7e1a0cf807efea8c))
+* **gitops:** batch image tag dispatch per release (v2) ([#504](https://github.com/abinnovision/actions/issues/504)) ([f1328db](https://github.com/abinnovision/actions/commit/f1328dbfdc91febb396443ca15b50bfaca6925db))
+
 ## [1.2.4](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.3...gitops-update-tags-source-v1.2.4) (2026-07-20)
 
 
