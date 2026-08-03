@@ -166,7 +166,7 @@ on:
 jobs:
   update:
     name: Update Tags
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v2
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1
     permissions:
       contents: read
       id-token: write
