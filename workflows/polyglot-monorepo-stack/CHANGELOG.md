@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.4...polyglot-monorepo-stack-source-v2.0.0) (2026-08-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **gitops:** batch image tag dispatch per release (v2) ([#504](https://github.com/abinnovision/actions/issues/504))
+
+### Features
+
+* **gitops:** batch image tag dispatch per release (v2) ([#504](https://github.com/abinnovision/actions/issues/504)) ([f1328db](https://github.com/abinnovision/actions/commit/f1328dbfdc91febb396443ca15b50bfaca6925db))
+
 ## [1.5.4](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.3...polyglot-monorepo-stack-source-v1.5.4) (2026-07-20)
 
 
