@@ -14,6 +14,10 @@ Updates image tags in kustomization files and creates pull requests.
 
 ## Usage
 
+This is a `workflow_call` workflow, so it can't be triggered directly. It must be called
+from its own workflow file in the consuming repository, triggered by e.g.
+`workflow_dispatch`.
+
 [//]: # "x-release-please-start-major"
 
 ```yaml
@@ -34,6 +38,42 @@ This workflow can be used with different version ranges. The following ranges ar
 - `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1`: Targeting major version <!-- x-release-please-major -->
 - `abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1.2.4`: Targeting a patch version <!-- x-release-please-version -->
 
+### Example Workflow File
+
+Complete, copyable caller workflow (e.g. `.github/workflows/update-tags.yaml`), triggered
+manually and scoping automerge to the `staging` application:
+
+[//]: # "x-release-please-start-major"
+
+```yaml
+name: Update Tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      application:
+        description: "Application directory to update, e.g. staging, production"
+        required: true
+      updates:
+        description: "Image tag updates as CSV, e.g. app-backend:vX.X.X,app-frontend:vX.X.X"
+        required: true
+
+jobs:
+  update:
+    name: Update Tags
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      application: ${{ github.event.inputs.application }}
+      updates: ${{ github.event.inputs.updates }}
+      # Auto-merge only for staging, once all listed images are updated
+      automerge-images: ${{ github.event.inputs.application == 'staging' && 'app-backend,app-frontend' || '' }}
+```
+
+[//]: # "x-release-please-end"
+
 ## Advanced Configuration
 
 ### Automerge
@@ -42,7 +82,7 @@ Auto-merge PR when all specified images are updated:
 
 ```yaml
 with:
-  automerge-images: app-backend,app-frontend,app-worker
+  automerge-images: app-backend,app-frontend
 ```
 
 ### Custom Applications Directory
