@@ -930,29 +930,64 @@ jobs:
           echo ""
           echo "Image digest: ${{ steps.build.outputs.digest }}"
 
-      - name: Parse GitOps configuration and extract deployment tag
-        if: inputs.gitops-app-config != ''
+  # Dispatch GitOps updates for the whole release.
+  # Apps deploying to the same (target-repo, application) pair are batched into a single dispatch.
+  publish_gitops:
+    name: Publish / GitOps Updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - configure
+      - publish_prepare
+      - publish_apps
+    # All-or-nothing: dispatch only when every image of this release was published.
+    if: >-
+      always() && !cancelled()
+      && needs.publish_apps.result == 'success'
+      && needs.publish_prepare.outputs.has-released-apps == 'true'
+      && inputs.gitops-app-config != ''
+    permissions:
+      contents: "read"
+      id-token: "write"
+    steps:
+      - name: Group GitOps deployments by target
         id: gitops-config
         env:
+          # CSV format: app-name,target-repo,dev-application,release-application,registry,image-name
           GITOPS_APP_CONFIG: ${{ inputs.gitops-app-config }}
+          RELEASED_APPS: ${{ needs.publish_prepare.outputs.released-apps }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
-          # Parse GitOps config for this app
-          # Format: app-name,target-repo,dev-application,release-application,registry,image-name
-          target_repo=""
-          dev_app=""
-          release_app=""
-          registry=""
-          image_name=""
+          set -euo pipefail
 
-          if [[ -n "$GITOPS_APP_CONFIG" ]]; then
+          entries_file=$(mktemp)
+          resolved_file=$(mktemp)
+          echo "$RELEASED_APPS" | jq -c '.[]' > "$entries_file"
+
+          while read -r entry; do
+            app=$(echo "$entry" | jq -r '.app')
+            deployment_tag=$(echo "$entry" | jq -r '.packageVersion')
+            release_type=$(echo "$entry" | jq -r '.type')
+
+            target_repo=""
+            dev_app=""
+            release_app=""
+            registry=""
+            image_name=""
+
             while IFS= read -r line; do
               # Skip empty lines
               [[ -z "$line" ]] && continue
 
-              # Check if line starts with our app name followed by comma
-              if [[ "$line" =~ ^${{ matrix.entry.app }}, ]]; then
+              # Check if line starts with this app name followed by comma
+              if [[ "$line" == "$app,"* ]]; then
                 # Remove "app-name," prefix
-                rest="${line#${{ matrix.entry.app }},}"
+                rest="${line#"$app",}"
+
+                # Require the 4 remaining delimiters, otherwise the row is incomplete
+                if [[ "$(echo "$rest" | tr -cd ',' | wc -c)" -lt 4 ]]; then
+                  break
+                fi
 
                 # Split on first 5 commas
                 target_repo="${rest%%,*}"
@@ -971,63 +1006,84 @@ jobs:
                 break
               fi
             done <<< "$GITOPS_APP_CONFIG"
-          fi
 
-          # Validate that all required fields are present
-          if [[ -z "$target_repo" ]] || [[ -z "$dev_app" ]] || [[ -z "$release_app" ]] || [[ -z "$registry" ]] || [[ -z "$image_name" ]]; then
-            echo "::warning::GitOps configuration for app '${{ matrix.entry.app }}' is incomplete or not provided. Skipping GitOps deployment."
-            echo "  target_repo: ${target_repo:-(empty)}"
-            echo "  dev_app: ${dev_app:-(empty)}"
-            echo "  release_app: ${release_app:-(empty)}"
-            echo "  registry: ${registry:-(empty)}"
-            echo "  image_name: ${image_name:-(empty)}"
-            exit 0
-          fi
+            # Validate that all required fields are present
+            if [[ -z "$target_repo" ]] || [[ -z "$dev_app" ]] || [[ -z "$release_app" ]] || [[ -z "$registry" ]] || [[ -z "$image_name" ]]; then
+              echo "::warning::GitOps configuration for app '$app' is incomplete or not provided. Skipping GitOps deployment."
+              continue
+            fi
 
-          # Validate registry value
-          case "$registry" in
-            ghcr|gcpar|dockerhub) ;;
-            *)
-              echo "::error::Invalid registry '$registry' for app ${{ matrix.entry.app }}. Valid options: ghcr, gcpar, dockerhub"
-              exit 1
-              ;;
-          esac
+            # Validate registry value
+            case "$registry" in
+              ghcr|gcpar|dockerhub) ;;
+              *)
+                echo "::error::Invalid registry '$registry' for app $app. Valid options: ghcr, gcpar, dockerhub"
+                exit 1
+                ;;
+            esac
 
-          # Use version tag from release output directly
-          deployment_tag="${{ matrix.entry.packageVersion }}"
+            if [[ "$target_repo" != *"/"* ]]; then
+              target_repo="$REPOSITORY_OWNER/$target_repo"
+            fi
 
-          if [[ "$target_repo" != *"/"* ]]; then
-            target_repo="${{ github.repository_owner }}/$target_repo"
-          fi
-          echo "TARGET_REPO=$target_repo" >> $GITHUB_OUTPUT
-          # Resolve deployment app based on release type
-          if [[ "${{ matrix.entry.type }}" == "release" ]]; then
-            echo "DEPLOY_APP=$release_app" >> $GITHUB_OUTPUT
-          else
-            echo "DEPLOY_APP=$dev_app" >> $GITHUB_OUTPUT
-          fi
-          echo "IMAGE_NAME=$image_name" >> $GITHUB_OUTPUT
-          echo "DEPLOYMENT_TAG=$deployment_tag" >> $GITHUB_OUTPUT
+            # Resolve deployment application based on release type
+            if [[ "$release_type" == "release" ]]; then
+              deploy_app="$release_app"
+            else
+              deploy_app="$dev_app"
+            fi
 
+            jq -n -c --arg repo "$target_repo" --arg application "$deploy_app" --arg update "$image_name:$deployment_tag" \
+              '{targetRepo: $repo, application: $application, update: $update}' >> "$resolved_file"
+            echo "Collected $app -> $target_repo ($deploy_app): $image_name:$deployment_tag"
+          done < "$entries_file"
+
+          # Batch all updates targeting the same repository and application into one entry
+          groups=$(jq -s -c 'group_by(.targetRepo + "|" + .application)
+            | map({targetRepo: .[0].targetRepo, application: .[0].application, updates: (map(.update) | join(","))})' "$resolved_file")
+
+          target_repos=$(echo "$groups" | jq -r '[.[].targetRepo] | unique | join(" ")')
+
+          echo "groups=$groups" >> $GITHUB_OUTPUT
+          echo "target-repos=$target_repos" >> $GITHUB_OUTPUT
+          echo "has-groups=$(echo "$groups" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
+
+          echo "Deployment groups: $groups"
+
+      # One token covering every target repository; the dispatch loop cannot call an action per group.
       - id: gitops-token
         name: Exchange token for GitOps dispatch
-        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
+        if: steps.gitops-config.outputs.has-groups == 'true'
         uses: abinnovision/actions@exchange-github-token-dev
         with:
           broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
-          repositories: ${{ steps.gitops-config.outputs.TARGET_REPO }}
+          repositories: ${{ steps.gitops-config.outputs.target-repos }}
           scope: contents:read actions:write
 
-      - name: Update GitOps Deployment (${{ steps.gitops-config.outputs.DEPLOY_APP }})
-        if: inputs.gitops-app-config != '' && steps.gitops-config.outputs.TARGET_REPO != ''
+      - name: Update GitOps deployments
+        if: steps.gitops-config.outputs.has-groups == 'true'
         env:
           GH_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          GITOPS_GROUPS: ${{ steps.gitops-config.outputs.groups }}
+          GITOPS_WORKFLOW_FILE: ${{ inputs.gitops-workflow-file }}
         run: |
-          gh workflow run ${{ inputs.gitops-workflow-file }} \
-            --repo ${{ steps.gitops-config.outputs.TARGET_REPO }} \
-            --field application=${{ steps.gitops-config.outputs.DEPLOY_APP }} \
-            --field tag=${{ steps.gitops-config.outputs.DEPLOYMENT_TAG }} \
-            --field image=${{ steps.gitops-config.outputs.IMAGE_NAME }}
+          set -euo pipefail
+
+          groups_file=$(mktemp)
+          echo "$GITOPS_GROUPS" | jq -c '.[]' > "$groups_file"
+
+          while read -r group; do
+            target_repo=$(echo "$group" | jq -r '.targetRepo')
+            application=$(echo "$group" | jq -r '.application')
+            updates=$(echo "$group" | jq -r '.updates')
+
+            echo "Dispatching GitOps update to $target_repo for $application: $updates"
+
+            gh workflow run "$GITOPS_WORKFLOW_FILE" \
+              --repo "$target_repo" \
+              --field "application=$application" \
+              --field "updates=$updates"
+          done < "$groups_file"
 
   # Build and deploy static apps to GitHub Pages.
   # Apps must declare `"publishConfig": { "platform": "gh-pages" }` in their package.json to be included.
