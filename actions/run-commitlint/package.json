@@ -48,7 +48,7 @@
 		"@abinnovision/prettier-config": "^2.2.0",
 		"@commitlint/types": "^21.2.0",
 		"@vercel/ncc": "^0.44.1",
-		"eslint": "^10.7.0",
+		"eslint": "^10.8.0",
 		"prettier": "^3.9.6",
 		"typescript": "^6.0.3"
 	}

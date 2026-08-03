@@ -48,7 +48,7 @@
 		"@abinnovision/eslint-config-base": "^3.4.2",
 		"@abinnovision/prettier-config": "^2.2.0",
 		"@types/semver": "^7.7.1",
-		"eslint": "^10.7.0",
+		"eslint": "^10.8.0",
 		"prettier": "^3.9.6",
 		"typescript": "^6.0.3"
 	}
