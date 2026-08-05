@@ -349,9 +349,7 @@ These are plain build arguments, not BuildKit secrets.
 **Example Dockerfile:**
 
 ```dockerfile
-# syntax=docker/dockerfile:1.4
-FROM node:22-alpine AS builder
-
+# ...inside your existing build stage
 ARG TURBO_API
 ARG TURBO_TEAM
 ARG TURBO_TOKEN
