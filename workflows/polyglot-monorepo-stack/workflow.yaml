@@ -766,6 +766,9 @@ jobs:
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            network=host
 
       - name: Setup GCP Authentication
         if: inputs.enable-apps-registry-gcpar && inputs.gcp-auth != ''
@@ -839,6 +842,9 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
           echo "CACHE_FROM=$cache_from" >> $GITHUB_OUTPUT
           echo "CACHE_TO=$cache_to" >> $GITHUB_OUTPUT
+
+          # Turbo remote-cache passthrough
+          echo "TURBO_API=${TURBO_API/localhost/127.0.0.1}" >> $GITHUB_OUTPUT
           echo "Configured registries: ${#images[@]}"
 
       - name: Extract Docker metadata
@@ -918,8 +924,12 @@ jobs:
             uv_version=${{ steps.app-meta.outputs.UV_VERSION }}
             build_version=v${{ matrix.entry.version }}
             build_commit=${{ matrix.entry.sha }}
+            TURBO_API=${{ steps.image-names.outputs.TURBO_API }}
+            TURBO_TEAM=${{ env.TURBO_TEAM }}
+            TURBO_TOKEN=${{ env.TURBO_TOKEN }}
           secret-files: |
             ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && steps.app-secrets.outputs.SECRETS_MOUNT_STRING || '' }}
+          allow: network.host
 
       - name: Display built image references
         run: |
