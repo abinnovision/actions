@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.1.0...polyglot-monorepo-stack-source-v2.1.1) (2026-08-05)
+
+
+### Performance Improvements
+
+* **polyglot-monorepo-stack:** run test job in parallel with check_build ([#520](https://github.com/abinnovision/actions/issues/520)) ([a2113dd](https://github.com/abinnovision/actions/commit/a2113ddf03868c05c51c8c3e3e8a04df00e4f99a))
+
 ## [2.1.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.0.0...polyglot-monorepo-stack-source-v2.1.0) (2026-08-05)
 
 
