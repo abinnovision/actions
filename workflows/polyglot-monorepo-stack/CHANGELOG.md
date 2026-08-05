@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.1.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.0.0...polyglot-monorepo-stack-source-v2.1.0) (2026-08-05)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** enable BuildKit SBOM generation for app images ([#515](https://github.com/abinnovision/actions/issues/515)) ([6b8508a](https://github.com/abinnovision/actions/commit/6b8508a441073372c65c6432ba352cecea5e8595))
+* **polyglot-monorepo-stack:** expose Turbo remote cache to app Docker builds ([#517](https://github.com/abinnovision/actions/issues/517)) ([e5dadfb](https://github.com/abinnovision/actions/commit/e5dadfb8a0c869b342b8289d1e01471e07bb43bf))
+
+
+### Bug Fixes
+
+* **polyglot-monorepo-stack:** grant actions:write for cache writes ([#518](https://github.com/abinnovision/actions/issues/518)) ([94cbeaf](https://github.com/abinnovision/actions/commit/94cbeaf54e968955a835785c59081c585158406b))
+* **polyglot-monorepo-stack:** support the pull_request trigger ([#519](https://github.com/abinnovision/actions/issues/519)) ([b86e833](https://github.com/abinnovision/actions/commit/b86e833136b8e4390b9ce31621689d97c1027972))
+
 ## [2.0.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v1.5.4...polyglot-monorepo-stack-source-v2.0.0) (2026-08-03)
 
 
