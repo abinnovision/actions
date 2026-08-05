@@ -244,6 +244,8 @@ jobs:
     name: Configure
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     outputs:
       # Commit SHA to check out.
       commit-sha: ${{ steps.commit.outputs.commit_sha }}
@@ -255,14 +257,16 @@ jobs:
       # Apps available for GitHub Pages deployment.
       gh-pages-apps-available: ${{ steps.evaluate.outputs.gh_pages_apps_available }}
     steps:
-      # Resolve the commit SHA based on event type:
-      # pull_request_target: PR head (event runs in base branch context)
-      # push: triggering commit
-      # merge_group: merge commit head
+      # Resolve the commit SHA to check out for this event.
       - name: Evaluate commit
         id: commit
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              echo "PR is #${{ github.event.number }}..."
+              echo "PR Head SHA is ${{ github.event.pull_request.head.sha }}..."
+              echo "commit_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+              echo "::warning::'pull_request_target' is deprecated for polyglot-monorepo-stack: cache writes are denied and fork PRs cannot be checked out. Switch the caller to 'pull_request'."
               echo "PR is #${{ github.event.number }}..."
               echo "PR Head SHA is ${{ github.event.pull_request.head.sha }}..."
               echo "commit_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
@@ -390,6 +394,7 @@ jobs:
       - configure
     permissions:
       contents: read
+      packages: read
       actions: write
     steps:
       - name: Checkout
@@ -433,6 +438,7 @@ jobs:
         test-type: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix) }}
     permissions:
       contents: read
+      packages: read
       actions: write
     steps:
       - name: Checkout
@@ -473,6 +479,8 @@ jobs:
     timeout-minutes: 2
     needs: [configure, release]
     if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.result == 'success' && needs.release.outputs.versions != '{}'
+    permissions:
+      contents: read
     outputs:
       released-apps: ${{ steps.extract.outputs.released_apps }}
       has-released-apps: ${{ steps.extract.outputs.has_released_apps }}
@@ -1119,6 +1127,7 @@ jobs:
       && needs.publish_prepare.outputs.has-released-gh-pages-apps == 'true'
     permissions:
       contents: read
+      packages: read
       id-token: write
       pages: write
       actions: write

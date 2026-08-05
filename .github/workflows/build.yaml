@@ -6,13 +6,14 @@ concurrency:
   # If it's not a PR or merge group, use 'main' as the PR number.
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number || github.event.merge_group.id || 'main' }}
   # Cancel only in-progress jobs when it's a PR.
-  cancel-in-progress: ${{ github.event_name == 'pull_request_target' || github.event_name == 'merge_group' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 on:
   push:
     branches:
       - main
-  pull_request_target:
+  # Not 'pull_request_target': its cache is read-only and it cannot check out fork PRs.
+  pull_request:
     branches:
       - main
 
@@ -27,7 +28,7 @@ jobs:
     steps:
       - name: Evaluate commit
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
               echo "PR is #${{ github.event.number }}..."
               echo "PR Head SHA is ${{ github.event.pull_request.head.sha }}..."
               echo "COMMIT_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
@@ -45,6 +46,10 @@ jobs:
     timeout-minutes: 5
     needs:
       - configure
+    permissions:
+      contents: read
+      packages: read
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
