@@ -424,13 +424,13 @@ jobs:
         run: yarn run test-unit
 
   # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
+  # Runs concurrently with check_build: neither job consumes build artifacts from the other.
   test:
     name: Test / ${{ matrix.test-type }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
       - configure
-      - check_build
     if: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix)[0] != null }}
     strategy:
       fail-fast: false
