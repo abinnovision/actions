@@ -342,6 +342,40 @@ RUN if [ -n "$uv_version" ]; then pip install uv==${uv_version}; fi
       npm config set //registry.npmjs.org/:_authToken $(cat /run/secrets/NPM_TOKEN)
   ```
 
+## Turbo Remote Cache in Docker Builds
+
+The `Setup Tools` step already used by app builds starts a runner-local Turborepo remote-cache proxy via [`rharkor/caching-for-turbo`](https://github.com/rharkor/caching-for-turbo) (through `setup-node`'s `enable-turbo-cache: auto`), backed by the GitHub Actions cache. The buildx builder is created with `network=host` and the build receives three additional build arguments pointing at that same proxy:
+
+- `TURBO_API` - URL of the runner-local cache proxy (host-reachable `127.0.0.1` address)
+- `TURBO_TEAM` - Team identifier expected by the proxy
+- `TURBO_TOKEN` - Session token of the proxy (local to the job, not a real credential)
+
+These are plain build arguments, not BuildKit secrets.
+
+**Consuming the cache is opt-in per app.** To use it, the app's `Dockerfile` must:
+
+1. Declare `# syntax=docker/dockerfile:1.4` (or newer) as its **first line**
+2. Accept the three build arguments via `ARG`/`ENV`
+3. Annotate the `turbo build` instruction with `--network=host`
+
+**Example Dockerfile:**
+
+```dockerfile
+# ...inside your existing build stage
+ARG TURBO_API
+ARG TURBO_TEAM
+ARG TURBO_TOKEN
+ENV TURBO_API=${TURBO_API}
+ENV TURBO_TEAM=${TURBO_TEAM}
+ENV TURBO_TOKEN=${TURBO_TOKEN}
+
+RUN --network=host turbo build
+```
+
+Without `--network=host` on the `RUN` instruction, the build cannot reach the proxy and Turbo falls back to a local-only cache.
+
+For Dockerfiles that don't reference these build arguments, this is a no-op: the extra arguments stay unused and the build behaves exactly as before.
+
 ## Migration from node-monorepo-stack
 
 To migrate from `node-monorepo-stack` to `polyglot-monorepo-stack`:
