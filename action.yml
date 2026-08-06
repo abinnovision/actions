@@ -1,0 +1,21 @@
+name: Setup oidc-token-cli
+author: "abi group GmbH"
+description: |
+  Installs the abinnovision/oidc-token-cli binary with GitHub Actions tool
+  caching. Defaults to the latest release, so no inputs are required; pass a
+  bare semver to pin a specific version.
+inputs:
+  github-token:
+    description: "GitHub token for authenticated API and asset download requests."
+    required: true
+    default: ${{ github.token }}
+  version:
+    description: 'Version to install ("latest" or e.g. "0.7.0").'
+    required: false
+    default: "latest"
+outputs:
+  version:
+    description: "Resolved oidc-token-cli version installed (bare semver)."
+runs:
+  using: node24
+  main: dist/index.js
