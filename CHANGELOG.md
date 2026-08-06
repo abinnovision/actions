@@ -1,0 +1,72 @@
+# Changelog
+
+## [1.1.4](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.3...run-release-please-source-v1.1.4) (2026-05-11)
+
+
+### Bug Fixes
+
+* **run-release-please:** skip stale PR branch versions in prerelease computation ([#400](https://github.com/abinnovision/actions/issues/400)) ([526e9b2](https://github.com/abinnovision/actions/commit/526e9b25860c295fa34a949e976593a86479ed9f))
+
+## [1.1.3](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.2...run-release-please-source-v1.1.3) (2026-04-28)
+
+
+### Bug Fixes
+
+* upgrade GitHub Action dependencies to latest versions ([#380](https://github.com/abinnovision/actions/issues/380)) ([a95663b](https://github.com/abinnovision/actions/commit/a95663bbd9220d7fd39e1914f81eb2c31680e113))
+
+## [1.1.2](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.1...run-release-please-source-v1.1.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* propagate linked-versions releases to silent group siblings ([#374](https://github.com/abinnovision/actions/issues/374)) ([a31f285](https://github.com/abinnovision/actions/commit/a31f285c1255b6787135438b723bd76c85608cfb))
+
+## [1.1.1](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.0...run-release-please-source-v1.1.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* handle linked-version groups without groupName ([#372](https://github.com/abinnovision/actions/issues/372)) ([e9fc447](https://github.com/abinnovision/actions/commit/e9fc447f3f74179b26293539977d0861da8ae765))
+* synchronize prerelease versions for linked-version groups ([#369](https://github.com/abinnovision/actions/issues/369)) ([d8e5f5c](https://github.com/abinnovision/actions/commit/d8e5f5c080a0baa7928dd3db6ab2785ad1356ae1))
+* synchronize prerelease versions for linked-version groups ([#371](https://github.com/abinnovision/actions/issues/371)) ([91eb6cf](https://github.com/abinnovision/actions/commit/91eb6cff376eef7e1705d0bc9c9b97c294cac955))
+
+## [1.1.0](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.3...run-release-please-source-v1.1.0) (2026-04-12)
+
+
+### Features
+
+* add sha field to versions output and avoid duplicate builds ([#355](https://github.com/abinnovision/actions/issues/355)) ([4839cf5](https://github.com/abinnovision/actions/commit/4839cf56b3947bc3addc2e1d9194eda8327f78ef))
+* per-component changelog-based prerelease versioning ([#353](https://github.com/abinnovision/actions/issues/353)) ([da995d1](https://github.com/abinnovision/actions/commit/da995d1bccce3d4e778ba35bffa2a1fea2d30026))
+
+
+### Bug Fixes
+
+* upgrade GitHub actions to latest versions ([#365](https://github.com/abinnovision/actions/issues/365)) ([01d818a](https://github.com/abinnovision/actions/commit/01d818a9115747dbaf4e7b54fd3a3a64f94e1305))
+
+## [1.0.3](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.2...run-release-please-source-v1.0.3) (2026-04-11)
+
+
+### Bug Fixes
+
+* improve merge logic to avoid overwriting version bumps from PR branches ([#351](https://github.com/abinnovision/actions/issues/351)) ([9809975](https://github.com/abinnovision/actions/commit/980997527584f196413ff6453ab1caf4a39993d3))
+
+## [1.0.2](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.1...run-release-please-source-v1.0.2) (2026-02-22)
+
+
+### Bug Fixes
+
+* support component-specific release-please PR branches ([#330](https://github.com/abinnovision/actions/issues/330)) ([8e973f0](https://github.com/abinnovision/actions/commit/8e973f03f833307e57e8be02369df3703133f507))
+
+## [1.0.1](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.0.0...run-release-please-source-v1.0.1) (2026-02-19)
+
+
+### Bug Fixes
+
+* update versioning structure to include packageVersion and short SHA ([#320](https://github.com/abinnovision/actions/issues/320)) ([f6586bd](https://github.com/abinnovision/actions/commit/f6586bd30a741e6586b71136dcfca38e6536225c))
+
+## 1.0.0 (2026-02-18)
+
+
+### Features
+
+* implement run-release-please action ([#305](https://github.com/abinnovision/actions/issues/305)) ([5923820](https://github.com/abinnovision/actions/commit/5923820cbf91500a1d82c345dcf0251d4d1d00a5))
