@@ -7,7 +7,7 @@ Validates manifests and deploys ArgoCD applications.
 ## Behavior
 
 - **Pull requests:** Validates manifests, posts ArgoCD diff as PR comment
-- **Main branch:** Validates manifests, syncs to ArgoCD, waits for health
+- **Main branch:** Validates manifests, triggers ArgoCD sync, confirms it started without immediate errors (does not wait for full application health)
 
 ## Usage
 
@@ -62,8 +62,16 @@ with:
 
 ```yaml
 with:
-	sync-timeout: 1200
-	health-timeout: 1200
+	sync-timeout: 300 # bounds only the immediate post-trigger error check, not the full sync
+```
+
+### Conditional Pruning
+
+`sync-prune` is a plain boolean input, so it can be set to any expression evaluated by the calling workflow:
+
+```yaml
+with:
+	sync-prune: ${{ github.ref == 'refs/heads/main' }}
 ```
 
 ## Inputs
@@ -77,8 +85,8 @@ with:
 | `enable-kube-score`            | Enable kube-score validation (best practices).<br>**Note:** kube-score failures are warnings only, won't block deployment                                                                                                                                                                                                                                                            | No       | `true`                                                                                                                                  |
 | `enable-kubeconform`           | Enable kubeconform validation (schema validation).<br>**Note:** kubeconform failures are critical and will block deployment                                                                                                                                                                                                                                                          | No       | `true`                                                                                                                                  |
 | `kubeconform-schema-locations` | Newline-separated list of kubeconform schema locations.<br>**Default:** Default Kubernetes schemas + Datree CRDs catalog<br>**Example:**<br>`<br>default<br>https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>https://storage.googleapis.com/custom-crds/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>` | No       | `default<br>https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>` |
-| `sync-timeout`                 | ArgoCD sync timeout in seconds.<br>**Default:** `600` (10 minutes)                                                                                                                                                                                                                                                                                                                   | No       | `600`                                                                                                                                   |
-| `health-timeout`               | ArgoCD health check timeout in seconds.<br>**Default:** `600` (10 minutes)                                                                                                                                                                                                                                                                                                           | No       | `600`                                                                                                                                   |
+| `sync-timeout`                 | Timeout in seconds for the post-trigger check that the sync operation started without immediate errors.<br>**Note:** The sync itself runs asynchronously; this only bounds a short check, not the full sync duration.<br>**Default:** `120` (2 minutes)                                                                                                                              | No       | `120`                                                                                                                                   |
+| `health-timeout`               | **Deprecated:** No longer used. The workflow no longer waits for application health after sync.<br>Kept for backward compatibility; has no effect.                                                                                                                                                                                                                                   | No       | `600`                                                                                                                                   |
 | `skip-if-synced`               | Skip deployment if application is already in sync.                                                                                                                                                                                                                                                                                                                                   | No       | `true`                                                                                                                                  |
 | `sync-prune`                   | Enable pruning of resources that are no longer defined in the source.<br>**Note:** When enabled, resources removed from manifests will be deleted during sync                                                                                                                                                                                                                        | No       | _empty_                                                                                                                                 |
 | `enable-pr-comments`           | Enable posting diff comments on pull requests.                                                                                                                                                                                                                                                                                                                                       | No       | `true`                                                                                                                                  |

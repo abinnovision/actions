@@ -7,7 +7,7 @@ Validates manifests and deploys ArgoCD applications.
 ## Behavior
 
 - **Pull requests:** Validates manifests, posts ArgoCD diff as PR comment
-- **Main branch:** Validates manifests, syncs to ArgoCD, waits for health
+- **Main branch:** Validates manifests, triggers ArgoCD sync, confirms it started without immediate errors (does not wait for full application health)
 
 ## Usage
 
@@ -49,8 +49,16 @@ with:
 
 ```yaml
 with:
-	sync-timeout: 1200
-	health-timeout: 1200
+	sync-timeout: 300 # bounds only the immediate post-trigger error check, not the full sync
+```
+
+### Conditional Pruning
+
+`sync-prune` is a plain boolean input, so it can be set to any expression evaluated by the calling workflow:
+
+```yaml
+with:
+	sync-prune: $\{{ github.ref == 'refs/heads/main' }}
 ```
 
 ## Inputs
