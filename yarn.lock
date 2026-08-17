@@ -397,25 +397,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/is-ignored@npm:^21.2.0":
-  version: 21.2.0
-  resolution: "@commitlint/is-ignored@npm:21.2.0"
+"@commitlint/is-ignored@npm:^21.2.2":
+  version: 21.2.2
+  resolution: "@commitlint/is-ignored@npm:21.2.2"
   dependencies:
     "@commitlint/types": "npm:^21.2.0"
     semver: "npm:^7.6.0"
-  checksum: 10/e9d06738ce2418ccb28bc0b0e182129efe620e899e20a238533ad4f5e33ef5cddfd2801eb9e88abdc1a90be72f1e714e4c8ed03433bb537ddb284ce2968477aa
+  checksum: 10/6437215e79c384c540ccd280bd5a55cb895f01f3bc67374547866e9256c64906a76a7675c3795113eb5b6ebe6b22c003ffe4987da9a3f70ff633b5a594c70f23
   languageName: node
   linkType: hard
 
-"@commitlint/lint@npm:21.2.0, @commitlint/lint@npm:^21.2.0":
-  version: 21.2.0
-  resolution: "@commitlint/lint@npm:21.2.0"
+"@commitlint/lint@npm:21.2.2, @commitlint/lint@npm:^21.2.0":
+  version: 21.2.2
+  resolution: "@commitlint/lint@npm:21.2.2"
   dependencies:
-    "@commitlint/is-ignored": "npm:^21.2.0"
-    "@commitlint/parse": "npm:^21.2.0"
-    "@commitlint/rules": "npm:^21.2.0"
+    "@commitlint/is-ignored": "npm:^21.2.2"
+    "@commitlint/parse": "npm:^21.2.2"
+    "@commitlint/rules": "npm:^21.2.2"
     "@commitlint/types": "npm:^21.2.0"
-  checksum: 10/c7c5e7016fdd15d4b1f4ff644cd77f15e922dc46d7d05cf79f350f6b63a78b2ebd013ede962a19b5227d5f3c9a6a3229fc5a61f1a066ed5d3348d436394d28d5
+  checksum: 10/9f6ef4b05bcc641ecd776748149f7bf26be715619b8f3983367a774fc9505ce5667d8aa2f31ec90a2b86bd2432155783a0beadcaf88eead343164bbb54f8f9df
   languageName: node
   linkType: hard
 
@@ -443,14 +443,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/parse@npm:^21.2.0":
-  version: 21.2.0
-  resolution: "@commitlint/parse@npm:21.2.0"
+"@commitlint/parse@npm:^21.2.2":
+  version: 21.2.2
+  resolution: "@commitlint/parse@npm:21.2.2"
   dependencies:
     "@commitlint/types": "npm:^21.2.0"
     conventional-changelog-angular: "npm:^9.0.0"
     conventional-commits-parser: "npm:^7.0.0"
-  checksum: 10/759ec672a43e68a7819f1d7bf0c4d432e008b29c1981b47622807821e2044550f25077b7f2badbae82889704cca0c695b96bb65a65afe48b7f9837aa4528b189
+  checksum: 10/40946dc1a15566cc67b9a8179efc99a25b0f72405e79216f18ed492cbca431ea7b89da8ba3817dd5be162bbf31a5309a32fd0104730de9436703874e261a08c6
   languageName: node
   linkType: hard
 
@@ -479,15 +479,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@commitlint/rules@npm:^21.2.0":
-  version: 21.2.0
-  resolution: "@commitlint/rules@npm:21.2.0"
+"@commitlint/rules@npm:^21.2.2":
+  version: 21.2.2
+  resolution: "@commitlint/rules@npm:21.2.2"
   dependencies:
     "@commitlint/ensure": "npm:^21.2.0"
     "@commitlint/message": "npm:^21.2.0"
     "@commitlint/to-lines": "npm:^21.0.1"
     "@commitlint/types": "npm:^21.2.0"
-  checksum: 10/66567239ce0f6d7d4189b7e9f6d17b7cb153b16a86972c00d51f2a75300dd0ec80a94487e5bb5bc71c133930bcd2af05888ed835ab75ebc05c238d872cad16d7
+  checksum: 10/d0cb57fecced3a9c30cf1a9f8fdf519607278343d1826194772b028c08f24f27b6e0b905d6b7a74682f5df2f2a6c87abd8973b69173e6ccc019058b353ed9e7e
   languageName: node
   linkType: hard
 
@@ -4049,7 +4049,7 @@ __metadata:
     "@actions/github": "npm:^9.1.1"
     "@commitlint/execute-rule": "npm:21.0.1"
     "@commitlint/format": "npm:21.2.0"
-    "@commitlint/lint": "npm:21.2.0"
+    "@commitlint/lint": "npm:21.2.2"
     "@commitlint/types": "npm:^21.2.0"
     "@vercel/ncc": "npm:^0.44.1"
     chalk: "npm:^6.0.0"
