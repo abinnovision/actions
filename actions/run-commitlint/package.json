@@ -41,7 +41,7 @@
 		"@commitlint/format": "21.2.0",
 		"@commitlint/lint": "21.2.2",
 		"chalk": "^6.0.0",
-		"conventional-changelog-conventionalcommits": "10.2.1"
+		"conventional-changelog-conventionalcommits": "10.3.0"
 	},
 	"devDependencies": {
 		"@abinnovision/eslint-config-base": "^3.4.2",
