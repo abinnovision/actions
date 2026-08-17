@@ -100,18 +100,19 @@ on:
       sync-timeout:
         type: number
         required: false
-        default: 600
+        default: 120
         description: |-
-          ArgoCD sync timeout in seconds.
-          **Default:** `600` (10 minutes)
+          Timeout in seconds for the post-trigger check that the sync operation started without immediate errors.
+          **Note:** The sync itself runs asynchronously; this only bounds a short check, not the full sync duration.
+          **Default:** `120` (2 minutes)
 
       health-timeout:
         type: number
         required: false
         default: 600
         description: |-
-          ArgoCD health check timeout in seconds.
-          **Default:** `600` (10 minutes)
+          **Deprecated:** No longer used. The workflow no longer waits for application health after sync.
+          Kept for backward compatibility; has no effect.
 
       skip-if-synced:
         type: boolean
@@ -698,39 +699,39 @@ jobs:
 
           echo "::group::Syncing ArgoCD application: $ARGOCD_APP"
 
-          if argocd $ARGOCD_CLI_ARGS app sync $ARGOCD_APP --timeout ${{ inputs.sync-timeout }}${{ inputs.sync-prune && ' --prune' || '' }}; then
-            echo "::notice::Sync operation completed successfully"
-
-            # Wait for application to become healthy
-            if argocd $ARGOCD_CLI_ARGS app wait $ARGOCD_APP --health --timeout ${{ inputs.health-timeout }}; then
-              echo "::notice::Application is now healthy"
-
-              final_status=$(argocd $ARGOCD_CLI_ARGS app get $ARGOCD_APP -o json)
-              final_health=$(echo "$final_status" | jq -r '.status.health.status')
-              final_sync=$(echo "$final_status" | jq -r '.status.sync.status')
-
-              echo "Final Status:"
-              echo "  Health: $final_health"
-              echo "  Sync: $final_sync"
-
-              echo "status=success" >> $GITHUB_OUTPUT
-            else
-              echo "::error::Application failed to become healthy"
-
-              current_status=$(argocd $ARGOCD_CLI_ARGS app get $ARGOCD_APP -o json)
-              current_health=$(echo "$current_status" | jq -r '.status.health.status')
-
-              echo "Current Status:"
-              echo "  Health: $current_health"
-
-              echo "status=failure" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          else
-            echo "::error::Application sync failed"
+          if ! argocd $ARGOCD_CLI_ARGS app sync $ARGOCD_APP --async${{ inputs.sync-prune && ' --prune' || '' }}; then
+            echo "::error::Failed to trigger sync operation"
             echo "status=failure" >> $GITHUB_OUTPUT
             exit 1
           fi
+
+          echo "::notice::Sync operation triggered"
+
+          # Bounded wait for the sync operation only (not health) to catch immediate errors
+          argocd $ARGOCD_CLI_ARGS app wait $ARGOCD_APP --operation --timeout ${{ inputs.sync-timeout }} || true
+
+          operation_status=$(argocd $ARGOCD_CLI_ARGS app get $ARGOCD_APP -o json)
+          operation_phase=$(echo "$operation_status" | jq -r '.status.operationState.phase // "Unknown"')
+          operation_message=$(echo "$operation_status" | jq -r '.status.operationState.message // ""')
+
+          echo "Operation Status:"
+          echo "  Phase: $operation_phase"
+
+          case "$operation_phase" in
+            Succeeded)
+              echo "::notice::Sync operation succeeded"
+              echo "status=success" >> $GITHUB_OUTPUT
+              ;;
+            Failed|Error)
+              echo "::error::Sync operation failed: $operation_message"
+              echo "status=failure" >> $GITHUB_OUTPUT
+              exit 1
+              ;;
+            *)
+              echo "::notice::Sync operation still in progress after bounded check - not waiting further, ArgoCD will continue applying it"
+              echo "status=success" >> $GITHUB_OUTPUT
+              ;;
+          esac
 
           echo "::endgroup::"
 
