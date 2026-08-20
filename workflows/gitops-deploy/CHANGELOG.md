@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.1.0...gitops-deploy-source-v1.1.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **gitops-deploy:** stop blocking on full argocd sync/health wait ([#527](https://github.com/abinnovision/actions/issues/527)) ([34aad05](https://github.com/abinnovision/actions/commit/34aad0574c4648daf2df6a55745fc0b393b5a5ac))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/gitops-deploy-source-v1.0.9...gitops-deploy-source-v1.1.0) (2026-07-20)
 
 
