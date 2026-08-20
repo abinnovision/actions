@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.3](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.3.2...run-commitlint-source-v1.3.3) (2026-08-20)
+
+
+### Bug Fixes
+
+* **deps:** bump @commitlint/format from 21.2.0 to 21.2.2 ([#530](https://github.com/abinnovision/actions/issues/530)) ([90219d2](https://github.com/abinnovision/actions/commit/90219d243bc7a8a9ec0a11f398362686ed7fde52))
+* **deps:** bump @commitlint/lint from 21.2.0 to 21.2.2 ([#529](https://github.com/abinnovision/actions/issues/529)) ([dc07269](https://github.com/abinnovision/actions/commit/dc07269e676c30b9e4a81e345fd7dfc8357ff9dc))
+* **deps:** bump conventional-changelog-conventionalcommits from 10.2.1 to 10.3.0 ([#533](https://github.com/abinnovision/actions/issues/533)) ([cde48f2](https://github.com/abinnovision/actions/commit/cde48f2b451fc5a9713988cd10e4aa7de2ea86cb))
+
 ## [1.3.2](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.3.1...run-commitlint-source-v1.3.2) (2026-08-05)
 
 
