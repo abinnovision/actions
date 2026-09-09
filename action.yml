@@ -1,0 +1,113 @@
+name: "Exchange GitHub Token"
+description: "Exchange a GitHub Actions OIDC token for a GitHub App installation token via a compatible token broker"
+
+inputs:
+  broker-url:
+    description: "Base URL of the token broker service (used as OIDC issuer for discovery)"
+    required: true
+  audience:
+    description: "OIDC audience for the token broker (defaults to broker-url)"
+    required: false
+  scope:
+    description: "Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)"
+    required: true
+  resources:
+    description: >-
+      Resources the token should access, whitespace-separated, using typed prefixes:
+      repo:owner/name, org:name, or enterprise:slug. Passed through to the broker as
+      --resource. Defaults to the current repository when neither resources nor repositories is set.
+    required: false
+  repositories:
+    description: "Deprecated: use `resources`. Repositories the token should access, whitespace-separated."
+    required: false
+    deprecationMessage: "The 'repositories' input is deprecated; use 'resources' with typed prefixes (repo:/org:/enterprise:) instead."
+  github-token:
+    description: "Token for downloading oidc-token-cli from GitHub releases"
+    required: false
+    default: "${{ github.token }}"
+  oidc-token-cli-version:
+    description: "Version of oidc-token-cli to install"
+    required: false
+    default: "latest"
+
+outputs:
+  token:
+    description: "GitHub App installation token"
+    value: ${{ steps.exchange.outputs.token }}
+  committer-name:
+    description: "Bot committer name (e.g. app-name[bot])"
+    value: ${{ steps.exchange.outputs.committer-name }}
+  committer-email:
+    description: "Bot committer email"
+    value: ${{ steps.exchange.outputs.committer-email }}
+
+runs:
+  using: composite
+  steps:
+    - uses: abinnovision/actions@setup-oidc-token-cli-dev
+      with:
+        github-token: ${{ inputs.github-token }}
+        version: ${{ inputs.oidc-token-cli-version }}
+
+    - id: exchange
+      shell: bash
+      env:
+        BROKER_URL: ${{ inputs.broker-url }}
+        AUDIENCE: ${{ inputs.audience }}
+        SCOPE: ${{ inputs.scope }}
+        RESOURCES: ${{ inputs.resources }}
+        REPOSITORIES: ${{ inputs.repositories }}
+      run: |
+        set -euo pipefail
+
+        # Build oidc-token arguments
+        ARGS=(
+          --issuer "$BROKER_URL"
+          --client-id gh-token-broker
+          --grant-type token-exchange
+          --subject-token-source github-actions
+          --audience "${AUDIENCE:-$BROKER_URL}"
+        )
+
+        # Add scope (whitespace-separated scope:level tokens)
+        SCOPE_VALUE=$(echo "$SCOPE" | tr '\n' ' ' | xargs)
+        ARGS+=(--scope "$SCOPE_VALUE")
+
+        # Emit a deprecation warning if the legacy repositories input is used
+        if [ -n "$REPOSITORIES" ]; then
+          echo "::warning::The 'repositories' input is deprecated; use 'resources' with typed prefixes (repo:/org:/enterprise:) instead."
+        fi
+
+        # Collect resources: resources (prefixed) first, then legacy repositories
+        RESOURCE_COUNT=0
+        for res in $(echo "$RESOURCES" | tr '\n' ' ' | xargs -n1); do
+          ARGS+=(--resource "$res")
+          RESOURCE_COUNT=$((RESOURCE_COUNT + 1))
+        done
+        for repo in $(echo "$REPOSITORIES" | tr '\n' ' ' | xargs -n1); do
+          ARGS+=(--resource "$repo")
+          RESOURCE_COUNT=$((RESOURCE_COUNT + 1))
+        done
+
+        # Default to the current repository only when neither input was provided
+        if [ "$RESOURCE_COUNT" -eq 0 ]; then
+          ARGS+=(--resource "$GITHUB_REPOSITORY")
+        fi
+
+        # Exchange token via oidc-token-cli (JSON mode)
+        RESPONSE=$(oidc-token --all "${ARGS[@]}")
+
+        TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+        COMMITTER_NAME=$(echo "$RESPONSE" | jq -r '.app_name // empty')
+        COMMITTER_EMAIL=$(echo "$RESPONSE" | jq -r '.app_email // empty')
+
+        if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+          echo "::error::oidc-token --all did not return an access_token"
+          exit 1
+        fi
+
+        echo "::add-mask::$TOKEN"
+
+        echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+        echo "committer-name=$COMMITTER_NAME" >> "$GITHUB_OUTPUT"
+        echo "committer-email=$COMMITTER_EMAIL" >> "$GITHUB_OUTPUT"
