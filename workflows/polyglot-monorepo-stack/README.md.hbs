@@ -19,7 +19,9 @@ on:
 {{{usage-example type="workflow" name=name inputs=inputs secrets=secrets version=version}}}
 
 Add `secrets: inherit` to the job if you use any of the optional [secrets](#secrets), such as a
-custom checkout token or per-app image build secrets.
+custom checkout token or per-app image build secrets. To read other private repositories during
+checkout, use [`checkout-token-resources`](#checking-out-other-repositories) rather than a personal
+access token.
 
 The repository must also meet the [layout requirements](#repository-layout). Everything beyond that
 is opt-in through [inputs](#inputs).
@@ -59,9 +61,10 @@ no release or publish is ever cut short.
 
 ### Permissions
 
-The jobs request `contents: read`, `packages: read` and `actions: write`, plus `contents: write`,
-`packages: write`, `id-token: write` and `pages: write` in the publishing jobs. `actions: write` is
-what the Actions cache service requires to save entries.
+The check, test and publish jobs request `contents: read`, `packages: read`, `actions: write` and
+`id-token: write`, plus `contents: write`, `packages: write` and `pages: write` in the publishing
+jobs. `actions: write` is what the Actions cache service requires to save entries, and
+`id-token: write` is what the OIDC token exchange requires.
 
 A called workflow can never exceed its caller's permissions. The calling repository must therefore
 either keep the default "Read and write permissions" setting for `GITHUB_TOKEN`, or declare a
@@ -71,8 +74,9 @@ top-level `permissions:` block that covers those scopes.
 
 Pull requests from forks get a read-only token that the `permissions:` key cannot elevate. Cache
 saves are skipped with a warning, `CHECKOUT_TOKEN` is empty so private submodules do not resolve,
-and private GitHub Package Registry dependencies are unavailable. Those runs restore the default
-branch cache instead of writing their own.
+and private GitHub Package Registry dependencies are unavailable. Fork runs also have no OIDC token,
+so the checkout token exchange is skipped rather than failing and `checkout-token-resources` has no
+effect. Those runs restore the default branch cache instead of writing their own.
 
 Dependabot pull requests do honour the `permissions:` key and keep cache writes. They see Dependabot
 secrets rather than Actions secrets, which the pull request lane does not need.
@@ -322,6 +326,38 @@ cluster.
 This requires `token-broker-url` (or the `TOKEN_BROKER_URL` repository variable), which the workflow
 uses to exchange an OIDC token for one scoped to the target repositories. The dispatched workflow
 defaults to `update-tags.yaml` and receives `application` and `updates` inputs.
+
+## Checking out other repositories
+
+By default every checkout uses the job's `GITHUB_TOKEN`, which only reaches the calling repository.
+Repositories with private git submodules, private Go modules or other git-based dependencies need
+wider access. Set `checkout-token-resources` and the workflow exchanges its OIDC token at the token
+broker for a short-lived installation token with `contents:read` on this repository plus everything
+listed, and uses that token for every checkout.
+
+```yaml
+with:
+  checkout-submodules: recursive
+  checkout-token-resources: repo:my-org/private-submodule repo:my-org/go-lib
+```
+
+Resources are whitespace-separated and use typed prefixes: `repo:owner/name` for a single
+repository, `org:name` for an entire organisation, `enterprise:slug` for an enterprise. The calling
+repository is always included, so it never has to be listed. Prefer `repo:`: the token is persisted
+as a git credential for the whole job, so an `org:` or `enterprise:` grant lets every later step,
+including test code, read everything under it.
+
+This requires `token-broker-url` (or the `TOKEN_BROKER_URL` repository variable), and the token
+broker's GitHub App must be installed on every resource you list. `actions/checkout` persists the
+token as a git credential for `github.com`, so submodule and `go mod download` fetches over HTTPS
+pick it up without any further setup.
+
+When set, this takes precedence over the `CHECKOUT_TOKEN` secret, which is deprecated. Pull requests
+from forks have no OIDC token, so the exchange is skipped there and checkout falls back to
+`CHECKOUT_TOKEN`, then the read-only `GITHUB_TOKEN`.
+
+Private GitHub Package Registry dependencies are a separate concern; they authenticate with the job
+`GITHUB_TOKEN` and are unaffected by this input.
 
 ## Versions
 
