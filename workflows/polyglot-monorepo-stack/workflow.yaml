@@ -31,6 +31,7 @@ on:
           Access token to use for checkout.
           **Default:** `Github Token`
           **Note:** PAT requires an expiration date.
+          **Deprecated:** Prefer `checkout-token-resources`, which mints a short-lived scoped token via the token broker. Still honoured when `checkout-token-resources` is not set.
     inputs:
       token-broker-url:
         type: string
@@ -202,6 +203,18 @@ on:
           **Default:** `false`
           **Example:** `true`, `false`, `recursive`
           **Note:** Use `recursive` to recursively checkout submodules
+      checkout-token-resources:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Additional resources the checkout token must be able to read, whitespace-separated.
+          When set, the workflow exchanges its OIDC token at the token broker for an installation token with `contents:read` on this repository plus these resources, and uses it for every checkout.
+          **Default:** _empty_ (no exchange; `CHECKOUT_TOKEN` or `GITHUB_TOKEN` is used)
+          **Format:** `repo:owner/name`, `org:name` or `enterprise:slug`
+          **Example:** `repo:my-org/private-submodule repo:my-org/go-lib`
+          **Requires:** `token-broker-url` (or the `TOKEN_BROKER_URL` repository variable), and the token broker's GitHub App installed on this repository and every listed resource
+          **Note:** Takes precedence over the `CHECKOUT_TOKEN` secret. Unavailable on pull requests from forks, which have no OIDC token; those runs fall back to `CHECKOUT_TOKEN`, then `GITHUB_TOKEN`
       prerelease-channel:
         type: string
         required: false
@@ -295,6 +308,16 @@ jobs:
           fi
           if ! grep -qE '^install-immutable:' Makefile; then
             echo "::error::Makefile missing required 'install-immutable' target"
+            exit 1
+          fi
+
+      - name: Validate checkout token configuration
+        if: inputs.checkout-token-resources != ''
+        env:
+          BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+        run: |
+          if [[ -z "$BROKER_URL" ]]; then
+            echo "::error::token-broker-url is required when checkout-token-resources is provided"
             exit 1
           fi
 
@@ -396,13 +419,28 @@ jobs:
       contents: read
       packages: read
       actions: write
+      id-token: write
     steps:
-      - name: Checkout
+      - &checkout-token
+        id: checkout-token
+        name: Exchange token for checkout
+        if: >-
+          inputs.checkout-token-resources != ''
+          && (github.event.pull_request == null
+          || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: abinnovision/actions@exchange-github-token-dev
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          resources: "repo:${{ github.repository }} ${{ inputs.checkout-token-resources }}"
+          scope: contents:read
+
+      - &checkout
+        name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          token: ${{ steps.checkout-token.outputs.token || secrets.CHECKOUT_TOKEN || github.token }}
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
       - name: Install dependencies
@@ -440,13 +478,10 @@ jobs:
       contents: read
       packages: read
       actions: write
+      id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.configure.outputs.commit-sha }}
-          submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+      - *checkout-token
+      - *checkout
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
       - name: Install dependencies
@@ -528,12 +563,8 @@ jobs:
       packages: "write"
       actions: "write"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.configure.outputs.commit-sha }}
-          submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+      - *checkout-token
+      - *checkout
 
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
@@ -664,12 +695,8 @@ jobs:
       packages: "write"
       actions: "write"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.configure.outputs.commit-sha }}
-          submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+      - *checkout-token
+      - *checkout
 
       - name: Validate GitOps configuration
         if: inputs.gitops-app-config != ''
@@ -1135,12 +1162,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.configure.outputs.commit-sha }}
-          submodules: ${{ inputs.checkout-submodules }}
-          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+      - *checkout-token
+      - *checkout
 
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
