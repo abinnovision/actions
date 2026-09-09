@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.1.1...polyglot-monorepo-stack-source-v2.2.0) (2026-09-09)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** add brokered multi-repo checkout token ([#552](https://github.com/abinnovision/actions/issues/552)) ([26feddf](https://github.com/abinnovision/actions/commit/26feddf31e9d6afd98a505eb2eced448abf4686f))
+
 ## [2.1.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.1.0...polyglot-monorepo-stack-source-v2.1.1) (2026-08-05)
 
 
