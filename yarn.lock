@@ -1731,7 +1731,6 @@ __metadata:
     "@types/node": "npm:^26.4.1"
     handlebars: "npm:^4.7.9"
     husky: "npm:^9.1.7"
-    js-yaml: "npm:^5.4.1"
     lint-staged: "npm:^17.4.1"
     prettier: "npm:^3.9.6"
     sort-package-json: "npm:^4.0.0"
@@ -3271,17 +3270,6 @@ __metadata:
   bin:
     js-yaml: bin/js-yaml.js
   checksum: 10/2bcec3a8118d7f744badeb04e14366578d234a736f353d41fe35d2305e4ce2409a8e041d277f07cd6bbc8aaa12128d650a68ce43247072519bede20962d2126f
-  languageName: node
-  linkType: hard
-
-"js-yaml@npm:^5.4.1":
-  version: 5.4.1
-  resolution: "js-yaml@npm:5.4.1"
-  dependencies:
-    argparse: "npm:^2.0.1"
-  bin:
-    js-yaml: bin/js-yaml.mjs
-  checksum: 10/6fff9ee00bd59aeb7e1484b4281f5e927b117cbfbf3ffa6c0fef0c58519317eb61527e93c4aa70f417709229bc1eeed63cba773913577a64405975a72fba7180
   languageName: node
   linkType: hard
 
