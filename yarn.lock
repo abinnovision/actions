@@ -932,7 +932,7 @@ __metadata:
     "@actions/tool-cache": "npm:^4.0.0"
     "@types/semver": "npm:^7.8.0"
     eslint: "npm:^10.10.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     semver: "npm:^7.8.5"
     typescript: "npm:^6.0.3"
   languageName: unknown
@@ -1774,7 +1774,7 @@ __metadata:
     husky: "npm:^9.1.7"
     js-yaml: "npm:^5.4.2"
     lint-staged: "npm:^17.5.1"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     sort-package-json: "npm:^4.0.0"
     tablemark: "npm:^4.1.0"
     tsx: "npm:^4.23.13"
@@ -2782,7 +2782,7 @@ __metadata:
   resolution: "exchange-github-token@workspace:actions/exchange-github-token"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     setup-oidc-token-cli: "workspace:^"
   languageName: unknown
   linkType: soft
@@ -2991,7 +2991,7 @@ __metadata:
   resolution: "gitops-deploy@workspace:workflows/gitops-deploy"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     setup-k8s-tools: "workspace:^"
     setup-node: "workspace:^"
     setup-oidc-token-cli: "workspace:^"
@@ -3004,7 +3004,7 @@ __metadata:
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     exchange-github-token: "workspace:^"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     setup-gcp: "workspace:^"
     setup-k8s-tools: "workspace:^"
     setup-node: "workspace:^"
@@ -3871,7 +3871,7 @@ __metadata:
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     exchange-github-token: "workspace:^"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     release: "workspace:^"
     setup-gcp: "workspace:^"
     setup-tools: "workspace:^"
@@ -3885,12 +3885,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier@npm:^3.9.6":
-  version: 3.9.6
-  resolution: "prettier@npm:3.9.6"
+"prettier@npm:^3.9.8":
+  version: 3.9.8
+  resolution: "prettier@npm:3.9.8"
   bin:
     prettier: bin/prettier.cjs
-  checksum: 10/1dd1a1e0e40ec3b91cda9d294c4a95022aef61880ca3f441aad99b1252279f58a766c4cece81132c01550dcff1fd445efbd8812ea4a2374313e7fc6c8136f11f
+  checksum: 10/4ac262aaf9a5e221b02cc17447ebe7aa9689be59b85ab9de8152cd7422fb363ed3e09da6df585fa19ab1fc6cffebdc3ea34db1a75c978536aeba3f87bfd06ab3
   languageName: node
   linkType: hard
 
@@ -4045,7 +4045,7 @@ __metadata:
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     exchange-github-token: "workspace:^"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     run-release-please: "workspace:^"
     setup-gcp: "workspace:^"
   languageName: unknown
@@ -4138,7 +4138,7 @@ __metadata:
     chalk: "npm:^6.0.0"
     conventional-changelog-conventionalcommits: "npm:10.4.0"
     eslint: "npm:^10.10.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     typescript: "npm:^6.0.3"
   languageName: unknown
   linkType: soft
@@ -4154,7 +4154,7 @@ __metadata:
     "@types/semver": "npm:^7.8.0"
     "@vercel/ncc": "npm:^0.45.0"
     eslint: "npm:^10.10.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     release-please: "patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch"
     semver: "npm:^7.8.5"
     typescript: "npm:^6.0.3"
@@ -4184,7 +4184,7 @@ __metadata:
   resolution: "setup-gcp@workspace:actions/setup-gcp"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
   languageName: unknown
   linkType: soft
 
@@ -4199,7 +4199,7 @@ __metadata:
     "@internal/action-tool-installer": "workspace:^"
     "@vercel/ncc": "npm:^0.45.0"
     eslint: "npm:^10.10.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     typescript: "npm:^6.0.3"
   languageName: unknown
   linkType: soft
@@ -4209,7 +4209,7 @@ __metadata:
   resolution: "setup-node@workspace:actions/setup-node"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
   languageName: unknown
   linkType: soft
 
@@ -4224,7 +4224,7 @@ __metadata:
     "@internal/action-tool-installer": "workspace:^"
     "@vercel/ncc": "npm:^0.45.0"
     eslint: "npm:^10.10.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     typescript: "npm:^6.0.3"
   languageName: unknown
   linkType: soft
@@ -4234,7 +4234,7 @@ __metadata:
   resolution: "setup-tools@workspace:actions/setup-tools"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
     setup-node: "workspace:^"
   languageName: unknown
   linkType: soft
@@ -4491,7 +4491,7 @@ __metadata:
   resolution: "triage-dependabot-pr@workspace:actions/triage-dependabot-pr"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
-    prettier: "npm:^3.9.6"
+    prettier: "npm:^3.9.8"
   languageName: unknown
   linkType: soft
 
