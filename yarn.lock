@@ -4133,7 +4133,7 @@ __metadata:
     "@commitlint/execute-rule": "npm:21.0.1"
     "@commitlint/format": "npm:21.2.3"
     "@commitlint/lint": "npm:21.2.2"
-    "@commitlint/types": "npm:^21.2.0"
+    "@commitlint/types": "npm:^21.2.3"
     "@vercel/ncc": "npm:^0.45.0"
     chalk: "npm:^6.0.0"
     conventional-changelog-conventionalcommits: "npm:10.4.0"
