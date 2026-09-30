@@ -155,7 +155,7 @@ on:
         description: |-
           Enable publishing Docker images to GCP Artifact Registry.
           **Default:** `false`
-          **Requires:** `registry-gcpar-url` and `gcp-auth` inputs
+          **Requires:** `registry-gcpar-url` and either `gcp-workload-identity-provider` or `gcp-auth`
       registry-gcpar-url:
         type: string
         required: false
@@ -163,15 +163,24 @@ on:
           GCP Artifact Registry URL for Docker images.
           **Required:** When `enable-apps-registry-gcpar` is enabled
           **Example:** `europe-west4-docker.pkg.dev/project-id/repository-name`
+      gcp-workload-identity-provider:
+        type: string
+        required: false
+        description: |-
+          Full Workload Identity Federation provider resource name.
+          Authenticates directly as the repository without a service account.
+          This is public configuration, not a secret.
+          **Required:** When `enable-apps-registry-gcpar` is enabled, unless `gcp-auth` is set
+          **Note:** Mutually exclusive with `gcp-auth`
+          **Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`
       gcp-auth:
         type: string
         required: false
         description: |-
-          GCP authentication configuration (Workload Identity Federation).
+          **Deprecated:** Use `gcp-workload-identity-provider`.
+          The `GCP_AUTH` variable, authenticating as a service account.
           This is public configuration, not a secret.
-          **Required:** When `enable-apps-registry-gcpar` is enabled
-          **Note:** Can be reused for other GCP services in the workflow
-          **Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`
+          **Note:** Mutually exclusive with `gcp-workload-identity-provider`
       gitops-workflow-file:
         type: string
         required: false
@@ -814,12 +823,14 @@ jobs:
             network=host
 
       - name: Setup GCP Authentication
-        if: inputs.enable-apps-registry-gcpar && inputs.gcp-auth != ''
+        if: inputs.enable-apps-registry-gcpar && (inputs.gcp-auth != '' || inputs.gcp-workload-identity-provider != '')
         id: gcp-auth
         uses: abinnovision/actions@setup-gcp-dev
         with:
           auth: ${{ inputs.gcp-auth }}
-          token_format: "access_token"
+          workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
+          # Access tokens require a service account, which only the "auth" input provides.
+          token_format: ${{ inputs.gcp-auth != '' && 'access_token' || '' }}
 
       - name: Login to GCP Artifact Registry
         if: inputs.enable-apps-registry-gcpar && inputs.registry-gcpar-url != ''
@@ -827,7 +838,7 @@ jobs:
         with:
           registry: ${{ inputs.registry-gcpar-url }}
           username: "oauth2accesstoken"
-          password: "${{ steps.gcp-auth.outputs.access_token }}"
+          password: "${{ steps.gcp-auth.outputs.access_token || steps.gcp-auth.outputs.auth_token }}"
 
       - name: Login to GitHub Container Registry
         if: inputs.enable-apps-registry-ghcr
