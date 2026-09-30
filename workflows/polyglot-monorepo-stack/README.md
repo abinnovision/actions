@@ -223,8 +223,9 @@ cannot meet npm's provenance requirements.
 
 Enable with `enable-app-image-builds` plus at least one of `enable-apps-registry-ghcr`,
 `enable-apps-registry-dockerhub` or `enable-apps-registry-gcpar`. Images are built only for apps
-that the release actually versioned, and each image is tagged with both its commit SHA and its
-semantic version.
+that the release actually versioned, and each image is tagged with its commit SHA (`sha-<sha>`), its
+semantic version (`1.2.3`) and a class tag (`release-1.2.3` or `prerelease-1.2.3-beta.1`). The class
+tag lets registry cleanup policies, which match tags by prefix only, target releases or prereleases.
 
 Before building, the workflow runs `turbo prune --docker` for the app and builds from the pruned
 tree in `out/<app-name>/`, which contains a `json/` directory with package manifests and a `full/`

@@ -910,6 +910,7 @@ jobs:
           tags: |
             type=raw,value=sha-${{ matrix.entry.sha }}
             type=semver,pattern={{version}},value=v${{ matrix.entry.packageVersion }}
+            type=raw,value=${{ matrix.entry.type }}-${{ matrix.entry.packageVersion }}
 
       - name: Prepare app-specific secrets
         id: app-secrets
