@@ -3,7 +3,7 @@ author: "abi group GmbH"
 description: |
   Setup development tools from .tool-versions using native GitHub Actions.
   Automatically installs all tools defined in the file.
-  Supports Node.js (with corepack), Python (with uv), and Go.
+  Supports Node.js (with corepack), Python (with uv), Go, and OpenTofu.
 
 inputs:
   tool-versions-file:
@@ -25,6 +25,12 @@ inputs:
     required: false
     default: "auto"
 
+  # OpenTofu specific (used when opentofu is in .tool-versions)
+  opentofu-wrapper:
+    description: "Install the OpenTofu wrapper script that exposes stdout, stderr and exitcode as step outputs"
+    required: false
+    default: "false"
+
 outputs:
   node-version:
     description: "Installed Node.js version (if nodejs in .tool-versions)"
@@ -38,6 +44,9 @@ outputs:
   go-version:
     description: "Installed Go version (if golang in .tool-versions)"
     value: ${{ steps.parse.outputs.go-version }}
+  opentofu-version:
+    description: "Installed OpenTofu version (if opentofu in .tool-versions)"
+    value: ${{ steps.parse.outputs.opentofu-version }}
 
 runs:
   using: composite
@@ -74,6 +83,11 @@ runs:
           echo "go-version=$(grep -E '^golang' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
         fi
 
+        if grep -qE '^opentofu ' "$TOOL_VERSIONS_FILE"; then
+          echo "has-opentofu=true" >> $GITHUB_OUTPUT
+          echo "opentofu-version=$(grep -E '^opentofu ' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+        fi
+
     # Node.js setup via internal setup-node action
     - name: Setup Node.js
       if: steps.parse.outputs.has-nodejs == 'true'
@@ -107,3 +121,11 @@ runs:
       with:
         go-version: ${{ steps.parse.outputs.go-version }}
         cache: true
+
+    # OpenTofu setup via opentofu/setup-opentofu
+    - name: Setup OpenTofu
+      if: steps.parse.outputs.has-opentofu == 'true'
+      uses: opentofu/setup-opentofu@v2
+      with:
+        tofu_version: ${{ steps.parse.outputs.opentofu-version }}
+        tofu_wrapper: ${{ inputs.opentofu-wrapper }}
