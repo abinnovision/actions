@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.3.1...polyglot-monorepo-stack-source-v2.4.0) (2026-09-30)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** add release class tag to app images ([#580](https://github.com/abinnovision/actions/issues/580)) ([997daf0](https://github.com/abinnovision/actions/commit/997daf071792ceb0f524471767dac50a821b5068))
+
 ## [2.3.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.3.0...polyglot-monorepo-stack-source-v2.3.1) (2026-09-30)
 
 
