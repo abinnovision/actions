@@ -1,0 +1,94 @@
+# {{name}}
+
+Checks, plans and applies an OpenTofu root module with GCS state and encrypted state files.
+
+## Behavior
+
+| Job         | Runs on                                   | Does                                                                                                |
+| :---------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- |
+| `Configure` | Always                                    | Resolves the mode (`plan`, `apply` or none) and validates the configuration                        |
+| `Check`     | Always                                    | `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate`                          |
+| `Plan`      | Pull requests from the same repository    | `tofu plan` and one sticky PR comment per `working-directory` with the summary and a collapsible diff |
+| `Apply`     | Push to `default-branch`                  | Fresh `tofu plan -out` and `tofu apply` in `apply-environment`; runs for one root never overlap     |
+
+- State and plan files are always encrypted with OpenTofu's `gcp_kms` key provider
+- Optional GitHub token exchange via the token broker, passed as `GITHUB_TOKEN` to the GitHub provider
+- Pull requests from forks only run `Check`, since they cannot authenticate to GCP
+- `pull_request_target` is rejected
+- Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
+
+## Requirements
+
+- The repository is provisioned by foundry with `foundry-state-backend: true`, which publishes the
+  `FOUNDRY_WIF_PROVIDER`, `FOUNDRY_STATE_BUCKET` and `FOUNDRY_STATE_KEY` variables. The
+  `gcp-workload-identity-provider`, `state-bucket` and `state-key` inputs override them
+- The `apply-environment` environment (default `production`) is restricted to the default branch
+- The root module declares an empty GCS backend:
+
+```hcl
+terraform {
+  backend "gcs" {}
+}
+```
+
+## Usage
+
+This is a `workflow_call` workflow, so it can't be triggered directly. Call it from a workflow triggered by
+`pull_request` and `push` (never `pull_request_target`).
+
+{{{usage-example type="workflow" name=name inputs=inputs version=version}}}
+
+### Latest versions
+
+{{{version-examples type="workflow" name=name version=version}}}
+
+### Example Workflow File
+
+Complete, copyable caller workflow (e.g. `.github/workflows/tofu.yaml`):
+
+[//]: # "x-release-please-start-major"
+
+```yaml
+name: OpenTofu
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tofu:
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@{{name}}-v{{version.major}}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      working-directory: infra
+```
+
+[//]: # "x-release-please-end"
+
+Repositories with several roots call the workflow once per root with different `working-directory` values.
+
+## Advanced Configuration
+
+### State encryption migration
+
+The encryption config allows reading an existing unencrypted state as a fallback. The first apply rewrites
+the state encrypted. Plans on pull requests run with `-lock=false` and never write state.
+
+### GitHub provider token
+
+Set `github-token-plan-scope` and/or `github-token-apply-scope` to exchange a GitHub App token through the
+token broker. Use the read-only scopes for plan and the write scopes for apply.
+
+```yaml
+with:
+  github-token-plan-scope: contents:read
+  github-token-apply-scope: contents:write
+```
+
+## Inputs
+
+{{> inputs-table inputs}}

@@ -3724,6 +3724,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"opentofu-stack@workspace:workflows/opentofu-stack":
+  version: 0.0.0-use.local
+  resolution: "opentofu-stack@workspace:workflows/opentofu-stack"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    exchange-github-token: "workspace:^"
+    prettier: "npm:^3.9.9"
+    setup-gcp: "workspace:^"
+    setup-tools: "workspace:^"
+  languageName: unknown
+  linkType: soft
+
 "optionator@npm:^0.9.3":
   version: 0.9.4
   resolution: "optionator@npm:0.9.4"
