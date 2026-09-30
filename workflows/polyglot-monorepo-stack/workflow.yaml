@@ -829,16 +829,17 @@ jobs:
         with:
           auth: ${{ inputs.gcp-auth }}
           workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
-          # Access tokens require a service account, which only the "auth" input provides.
-          token_format: ${{ inputs.gcp-auth != '' && 'access_token' || '' }}
 
+      - name: Setup gcloud
+        if: inputs.enable-apps-registry-gcpar && inputs.registry-gcpar-url != ''
+        uses: google-github-actions/setup-gcloud@v3
+
+      # Uses the gcloud credential helper so tokens are refreshed during long builds.
       - name: Login to GCP Artifact Registry
         if: inputs.enable-apps-registry-gcpar && inputs.registry-gcpar-url != ''
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ inputs.registry-gcpar-url }}
-          username: "oauth2accesstoken"
-          password: "${{ steps.gcp-auth.outputs.access_token || steps.gcp-auth.outputs.auth_token }}"
+        env:
+          REGISTRY_GCPAR_URL: ${{ inputs.registry-gcpar-url }}
+        run: gcloud auth configure-docker "${REGISTRY_GCPAR_URL%%/*}" --quiet
 
       - name: Login to GitHub Container Registry
         if: inputs.enable-apps-registry-ghcr
