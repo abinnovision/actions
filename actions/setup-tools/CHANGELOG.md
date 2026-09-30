@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.0.2...setup-tools-source-v1.1.0) (2026-09-30)
+
+
+### Features
+
+* **setup-tools:** add OpenTofu support ([#571](https://github.com/abinnovision/actions/issues/571)) ([58143eb](https://github.com/abinnovision/actions/commit/58143ebd6b025227740b733bfbe69f5f13dcab1f))
+
 ## [1.0.2](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.0.1...setup-tools-source-v1.0.2) (2026-04-12)
 
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.5](https://github.com/abinnovision/actions/compare/release-source-v2.1.4...release-source-v2.1.5) (2026-09-30)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-gcp bumped to 1.2.0
+
 ## [2.1.4](https://github.com/abinnovision/actions/compare/release-source-v2.1.3...release-source-v2.1.4) (2026-07-20)
 
 

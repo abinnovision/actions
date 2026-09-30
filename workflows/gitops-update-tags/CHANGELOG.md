@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v2.0.0...gitops-update-tags-source-v2.0.1) (2026-09-30)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-gcp bumped to 1.2.0
+
 ## [2.0.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v1.2.4...gitops-update-tags-source-v2.0.0) (2026-08-03)
 
 

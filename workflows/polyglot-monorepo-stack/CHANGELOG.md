@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.3.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.2.0...polyglot-monorepo-stack-source-v2.3.0) (2026-09-30)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** support direct workload identity federation ([#574](https://github.com/abinnovision/actions/issues/574)) ([fa18314](https://github.com/abinnovision/actions/commit/fa1831467fad049c3421c6274407120e2e080e05))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * release bumped to 2.1.5
+    * setup-gcp bumped to 1.2.0
+    * setup-tools bumped to 1.1.0
+
 ## [2.2.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.1.1...polyglot-monorepo-stack-source-v2.2.0) (2026-09-09)
 
 

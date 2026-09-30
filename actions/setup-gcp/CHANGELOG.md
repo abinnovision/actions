@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/setup-gcp-source-v1.1.1...setup-gcp-source-v1.2.0) (2026-09-30)
+
+
+### Features
+
+* **setup-gcp:** support direct workload identity federation ([#573](https://github.com/abinnovision/actions/issues/573)) ([9b25b65](https://github.com/abinnovision/actions/commit/9b25b652af15317aa40100de67d1f22d0b5c1d59))
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/setup-gcp-source-v1.1.0...setup-gcp-source-v1.1.1) (2025-12-13)
 
 
