@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.3.0...polyglot-monorepo-stack-source-v2.3.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* **polyglot-monorepo-stack:** refresh artifact registry credentials during long builds ([#576](https://github.com/abinnovision/actions/issues/576)) ([93b072f](https://github.com/abinnovision/actions/commit/93b072f11d9f5dec60b2fdf96aadf308444da30e))
+
 ## [2.3.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.2.0...polyglot-monorepo-stack-source-v2.3.0) (2026-09-30)
 
 
