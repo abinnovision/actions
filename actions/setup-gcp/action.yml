@@ -2,17 +2,32 @@ name: Setup GCP
 author: "abi group GmbH"
 description: |
   Setup for the Google Cloud Platform. This uses the opinionated way of AB Innovision.
+  Authenticates either through the GCP_AUTH variable (service account) or directly
+  through a Workload Identity Federation provider.
 inputs:
   auth:
-    description: The "GCP_AUTH" variable which is present in all repositories.
-    required: true
+    description: |-
+      Deprecated: use "workload-identity-provider".
+      The "GCP_AUTH" variable, authenticating as a service account.
+      Mutually exclusive with "workload-identity-provider".
+    required: false
+    default: ""
+    deprecationMessage: "The 'auth' input is deprecated; use 'workload-identity-provider' instead."
+  workload-identity-provider:
+    description: |-
+      Full Workload Identity Federation provider resource name.
+      Authenticates directly as the repository without a service account.
+      Mutually exclusive with "auth".
+    required: false
+    default: ""
   token_format:
     required: false
     default: ""
     description: |-
       Output format for the generated authentication token. For OAuth 2.0 access
       tokens, specify "access_token". For OIDC tokens, specify "id_token". To
-      skip token generation, leave this value empty.
+      skip token generation, leave this value empty. Both formats require a
+      service account.
 
       See: https://github.com/google-github-actions/auth/blob/v1.0.0/action.yml#L84-L90
   delegates:
@@ -38,6 +53,14 @@ inputs:
 
       **Example**: "gke-gcloud-auth-plugin,kubectl".
 outputs:
+  auth_token:
+    value: ${{ steps.auth.outputs.auth_token }}
+    description: |-
+      The intermediate authentication token, which can be used with direct
+      Workload Identity Federation (e.g. as password for "oauth2accesstoken"
+      when logging in to Artifact Registry).
+
+      See: https://github.com/google-github-actions/auth/blob/v3/action.yml
   access_token:
     value: ${{ steps.auth.outputs.access_token }}
     description: |-
@@ -65,10 +88,24 @@ runs:
     - id: prepare
       name: "Prepare"
       shell: bash
+      env:
+        AUTH: ${{ inputs.auth }}
+        WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
       run: |
-        DECODED=$(echo "${{ inputs.auth }}" | base64 --decode)
-        echo "GCP_SERVICE_ACCOUNT=$(echo "$DECODED" | jq -cr ".serviceAccount")" >> $GITHUB_ENV
-        echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
+        if [[ -n "$AUTH" && -n "$WORKLOAD_IDENTITY_PROVIDER" ]] || [[ -z "$AUTH" && -z "$WORKLOAD_IDENTITY_PROVIDER" ]]; then
+          echo "::error::Exactly one of 'auth' or 'workload-identity-provider' must be set"
+          exit 1
+        fi
+
+        if [[ -n "$AUTH" ]]; then
+          echo "::warning::The 'auth' input is deprecated; use 'workload-identity-provider' instead."
+          DECODED=$(echo "$AUTH" | base64 --decode)
+          echo "GCP_SERVICE_ACCOUNT=$(echo "$DECODED" | jq -cr ".serviceAccount")" >> $GITHUB_ENV
+          echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$(echo "$DECODED" | jq -cr ".workloadIdentityProvider")" >> $GITHUB_ENV
+        else
+          echo "GCP_SERVICE_ACCOUNT=" >> $GITHUB_ENV
+          echo "GCP_WORKLOAD_IDENTITY_PROVIDER=$WORKLOAD_IDENTITY_PROVIDER" >> $GITHUB_ENV
+        fi
     - id: auth
       name: "Authenticate"
       uses: google-github-actions/auth@v3
