@@ -38,6 +38,9 @@ steps:
       echo "Token acquired for $\{{ steps.token.outputs.committer-name }}"
 ```
 
+The token is revoked in a post step at the end of the job. Set `skip-token-revoke: true` to keep it
+valid until it expires.
+
 ## Latest versions
 
 {{{version-examples type="action" name=name version=version}}}

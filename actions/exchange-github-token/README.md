@@ -38,6 +38,9 @@ steps:
       echo "Token acquired for ${{ steps.token.outputs.committer-name }}"
 ```
 
+The token is revoked in a post step at the end of the job. Set `skip-token-revoke: true` to keep it
+valid until it expires.
+
 ## Latest versions
 
 This action can be used with different version ranges. The following ranges are available:
@@ -56,6 +59,7 @@ This action can be used with different version ranges. The following ranges are 
 | `repositories`           | Deprecated: use `resources`. Repositories the token should access, whitespace-separated.                                                                                                                                                                     | No       | _empty_               |
 | `github-token`           | Token for downloading oidc-token-cli from GitHub releases                                                                                                                                                                                                    | No       | `${{ github.token }}` |
 | `oidc-token-cli-version` | Version of oidc-token-cli to install                                                                                                                                                                                                                         | No       | `latest`              |
+| `skip-token-revoke`      | Skip revoking the token at the end of the job                                                                                                                                                                                                                | No       | `false`               |
 
 ## Outputs
 
