@@ -1,0 +1,48 @@
+name: "Exchange GitHub Token"
+description: "Exchange a GitHub Actions OIDC token for a GitHub App installation token via a compatible token broker"
+
+inputs:
+  broker-url:
+    description: "Base URL of the token broker service (used as OIDC issuer for discovery)"
+    required: true
+  audience:
+    description: "OIDC audience for the token broker (defaults to broker-url)"
+    required: false
+  scope:
+    description: "Permission scopes, whitespace-separated (e.g. contents:write pull_requests:write)"
+    required: true
+  resources:
+    description: >-
+      Resources the token should access, whitespace-separated, using typed prefixes:
+      repo:owner/name, org:name, or enterprise:slug. Passed through to the broker as
+      --resource. Defaults to the current repository when neither resources nor repositories is set.
+    required: false
+  repositories:
+    description: "Deprecated: use `resources`. Repositories the token should access, whitespace-separated."
+    required: false
+    deprecationMessage: "The 'repositories' input is deprecated; use 'resources' with typed prefixes (repo:/org:/enterprise:) instead."
+  github-token:
+    description: "Token for downloading oidc-token-cli from GitHub releases"
+    required: false
+    default: "${{ github.token }}"
+  oidc-token-cli-version:
+    description: "Version of oidc-token-cli to install"
+    required: false
+    default: "latest"
+  skip-token-revoke:
+    description: "Skip revoking the token at the end of the job"
+    required: false
+    default: "false"
+
+outputs:
+  token:
+    description: "GitHub App installation token"
+  committer-name:
+    description: "Bot committer name (e.g. app-name[bot])"
+  committer-email:
+    description: "Bot committer email"
+
+runs:
+  using: node24
+  main: dist/main/index.js
+  post: dist/post/index.js
