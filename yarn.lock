@@ -2781,9 +2781,15 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "exchange-github-token@workspace:actions/exchange-github-token"
   dependencies:
+    "@abinnovision/eslint-config-base": "npm:^3.4.2"
     "@abinnovision/prettier-config": "npm:^2.2.0"
+    "@actions/core": "npm:^3.0.1"
+    "@actions/github": "npm:^9.1.1"
+    "@internal/action-tool-installer": "workspace:^"
+    "@vercel/ncc": "npm:^0.45.0"
+    eslint: "npm:^10.11.0"
     prettier: "npm:^3.9.9"
-    setup-oidc-token-cli: "workspace:^"
+    typescript: "npm:^6.0.3"
   languageName: unknown
   linkType: soft
 

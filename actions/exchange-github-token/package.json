@@ -9,26 +9,40 @@
 	},
 	"type": "module",
 	"files": [
-		"action.yml",
+		"dist",
 		"README.md",
 		"CHANGELOG.md",
-		"LICENSE.md"
+		"LICENSE.md",
+		"action.yml"
 	],
 	"scripts": {
-		"format:check": "prettier --check '*.{md,json,json5,yaml,yml}'",
-		"format:fix": "prettier --write '*.{md,json,json5,yaml,yml}'"
+		"build": "ncc build src/main.ts -o dist/main && ncc build src/post.ts -o dist/post",
+		"format:check": "prettier --check 'src/**/*.{ts,js}' '*.{md,json,json5,yaml,yml}'",
+		"format:fix": "prettier --write 'src/**/*.{ts,js}' '*.{md,json,json5,yaml,yml}'",
+		"lint:check": "eslint 'src/**/*.{ts,js}'",
+		"lint:fix": "eslint --fix 'src/**/*.{ts,js}'"
 	},
 	"lint-staged": {
-		"*.{json,json5,yaml,yml,md}": [
+		"src/**/*.{ts,js}": [
+			"prettier --write",
+			"eslint --fix"
+		],
+		"*.{md,json,json5,yaml,yml}": [
 			"prettier --write"
 		]
 	},
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
-		"setup-oidc-token-cli": "workspace:^"
+		"@actions/core": "^3.0.1",
+		"@actions/github": "^9.1.1",
+		"@internal/action-tool-installer": "workspace:^"
 	},
 	"devDependencies": {
+		"@abinnovision/eslint-config-base": "^3.4.2",
 		"@abinnovision/prettier-config": "^2.2.0",
-		"prettier": "^3.9.9"
+		"@vercel/ncc": "^0.45.0",
+		"eslint": "^10.11.0",
+		"prettier": "^3.9.9",
+		"typescript": "^6.0.3"
 	}
 }
