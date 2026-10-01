@@ -964,6 +964,9 @@ jobs:
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v7
+        env:
+          # Replaced by the "Write image summary" step.
+          DOCKER_BUILD_SUMMARY: "false"
         with:
           context: "."
           push: true
@@ -988,14 +991,65 @@ jobs:
             ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && steps.app-secrets.outputs.SECRETS_MOUNT_STRING || '' }}
           allow: network.host
 
-      - name: Display built image references
+      - name: Write image summary
+        env:
+          APP: ${{ matrix.entry.app }}
+          APP_VERSION: ${{ matrix.entry.packageVersion }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          BUILD_REF: ${{ fromJSON(steps.build.outputs.metadata)['buildx.build.ref'] }}
+          CACHE_FROM: ${{ steps.image-names.outputs.CACHE_FROM }}
         run: |
-          echo "Successfully built and pushed the following images for ${{ matrix.entry.app }}:"
-          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+          echo "Successfully built and pushed the following images for $APP:"
+          echo "$TAGS" | while IFS= read -r tag; do
             echo "  - $tag"
           done
           echo ""
-          echo "Image digest: ${{ steps.build.outputs.digest }}"
+          echo "Image digest: $DIGEST"
+
+          # Compressed size per platform, read from the registry. Attestation manifests are skipped.
+          first_tag=$(echo "$TAGS" | head -n1)
+          repo="${first_tag%:*}"
+          sizes=$(
+            raw=$(docker buildx imagetools inspect --raw "$repo@$DIGEST") || exit 0
+            if echo "$raw" | jq -e '.manifests' > /dev/null; then
+              echo "$raw" | jq -r '.manifests[] | select(.platform.os != "unknown")
+                | "\(.platform.os)/\(.platform.architecture)\(if .platform.variant then "/" + .platform.variant else "" end) \(.digest)"'
+            else
+              echo "single $DIGEST"
+            fi | while read -r platform digest; do
+              size=$(docker buildx imagetools inspect --raw "$repo@$digest" | jq '.config.size + ([.layers[].size] | add)') || size=""
+              echo "| $platform | $(numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "n/a") |"
+            done
+          ) || true
+
+          # Build duration and cache usage from the buildx build record.
+          build_info="n/a"
+          if history=$(docker buildx history inspect --builder "${BUILD_REF%%/*}" "${BUILD_REF##*/}" --format json 2>/dev/null); then
+            build_info=$(echo "$history" | jq -r '"\(.Duration / 1e9 | floor | "\(. / 60 | floor)m \(. % 60)s") · \(.NumCachedSteps)/\(.NumTotalSteps) steps cached"') || build_info="n/a"
+          fi
+
+          {
+            echo "### 📦 \`$APP\` \`v$APP_VERSION\`"
+            echo ""
+            echo "| Platform | Size (compressed) |"
+            echo "| :------- | ----------------: |"
+            echo "${sizes:-| n/a | n/a |}"
+            echo ""
+            echo "**Build:** $build_info"
+            echo ""
+            if [[ -n "$CACHE_FROM" ]]; then
+              echo "**Registry cache:** \`${CACHE_FROM#*ref=}\`"
+            else
+              echo "**Registry cache:** none"
+            fi
+            echo ""
+            echo "**Digest:** \`$DIGEST\`"
+            echo ""
+            echo "**Tags:**"
+            echo ""
+            echo "$TAGS" | sed '/^$/d; s/.*/- `&`/'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Dispatch GitOps updates for the whole release.
   # Apps deploying to the same (target-repo, application) pair are batched into a single dispatch.
