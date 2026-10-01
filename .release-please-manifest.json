@@ -11,7 +11,7 @@
 	"workflows/release": "2.1.6",
 	"workflows/gitops-deploy": "1.1.1",
 	"workflows/gitops-update-tags": "2.0.2",
-	"workflows/polyglot-monorepo-stack": "2.4.1",
+	"workflows/polyglot-monorepo-stack": "2.5.0",
 	"packages/action-tool-installer": "3.0.0",
 	"workflows/opentofu-stack": "1.0.1"
 }
