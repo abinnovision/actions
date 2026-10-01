@@ -224,6 +224,10 @@ tree in `out/<app-name>/`, which contains a `json/` directory with package manif
 directory with sources. Turbo must be a dependency in the root `package.json` and every app needs a
 `name` in its `package.json`.
 
+Each publish job adds a section to the run summary with the compressed image size per platform, the
+build duration and cached steps, the registry cache, the digest and the tags. This replaces the
+default summary of `docker/build-push-action`.
+
 ### Build arguments
 
 | Argument         | Source                                        |
