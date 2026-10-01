@@ -1,0 +1,373 @@
+name: OpenTofu Stack
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        required: false
+        default: "tofu"
+        description: |-
+          Root module directory, passed to `tofu -chdir`.
+          **Default:** `tofu`
+          **Example:** `infra`, `tofu/production`
+
+      gcp-workload-identity-provider:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Full Workload Identity Federation provider resource name.
+          Authenticates directly as the repository without a service account.
+          This is public configuration, not a secret.
+          **Default:** Falls back to `vars.FOUNDRY_WIF_PROVIDER` if not provided.
+
+      state-bucket:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          GCS bucket holding the state.
+          **Default:** Falls back to `vars.FOUNDRY_STATE_BUCKET` if not provided.
+
+      state-key:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Full KMS crypto key resource name used to encrypt the state and plan files.
+          **Default:** Falls back to `vars.FOUNDRY_STATE_KEY` if not provided.
+
+      state-prefix:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Prefix of the GCS state object, so several roots can share one bucket.
+          **Default:** Falls back to `working-directory` if not provided.
+
+      default-branch:
+        type: string
+        required: false
+        default: "main"
+        description: |-
+          Branch that triggers the apply job on push.
+          **Default:** `main`
+
+      apply-environment:
+        type: string
+        required: false
+        default: "production"
+        description: |-
+          GitHub environment used by the apply job. Set to an empty string to disable.
+          **Default:** `production`
+
+      token-broker-url:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          URL of the token broker for OIDC token exchange.
+          **Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.
+
+      github-token-plan-scope:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Token broker scopes for the GitHub token used by plan, whitespace-separated.
+          The token is exported as `GITHUB_TOKEN` for the OpenTofu GitHub provider.
+          **Default:** Empty, the token exchange is skipped.
+          **Example:** `contents:read administration:read`
+
+      github-token-apply-scope:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Token broker scopes for the GitHub token used by apply, whitespace-separated.
+          The token is exported as `GITHUB_TOKEN` for the OpenTofu GitHub provider.
+          **Default:** Empty, the token exchange is skipped.
+          **Example:** `contents:write administration:write`
+
+      github-token-resources:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Resources the exchanged GitHub token can access, using typed prefixes
+          (`repo:owner/name`, `org:name`, `enterprise:slug`), whitespace-separated.
+          **Default:** Empty, the token is scoped to the current repository.
+
+permissions: {}
+
+env:
+  WORKING_DIR: ${{ inputs.working-directory }}
+  STATE_PREFIX: ${{ inputs.state-prefix || inputs.working-directory }}
+  WIF_PROVIDER: ${{ inputs.gcp-workload-identity-provider || vars.FOUNDRY_WIF_PROVIDER }}
+  STATE_BUCKET: ${{ inputs.state-bucket || vars.FOUNDRY_STATE_BUCKET }}
+  STATE_KEY: ${{ inputs.state-key || vars.FOUNDRY_STATE_KEY }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Resolve the operation for this event and validate the configuration.
+  configure:
+    name: Configure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      # Operation against the backend: plan, apply or none.
+      mode: ${{ steps.evaluate.outputs.mode }}
+
+      # Token broker scopes for the GitHub provider token of this mode.
+      github-token-scope: ${{ steps.evaluate.outputs.github_token_scope }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate working directory
+        run: |
+          if [[ ! -d "$WORKING_DIR" ]]; then
+            echo "::error::Working directory '$WORKING_DIR' not found"
+            exit 1
+          fi
+
+      - name: Evaluate
+        id: evaluate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ inputs.default-branch }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+          PLAN_SCOPE: ${{ inputs.github-token-plan-scope }}
+          APPLY_SCOPE: ${{ inputs.github-token-apply-scope }}
+          BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+        run: |
+          mode="none"
+          github_token_scope=""
+
+          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
+            echo "::error::'pull_request_target' is not supported by opentofu-stack. Switch the caller to 'pull_request'."
+            exit 1
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            if [[ "$HEAD_REPOSITORY" == "$REPOSITORY" ]]; then
+              mode="plan"
+              github_token_scope="$PLAN_SCOPE"
+            else
+              echo "::notice::Pull requests from forks cannot authenticate to GCP, skipping plan"
+            fi
+          elif [[ "$EVENT_NAME" == "push" && "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
+            mode="apply"
+            github_token_scope="$APPLY_SCOPE"
+          fi
+
+          if [[ "$mode" != "none" ]]; then
+            if [[ -z "$WIF_PROVIDER" || -z "$STATE_BUCKET" || -z "$STATE_KEY" ]]; then
+              echo "::error::A workload identity provider, state bucket and state key are required. Enable the foundry-state-backend custom property or set the inputs."
+              exit 1
+            fi
+
+            if [[ -n "$github_token_scope" && -z "$BROKER_URL" ]]; then
+              echo "::error::token-broker-url is required when a GitHub token scope is provided"
+              exit 1
+            fi
+          fi
+
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          # Scopes may be newline-separated; outputs must be single-line.
+          echo "github_token_scope=$(echo "$github_token_scope" | xargs)" >> "$GITHUB_OUTPUT"
+
+          echo "Mode: $mode"
+          echo "State: gs://$STATE_BUCKET/$STATE_PREFIX"
+
+  # Static checks without backend access.
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - &checkout
+        name: Checkout
+        uses: actions/checkout@v6
+
+      - &setup-tools
+        name: Setup Tools
+        uses: abinnovision/actions@setup-tools-v1.1.0
+
+      - name: Check formatting
+        run: tofu -chdir="$WORKING_DIR" fmt -check -recursive
+
+      - name: Initialize OpenTofu (without backend)
+        run: tofu -chdir="$WORKING_DIR" init -backend=false -input=false
+
+      - name: Validate
+        run: tofu -chdir="$WORKING_DIR" validate
+
+  # Plan against the real state and report it on the pull request.
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - configure
+      - check
+    if: needs.configure.outputs.mode == 'plan'
+    concurrency:
+      group: opentofu-plan-${{ github.repository }}-${{ github.ref }}-${{ inputs.working-directory }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - *checkout
+      - *setup-tools
+
+      - &configure-state-encryption
+        name: Configure state encryption
+        run: |
+          {
+            echo "TF_ENCRYPTION<<TF_ENCRYPTION_EOF"
+            cat <<EOF
+          key_provider "gcp_kms" "foundry" {
+            kms_encryption_key = "$STATE_KEY"
+            key_length         = 32
+          }
+          method "aes_gcm" "foundry" {
+            keys = key_provider.gcp_kms.foundry
+          }
+          method "unencrypted" "migrate" {}
+          state {
+            method = method.aes_gcm.foundry
+            fallback {
+              method = method.unencrypted.migrate
+            }
+          }
+          plan {
+            method = method.aes_gcm.foundry
+          }
+          EOF
+            echo "TF_ENCRYPTION_EOF"
+          } >> "$GITHUB_ENV"
+
+      - &setup-gcp
+        name: Setup GCP Authentication
+        uses: abinnovision/actions@setup-gcp-v1.2.0
+        with:
+          workload-identity-provider: ${{ env.WIF_PROVIDER }}
+
+      - &github-token
+        id: github-token
+        name: Exchange token for GitHub provider
+        if: needs.configure.outputs.github-token-scope != ''
+        uses: abinnovision/actions@exchange-github-token-v1.4.0
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          scope: ${{ needs.configure.outputs.github-token-scope }}
+          resources: ${{ inputs.github-token-resources }}
+
+      - &init
+        name: Initialize OpenTofu
+        run: |
+          tofu -chdir="$WORKING_DIR" init -input=false \
+            -backend-config="bucket=$STATE_BUCKET" \
+            -backend-config="prefix=$STATE_PREFIX"
+
+      # Plans on pull requests never write state, so they skip the lock.
+      - name: Plan
+        id: plan
+        env:
+          GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
+        run: tofu -chdir="$WORKING_DIR" plan -lock=false -no-color -input=false -out=tfplan 2>&1 | tee plan.log
+
+      - name: Comment plan on pull request
+        if: ${{ !cancelled() && steps.plan.outcome != 'skipped' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+        run: |
+          MARKER="<!-- opentofu-stack:$WORKING_DIR -->"
+          export MARKER
+
+          if [[ "$PLAN_OUTCOME" == "success" ]]; then
+            tofu -chdir="$WORKING_DIR" show -no-color tfplan > plan.txt
+            SUMMARY=$(grep -m1 -E '^(Plan:|No changes\.)' plan.txt || true)
+            # Move change markers to column 0 so the diff syntax highlights them.
+            sed -E 's/^([[:space:]]+)([-+~])/\2\1/; s/^~/!/' plan.txt > plan.diff
+            LANG_HINT="diff"
+          else
+            SUMMARY="Plan failed"
+            cp plan.log plan.diff
+            LANG_HINT=""
+          fi
+
+          {
+            echo "$MARKER"
+            echo "### OpenTofu plan: \`$WORKING_DIR\`"
+            echo
+            echo "**${SUMMARY:-No summary}**"
+            echo
+            echo "<details><summary>Show plan</summary>"
+            echo
+            echo "\`\`\`$LANG_HINT"
+            head -c 60000 plan.diff
+            echo
+            echo '```'
+            echo
+            echo "</details>"
+          } > body.md
+
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+
+          COMMENT_ID=$(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith(env.MARKER))) | .id' | sed -n 1p)
+
+          if [[ -n "$COMMENT_ID" ]]; then
+            gh api --method PATCH "repos/$GH_REPO/issues/comments/$COMMENT_ID" -F body=@body.md > /dev/null
+          else
+            gh api --method POST "repos/$GH_REPO/issues/$PR_NUMBER/comments" -F body=@body.md > /dev/null
+          fi
+
+  # Apply a fresh plan on the default branch. Runs for one root never overlap.
+  apply:
+    name: Apply
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs:
+      - configure
+      - check
+    if: needs.configure.outputs.mode == 'apply'
+    environment: ${{ inputs.apply-environment || null }}
+    concurrency:
+      group: opentofu-apply-${{ github.repository }}-${{ inputs.working-directory }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - *checkout
+      - *setup-tools
+      - *configure-state-encryption
+      - *setup-gcp
+      - *github-token
+      - *init
+
+      - name: Plan
+        env:
+          GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
+        run: tofu -chdir="$WORKING_DIR" plan -input=false -out=tfplan
+
+      - name: Apply
+        env:
+          GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
+        run: tofu -chdir="$WORKING_DIR" apply -input=false tfplan
