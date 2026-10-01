@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.4.1...polyglot-monorepo-stack-source-v2.5.0) (2026-10-01)
+
+
+### Features
+
+* **polyglot-monorepo-stack:** add image sizes and build cache info to run summary ([#585](https://github.com/abinnovision/actions/issues/585)) ([d328c2b](https://github.com/abinnovision/actions/commit/d328c2b2011c2c09294f592869a6eb3a24535f0a))
+
 ## [2.4.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.4.0...polyglot-monorepo-stack-source-v2.4.1) (2026-10-01)
 
 
