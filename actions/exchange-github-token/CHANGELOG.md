@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.3.0...exchange-github-token-source-v1.4.0) (2026-10-01)
+
+
+### Features
+
+* **exchange-github-token:** revoke token in post step ([#582](https://github.com/abinnovision/actions/issues/582)) ([a5caf6e](https://github.com/abinnovision/actions/commit/a5caf6e2608f5a1c2a68995e2caece1886b3fa3e))
+
 ## [1.3.0](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.2.1...exchange-github-token-source-v1.3.0) (2026-07-20)
 
 
