@@ -271,7 +271,7 @@ jobs:
 
       - name: Setup Turbo cache
         if: steps.unit.outputs.turbo-cache == 'true'
-        uses: rharkor/caching-for-turbo@v2.3.13
+        uses: rharkor/caching-for-turbo@v2.5.1
 
       - name: Setup Docker Buildx
         if: steps.unit.outputs.skip != 'true'
