@@ -2,17 +2,17 @@
 
 Publishes the npm packages built by a stack to npmjs and GitHub Packages. It does not check out the repository and does
 not install, build or run any script of a package: it writes the released version into each package tarball of the
-build payload, bumps the ranges of dependencies released in the same list and publishes the tarball.
+dist payload, bumps the ranges of dependencies released in the same list and publishes the tarball.
 
 The release list is the `releases` output of a stack, see the
-[publishing protocol](../../docs/stacks/README.md#publishing). This workflow consumes `payloads.build` of the entries
+[publishing protocol](../../docs/stacks/README.md#publishing). This workflow consumes `payloads.dist` of the entries
 whose `path` matches `include`.
 
 ## Behavior
 
 - Skips all work when `releases` is empty, `[]` or no entry matches `include`; other entries are ignored
-- Fails when a selected entry has an unsupported `schema` or no `payloads.build`, before anything is published
-- Downloads the build payload artifact and extracts the tarball of every selected entry
+- Fails when a selected entry has an unsupported `schema` or no `payloads.dist`, before anything is published
+- Downloads the dist payload artifact and extracts the tarball of every selected entry
 - Writes the entry `version` into the `package.json` of each tarball and bumps dependency ranges of packages released in
   the same list: a range that is exactly `<old>`, `^<old>` or `~<old>`, where `<old>` is that package's version in its
   tarball, becomes `<new>`, `^<new>` or `~<new>`; other ranges are kept as written
@@ -54,7 +54,7 @@ permissions:
 ## Usage
 
 This is a `workflow_call` workflow, so it can't be triggered directly. Call it after the stack job that produced the
-release list and the build payload.
+release list and the dist payload.
 
 [//]: # "x-release-please-start-major"
 
@@ -102,10 +102,10 @@ jobs:
 
 ## Inputs
 
-| Input        | Description                                                                                                                                                                                                                                                      | Required | Default      |
-| :----------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :----------- |
-| `releases`   | Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.<br>This workflow publishes the entries matching `include` from their build payload.<br>An empty string or `[]` skips all work.<br>**Example:** `needs.ci.outputs.releases` | Yes      |              |
-| `include`    | Directory patterns of the entries to publish, one per line, matched against the entry `path`.<br>`*` matches one path segment.<br>**Default:** `packages/*`                                                                                                      | No       | `packages/*` |
-| `npm`        | Allow publishing to npmjs.<br>Packages opt in through `publishConfig.npm: true` in their `package.json`.<br>**Default:** `false`<br>**Authentication:** OIDC via [npm trusted publishing](https://docs.npmjs.com/trusted-publishers).                            | No       | _empty_      |
-| `ghpr`       | Allow publishing to GitHub Packages.<br>Packages opt in through `publishConfig.ghpr: true` in their `package.json` and must be scoped.<br>**Default:** `false`<br>**Authentication:** Uses `GITHUB_TOKEN` (automatically available)                              | No       | _empty_      |
-| `provenance` | Generate npm provenance attestations when publishing to npmjs.<br>**Default:** `true`                                                                                                                                                                            | No       | `true`       |
+| Input        | Description                                                                                                                                                                                                                                                     | Required | Default      |
+| :----------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :----------- |
+| `releases`   | Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.<br>This workflow publishes the entries matching `include` from their dist payload.<br>An empty string or `[]` skips all work.<br>**Example:** `needs.ci.outputs.releases` | Yes      |              |
+| `include`    | Directory patterns of the entries to publish, one per line, matched against the entry `path`.<br>`*` matches one path segment.<br>**Default:** `packages/*`                                                                                                     | No       | `packages/*` |
+| `npm`        | Allow publishing to npmjs.<br>Packages opt in through `publishConfig.npm: true` in their `package.json`.<br>**Default:** `false`<br>**Authentication:** OIDC via [npm trusted publishing](https://docs.npmjs.com/trusted-publishers).                           | No       | _empty_      |
+| `ghpr`       | Allow publishing to GitHub Packages.<br>Packages opt in through `publishConfig.ghpr: true` in their `package.json` and must be scoped.<br>**Default:** `false`<br>**Authentication:** Uses `GITHUB_TOKEN` (automatically available)                             | No       | _empty_      |
+| `provenance` | Generate npm provenance attestations when publishing to npmjs.<br>**Default:** `true`                                                                                                                                                                           | No       | `true`       |

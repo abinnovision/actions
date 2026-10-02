@@ -11,7 +11,7 @@ the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish
 | Job         | Runs                                                       | Does                                                                                                                            |
 | :---------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
 | `Configure` | Always                                                     | Resolves the commit, mode and trust level, validates the Makefile, resolves the units, discovers test types                     |
-| `Check`     | Always                                                     | `install-immutable`, dependency checks, `check`, `build` and unit tests; on push to `default-branch` also packs the build units |
+| `Check`     | Always                                                     | `install-immutable`, dependency checks, `check`, `build` and unit tests; on push to `default-branch` also packs the dist units |
 | `Test`      | One job per test type not already covered by `Check`       | `install-immutable`, `build` and `test-<type>`                                                                                  |
 | `Pack`      | Push to `default-branch`, in parallel with `Check`         | Prunes the source units into the source payload                                                                                 |
 | `Release`   | Push to `default-branch`, after `Check`, `Test` and `Pack` | Runs the [`release`](../release/README.md) workflow, which creates or lands release PRs                                         |
@@ -194,7 +194,7 @@ install-immutable:
 your-repo/
 ├── Makefile              # install and install-immutable targets
 ├── .tool-versions        # asdf versions: nodejs (required), python, golang, uv
-├── packages/             # build units by default
+├── packages/             # dist units by default
 │   └── <name>/package.json
 └── apps/                 # source units by default
     └── <name>/
@@ -228,7 +228,7 @@ where `*` matches exactly one path segment:
 | Input          | Default      | On push to `default-branch`                                              |
 | :------------- | :----------- | :----------------------------------------------------------------------- |
 | `source-units` | `apps/*`     | `Pack` runs `turbo prune --docker` per unit into the source payload      |
-| `build-units`  | `packages/*` | `Check` runs `yarn pack` per unit after its build into the build payload |
+| `dist-units`  | `packages/*` | `Check` runs `yarn pack` per unit after its build into the dist payload |
 
 ```yaml
 with:
@@ -238,14 +238,14 @@ with:
 ```
 
 Every source unit needs a `name` in its `package.json`, and Turbo must be a dependency in the root
-`package.json`. Basenames must be unique within the source units and within the build units;
+`package.json`. Basenames must be unique within the source units and within the dist units;
 `Configure` fails otherwise. Packing is not filtered by `private`.
 
 ## Publishing
 
 The payloads, the `releases` list and the rules of the publish workflows are described in the
 [publish protocol](../../docs/stacks/README.md#publishing). Every released workspace is listed, with
-`payloads.source` when it is a source unit and `payloads.build` when it is a build unit. A failing
+`payloads.source` when it is a source unit and `payloads.dist` when it is a dist unit. A failing
 `yarn pack` or prune fails the run before anything is released.
 
 ## Dockerfiles

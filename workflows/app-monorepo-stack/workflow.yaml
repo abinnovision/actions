@@ -1,6 +1,6 @@
 # CI for Yarn + Turborepo monorepos that mix Node.js, Python and Go.
-# Checks, builds and tests every change. On push to the default branch it packs the build units into the
-# build payload, prunes the source units into the source payload and creates releases. Both payloads are
+# Checks, builds and tests every change. On push to the default branch it packs the dist units into the
+# dist payload, prunes the source units into the source payload and creates releases. Both payloads are
 # target-neutral artifacts. The released units are exposed as one release list through the `releases`
 # output. Publishing is wired by the caller.
 
@@ -88,12 +88,12 @@ on:
           `*` matches exactly one path segment. Only directories with a `package.json` count.
           **Default:** `apps/*`
           **Example:** `apps/*` and `services/*` on separate lines
-      build-units:
+      dist-units:
         type: string
         required: false
         default: "packages/*"
         description: |-
-          Units packed into the build payload, one directory pattern per line.
+          Units packed into the dist payload, one directory pattern per line.
           `*` matches exactly one path segment. Only directories with a `package.json` count.
           **Default:** `packages/*`
           **Example:** `packages/*` and `libs/*` on separate lines
@@ -104,7 +104,7 @@ on:
         description: |-
           Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.
           Each entry: {schema: 1, name, path, version, channel, sha, payloads}.
-          `payloads.source` is set for source units, `payloads.build` for build units.
+          `payloads.source` is set for source units, `payloads.dist` for dist units.
           `[]` when nothing was released.
 
 permissions: {}
@@ -134,7 +134,7 @@ jobs:
 
       # Unit paths as compact JSON arrays.
       source-units: ${{ steps.units.outputs.source-units }}
-      build-units: ${{ steps.units.outputs.build-units }}
+      dist-units: ${{ steps.units.outputs.dist-units }}
 
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
@@ -209,7 +209,7 @@ jobs:
         id: units
         env:
           INPUT_SOURCE_UNITS: ${{ inputs.source-units }}
-          INPUT_BUILD_UNITS: ${{ inputs.build-units }}
+          INPUT_DIST_UNITS: ${{ inputs.dist-units }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -242,7 +242,7 @@ jobs:
           }
 
           resolve source-units "$INPUT_SOURCE_UNITS"
-          resolve build-units "$INPUT_BUILD_UNITS"
+          resolve dist-units "$INPUT_DIST_UNITS"
 
       # Parse test types.
       - name: Evaluate
@@ -290,7 +290,7 @@ jobs:
           echo "Test types for matrix: $test_types_matrix_json"
 
   # Install, check and build. Order controlled by the run-build-before-check input.
-  # On push to the default branch it then packs the build units into the build payload.
+  # On push to the default branch it then packs the dist units into the dist payload.
   check:
     name: Check
     runs-on: ubuntu-latest
@@ -343,26 +343,26 @@ jobs:
         if: ${{ inputs.run-unit-tests-in-build && contains(fromJSON(needs.configure.outputs.test-types), 'unit') }}
         run: yarn run test-unit
 
-      # One version-free tarball per build unit, named after the directory basename.
-      - name: Pack build units
-        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.build-units != '[]'
+      # One version-free tarball per dist unit, named after the directory basename.
+      - name: Pack dist units
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
         env:
-          BUILD_UNITS: ${{ needs.configure.outputs.build-units }}
+          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
         run: |
           set -euo pipefail
 
-          mkdir -p "$RUNNER_TEMP/build"
-          mapfile -t units < <(jq -r '.[]' <<< "$BUILD_UNITS")
+          mkdir -p "$RUNNER_TEMP/dist"
+          mapfile -t units < <(jq -r '.[]' <<< "$DIST_UNITS")
           for unit in "${units[@]}"; do
-            (cd "$unit" && yarn pack --out "$RUNNER_TEMP/build/${unit##*/}.tgz")
+            (cd "$unit" && yarn pack --out "$RUNNER_TEMP/dist/${unit##*/}.tgz")
           done
 
-      - name: Upload build payload
-        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.build-units != '[]'
+      - name: Upload dist payload
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
         uses: actions/upload-artifact@v7
         with:
-          name: payload-build
-          path: ${{ runner.temp }}/build
+          name: payload-dist
+          path: ${{ runner.temp }}/dist
           retention-days: 7
           if-no-files-found: error
           # Allows re-running the job within the same workflow run.
@@ -502,14 +502,14 @@ jobs:
         env:
           VERSIONS: ${{ needs.release.outputs.versions }}
           SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
-          BUILD_UNITS: ${{ needs.configure.outputs.build-units }}
+          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
           INPUT_PRERELEASE_CHANNEL: ${{ inputs.prerelease-channel }}
         run: |
           set -euo pipefail
 
           releases=$(jq -c \
             --argjson source "$SOURCE_UNITS" \
-            --argjson build "$BUILD_UNITS" \
+            --argjson dist "$DIST_UNITS" \
             --arg channel "$INPUT_PRERELEASE_CHANNEL" \
             '[to_entries[] | .key as $path | ($path | split("/") | last) as $name | {
               schema: 1,
@@ -520,7 +520,7 @@ jobs:
               sha: .value.sha,
               payloads: (
                 (if $path | IN($source[]) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
-                + (if $path | IN($build[]) then {build: {artifact: "payload-build", file: "\($name).tgz"}} else {} end)
+                + (if $path | IN($dist[]) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
               )
             }]' <<< "$VERSIONS")
 

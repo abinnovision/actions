@@ -8,15 +8,15 @@ the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish
 
 ## Behavior
 
-| Job         | Runs                                                       | Does                                                                                                                            |
-| :---------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
-| `Configure` | Always                                                     | Resolves the commit, mode and trust level, validates the Makefile, resolves the units, discovers test types                     |
-| `Check`     | Always                                                     | `install-immutable`, dependency checks, `check`, `build` and unit tests; on push to `default-branch` also packs the build units |
-| `Test`      | One job per test type not already covered by `Check`       | `install-immutable`, `build` and `test-<type>`                                                                                  |
-| `Pack`      | Push to `default-branch`, in parallel with `Check`         | Prunes the source units into the source payload                                                                                 |
-| `Release`   | Push to `default-branch`, after `Check`, `Test` and `Pack` | Runs the [`release`](../release/README.md) workflow, which creates or lands release PRs                                         |
-| `Releases`  | After `Release`, when a workspace was released             | Emits the `releases` list                                                                                                       |
-| `Status`    | Always                                                     | Single required status check, fails when any other job failed or was cancelled                                                  |
+| Job         | Runs                                                       | Does                                                                                                                           |
+| :---------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
+| `Configure` | Always                                                     | Resolves the commit, mode and trust level, validates the Makefile, resolves the units, discovers test types                    |
+| `Check`     | Always                                                     | `install-immutable`, dependency checks, `check`, `build` and unit tests; on push to `default-branch` also packs the dist units |
+| `Test`      | One job per test type not already covered by `Check`       | `install-immutable`, `build` and `test-<type>`                                                                                 |
+| `Pack`      | Push to `default-branch`, in parallel with `Check`         | Prunes the source units into the source payload                                                                                |
+| `Release`   | Push to `default-branch`, after `Check`, `Test` and `Pack` | Runs the [`release`](../release/README.md) workflow, which creates or lands release PRs                                        |
+| `Releases`  | After `Release`, when a workspace was released             | Emits the `releases` list                                                                                                      |
+| `Status`    | Always                                                     | Single required status check, fails when any other job failed or was cancelled                                                 |
 
 - `pull_request_target` is rejected
 - Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
@@ -205,7 +205,7 @@ install-immutable:
 your-repo/
 ├── Makefile              # install and install-immutable targets
 ├── .tool-versions        # asdf versions: nodejs (required), python, golang, uv
-├── packages/             # build units by default
+├── packages/             # dist units by default
 │   └── <name>/package.json
 └── apps/                 # source units by default
     └── <name>/
@@ -236,10 +236,10 @@ needs a matching `test-<type>` script, so enabling `test-types: unit,integration
 A unit is a directory with a `package.json`. Two inputs select them, one directory pattern per line,
 where `*` matches exactly one path segment:
 
-| Input          | Default      | On push to `default-branch`                                              |
-| :------------- | :----------- | :----------------------------------------------------------------------- |
-| `source-units` | `apps/*`     | `Pack` runs `turbo prune --docker` per unit into the source payload      |
-| `build-units`  | `packages/*` | `Check` runs `yarn pack` per unit after its build into the build payload |
+| Input          | Default      | On push to `default-branch`                                             |
+| :------------- | :----------- | :---------------------------------------------------------------------- |
+| `source-units` | `apps/*`     | `Pack` runs `turbo prune --docker` per unit into the source payload     |
+| `dist-units`   | `packages/*` | `Check` runs `yarn pack` per unit after its build into the dist payload |
 
 ```yaml
 with:
@@ -249,14 +249,14 @@ with:
 ```
 
 Every source unit needs a `name` in its `package.json`, and Turbo must be a dependency in the root
-`package.json`. Basenames must be unique within the source units and within the build units;
+`package.json`. Basenames must be unique within the source units and within the dist units;
 `Configure` fails otherwise. Packing is not filtered by `private`.
 
 ## Publishing
 
 The payloads, the `releases` list and the rules of the publish workflows are described in the
 [publish protocol](../../docs/stacks/README.md#publishing). Every released workspace is listed, with
-`payloads.source` when it is a source unit and `payloads.build` when it is a build unit. A failing
+`payloads.source` when it is a source unit and `payloads.dist` when it is a dist unit. A failing
 `yarn pack` or prune fails the run before anything is released.
 
 ## Dockerfiles
@@ -335,10 +335,10 @@ Package Registry dependencies use the job `GITHUB_TOKEN` and are unaffected.
 | `checkout-token-resources` | Additional resources the checkout token must be able to read, whitespace-separated.<br>When set, the workflow exchanges its OIDC token at the token broker for an installation token with `contents:read` on this repository plus these resources, and uses it for every checkout.<br>**Default:** _empty_ (no exchange; `GITHUB_TOKEN` is used)<br>**Format:** `repo:owner/name`, `org:name` or `enterprise:slug`<br>**Example:** `repo:my-org/private-submodule repo:my-org/go-lib`<br>**Requires:** `token-broker-url` (or the `TOKEN_BROKER_URL` repository variable), and the token broker's GitHub App installed on this repository and every listed resource<br>**Note:** Unavailable on pull requests from forks, which have no OIDC token; those runs use `GITHUB_TOKEN` | No       | _empty_      |
 | `prerelease-channel`       | Prerelease channel name (e.g., "beta", "canary", "rc").<br>When set, computes prerelease versions and sets the channel of prerelease entries in the release list.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | No       | _empty_      |
 | `source-units`             | Units pruned into the source payload, one directory pattern per line.<br>`*` matches exactly one path segment. Only directories with a `package.json` count.<br>**Default:** `apps/*`<br>**Example:** `apps/*` and `services/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | No       | `apps/*`     |
-| `build-units`              | Units packed into the build payload, one directory pattern per line.<br>`*` matches exactly one path segment. Only directories with a `package.json` count.<br>**Default:** `packages/*`<br>**Example:** `packages/*` and `libs/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | No       | `packages/*` |
+| `dist-units`               | Units packed into the dist payload, one directory pattern per line.<br>`*` matches exactly one path segment. Only directories with a `package.json` count.<br>**Default:** `packages/*`<br>**Example:** `packages/*` and `libs/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | No       | `packages/*` |
 
 ## Outputs
 
-| Output     | Description                                                                                                                                                                                                                                                                                                                                |
-| :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `releases` | Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.<br>Each entry: {schema: 1, name, path, version, channel, sha, payloads}.<br>`payloads.source` is set for source units, `payloads.build` for build units.<br>`[]` when nothing was released. |
+| Output     | Description                                                                                                                                                                                                                                                                                                                              |
+| :--------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `releases` | Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.<br>Each entry: {schema: 1, name, path, version, channel, sha, payloads}.<br>`payloads.source` is set for source units, `payloads.dist` for dist units.<br>`[]` when nothing was released. |

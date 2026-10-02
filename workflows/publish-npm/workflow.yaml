@@ -8,7 +8,7 @@ on:
         required: true
         description: |-
           Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.
-          This workflow publishes the entries matching `include` from their build payload.
+          This workflow publishes the entries matching `include` from their dist payload.
           An empty string or `[]` skips all work.
           **Example:** `needs.ci.outputs.releases`
 
@@ -56,7 +56,7 @@ defaults:
     shell: bash
 
 jobs:
-  # Publish the selected entries of the release list from the build payload.
+  # Publish the selected entries of the release list from the dist payload.
   publish:
     name: Packages
     runs-on: ubuntu-latest
@@ -86,7 +86,7 @@ jobs:
           errors=$(jq -r '
             .[] | .name as $name
             | (if .schema != 1 then "Entry \($name) has schema \(.schema // "none"), this workflow supports schema 1" else empty end),
-              (if .payloads.build == null then "Entry \($name) has no build payload" else empty end)
+              (if .payloads.dist == null then "Entry \($name) has no dist payload" else empty end)
           ' <<< "$packages")
 
           if [[ -n "$errors" ]]; then
@@ -98,7 +98,7 @@ jobs:
 
           {
             echo "packages=$packages"
-            echo "artifact=$(jq -r '.[0].payloads.build.artifact // ""' <<< "$packages")"
+            echo "artifact=$(jq -r '.[0].payloads.dist.artifact // ""' <<< "$packages")"
           } >> "$GITHUB_OUTPUT"
 
           if [[ "$packages" == "[]" ]]; then
@@ -155,7 +155,7 @@ jobs:
           # tarball version ("old") and released version ("new").
           version_map='{}'
           for i in "${!entries[@]}"; do
-            file=$(jq -r '.payloads.build.file' <<< "${entries[$i]}")
+            file=$(jq -r '.payloads.dist.file' <<< "${entries[$i]}")
             new=$(jq -r '.version' <<< "${entries[$i]}")
             mkdir -p "$workdir/$i"
             tar -xzf "$payload/$file" -C "$workdir/$i" 2> /dev/null || rm -rf "${workdir:?}/$i/package"
@@ -208,7 +208,7 @@ jobs:
           for i in "${!entries[@]}"; do
             entry="${entries[$i]}"
             entry_name=$(jq -r '.name' <<< "$entry")
-            file=$(jq -r '.payloads.build.file' <<< "$entry")
+            file=$(jq -r '.payloads.dist.file' <<< "$entry")
             version=$(jq -r '.version' <<< "$entry")
             channel=$(jq -r '.channel // ""' <<< "$entry")
             tag="${channel:-latest}"

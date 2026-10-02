@@ -94,7 +94,7 @@ A unit is a directory that contains a `package.json`. Units are selected by dire
 lines ignored), where `*` matches exactly one path segment and never `/`: `apps/*` matches `apps/web` but not
 `apps/web/admin`. Stacks and publish workflows use the same semantics.
 
-- Stack inputs: `source-units` (default `apps/*`) and `build-units` (default `packages/*`).
+- Stack inputs: `source-units` (default `apps/*`) and `dist-units` (default `packages/*`).
 - Publish workflow input: `include`, matched against the entry `path` (default `apps/*` for publish-oci, `packages/*`
   for publish-npm).
 
@@ -103,9 +103,9 @@ lines ignored), where `*` matches exactly one path segment and never `/`: `apps/
 | Kind   | Artifact         | File         | Contents                                                                                                     |
 | :----- | :--------------- | :----------- | :----------------------------------------------------------------------------------------------------------- |
 | source | `payload-source` | `source.tar` | Tracked source tree (including submodules) plus `out/<name>/` (`turbo prune --docker`) for every source unit |
-| build  | `payload-build`  | `<name>.tgz` | One `yarn pack` tarball per build unit; yarn has replaced `workspace:` ranges                                |
+| dist   | `payload-dist`   | `<name>.tgz` | One `yarn pack` tarball per dist unit; yarn has replaced `workspace:` ranges                                 |
 
-`<name>` is the directory basename; the stack rejects duplicate basenames within the source units or within the build
+`<name>` is the directory basename; the stack rejects duplicate basenames within the source units or within the dist
 units. Payloads are version-free and kept for 7 days. Artifacts are only shared within one workflow run, so the stack
 and the publish jobs must run in the same caller workflow.
 
@@ -123,30 +123,30 @@ and the publish jobs must run in the same caller workflow.
   "sha": "a3f2c1d",
   "payloads": {
     "source": { "artifact": "payload-source", "file": "source.tar" },
-    "build": { "artifact": "payload-build", "file": "backend.tgz" }
+    "dist": { "artifact": "payload-dist", "file": "backend.tgz" }
   }
 }
 ```
 
-| Field      | Description                                                                                          |
-| :--------- | :--------------------------------------------------------------------------------------------------- |
-| `schema`   | Protocol version, currently `1`                                                                      |
-| `name`     | Directory basename                                                                                   |
-| `path`     | Unit path in the repository, the unique key                                                          |
-| `version`  | Released version without build metadata                                                              |
-| `channel`  | Prerelease channel, `""` for a stable release                                                        |
-| `sha`      | Short commit SHA                                                                                     |
-| `payloads` | Payloads that exist for the unit, may be `{}`: `source` and `build`, each with `artifact` and `file` |
+| Field      | Description                                                                                         |
+| :--------- | :-------------------------------------------------------------------------------------------------- |
+| `schema`   | Protocol version, currently `1`                                                                     |
+| `name`     | Directory basename                                                                                  |
+| `path`     | Unit path in the repository, the unique key                                                         |
+| `version`  | Released version without build metadata                                                             |
+| `channel`  | Prerelease channel, `""` for a stable release                                                       |
+| `sha`      | Short commit SHA                                                                                    |
+| `payloads` | Payloads that exist for the unit, may be `{}`: `source` and `dist`, each with `artifact` and `file` |
 
-Every released unit is listed. A unit gets `payloads.source` when it is a source unit and `payloads.build` when it is a
-build unit.
+Every released unit is listed. A unit gets `payloads.source` when it is a source unit and `payloads.dist` when it is a
+dist unit.
 
 ### Publish workflows
 
 | Workflow                                             | Publishes                                 | Default `include` | Consumes          |
 | :--------------------------------------------------- | :---------------------------------------- | :---------------- | :---------------- |
 | [publish-oci](../../workflows/publish-oci/README.md) | Container images, then GitOps tag updates | `apps/*`          | `payloads.source` |
-| [publish-npm](../../workflows/publish-npm/README.md) | Packages to npmjs and GitHub Packages     | `packages/*`      | `payloads.build`  |
+| [publish-npm](../../workflows/publish-npm/README.md) | Packages to npmjs and GitHub Packages     | `packages/*`      | `payloads.dist`   |
 
 - An empty string or `[]` means nothing to do; the workflow skips without failing.
 - Entries whose `path` matches `include` are selected; all other entries are ignored silently.
