@@ -1,45 +1,32 @@
 # publish-npm
 
-Publishes npm package tarballs produced by a stack to npmjs and GitHub Packages. It never checks out
-or runs repository code: it downloads the packed tarballs, reads each tarball's own `package.json`
-and publishes the tarball as is.
+Publishes the npm packages built by a stack to npmjs and GitHub Packages. It does not check out the repository and does
+not install, build or run any script of a package: it writes the released version into each package tarball of the
+dist payload, bumps the ranges of dependencies released in the same list and publishes the tarball.
+
+The release list is the `releases` output of a stack, see the
+[publishing protocol](../../docs/stacks/README.md#publishing). This workflow consumes `payloads.dist` of the entries
+whose `path` matches `include`.
 
 ## Behavior
 
-- Skips all work when `releases` is empty or `[]`
-- Validates every entry before publishing anything and fails on an unsupported `schema`, a missing
-  `name`, `version`, `artifact` or `file`, or entries that do not share one artifact
-- Downloads the payload artifact named by the entries (normally `npm-packages`)
-- Skips packages with `"private": true`
-- Uses the entry's `channel` as dist-tag, `latest` when it is empty
-- Skips a registry when that exact version already exists there, so reruns are safe
-- A missing tarball, a tarball whose version differs from the entry's `version`, or a failed publish
-  fails that package only: it is reported with an error, the remaining packages are still published,
-  and the job fails at the end
+- Skips all work when `releases` is empty, `[]` or no entry matches `include`; other entries are ignored
+- Fails when a selected entry has an unsupported `schema` or no `payloads.dist`, before anything is published
+- Downloads the dist payload artifact and extracts the tarball of every selected entry
+- Writes the entry `version` into the `package.json` of each tarball and bumps dependency ranges of packages released in
+  the same list: a range that is exactly `<old>`, `^<old>` or `~<old>`, where `<old>` is that package's version in its
+  tarball, becomes `<new>`, `^<new>` or `~<new>`; other ranges are kept as written
+- Re-creates the tarball with `tar` from the same files, so no lifecycle script runs
+- Publishes with the entry's `channel` as dist-tag, `latest` when it is empty
+- Skips packages with `"private": true`, packages no registry applies to (see [Registry selection](#registry-selection))
+  and versions that already exist on a registry, so reruns are safe
+- A missing tarball, a leftover `workspace:` range (the tarball was not created by `yarn pack`) or a failed publish fails
+  that package only: the remaining packages are still published and the job fails at the end
 - Writes a job summary with the result per package and registry
 
-## Release list
+## Registry selection
 
-`releases` is a JSON array following the
-[release list protocol](../../docs/stacks/README.md#release-list) (schema 1), the `npm` output of a
-stack:
-
-```json
-[
-  {
-    "schema": 1,
-    "name": "client",
-    "version": "1.4.0-beta.5",
-    "channel": "beta",
-    "sha": "a3f2c1d",
-    "artifact": "npm-packages",
-    "file": "client.tgz"
-  }
-]
-```
-
-The artifact contains one `<name>.tgz` per entry, packed after the version was stamped. The npm
-package name and registry selection come from the tarball's `package/package.json`:
+The npm package name and registry selection come from the package's `package.json`:
 
 | Field                     | Default  | Effect                                                                        |
 | :------------------------ | :------- | :---------------------------------------------------------------------------- |
@@ -49,10 +36,10 @@ package name and registry selection come from the tarball's `package/package.jso
 
 ## Authentication
 
-- **npmjs:** [trusted publishing](https://docs.npmjs.com/trusted-publishers) through GitHub OIDC,
-  no token. The trusted publisher configured on npmjs must match the calling repository and its
-  workflow file (e.g. `ci.yaml`), not this reusable workflow. Verify this for every package before
-  the first release, otherwise the publish fails with an authentication error.
+- **npmjs:** [trusted publishing](https://docs.npmjs.com/trusted-publishers) through GitHub OIDC, no token. The trusted
+  publisher configured on npmjs must match the calling repository and its workflow file (e.g. `ci.yaml`), not this
+  reusable workflow. Verify this for every package before the first release, otherwise the publish fails with an
+  authentication error.
 - **GitHub Packages:** the workflow `GITHUB_TOKEN`. The package scope must match the repository owner.
 
 The calling job needs these permissions:
@@ -66,8 +53,8 @@ permissions:
 
 ## Usage
 
-This is a `workflow_call` workflow, so it can't be triggered directly. Call it after the stack job
-that produced the release list and artifact.
+This is a `workflow_call` workflow, so it can't be triggered directly. Call it after the stack job that produced the
+release list and the dist payload.
 
 [//]: # "x-release-please-start-major"
 
@@ -95,20 +82,18 @@ This workflow can be used with different version ranges. The following ranges ar
 ```yaml
 jobs:
   ci:
-    # ...stack call with outputs.npm
+    # ...stack call with outputs.releases
 
   publish-npm:
     name: Publish npm
     needs: ci
-    # Publishes the successfully packed units even when the stack partially failed.
-    if: ${{ !cancelled() }}
     uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-npm-v0
     permissions:
       contents: read
       id-token: write
       packages: write
     with:
-      releases: ${{ needs.ci.outputs.npm }}
+      releases: ${{ needs.ci.outputs.releases }}
       npm: true
       ghpr: true
 ```
@@ -117,9 +102,10 @@ jobs:
 
 ## Inputs
 
-| Input        | Description                                                                                                                                                                                                                                                                                         | Required | Default |
-| :----------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :------ |
-| `releases`   | Release list (schema 1) as a JSON array, the `npm` output of a stack.<br>Each entry names the tarball (`file`) inside the payload artifact (`artifact`).<br>All entries of one call must share the same artifact.<br>An empty string or `[]` skips all work.<br>**Example:** `needs.ci.outputs.npm` | Yes      |         |
-| `npm`        | Allow publishing to npmjs.<br>Packages opt in through `publishConfig.npm: true` in their `package.json`.<br>**Default:** `false`<br>**Authentication:** OIDC via [npm trusted publishing](https://docs.npmjs.com/trusted-publishers).                                                               | No       | _empty_ |
-| `ghpr`       | Allow publishing to GitHub Packages.<br>Packages opt in through `publishConfig.ghpr: true` in their `package.json` and must be scoped.<br>**Default:** `false`<br>**Authentication:** Uses `GITHUB_TOKEN` (automatically available)                                                                 | No       | _empty_ |
-| `provenance` | Generate npm provenance attestations when publishing to npmjs.<br>**Default:** `true`                                                                                                                                                                                                               | No       | `true`  |
+| Input        | Description                                                                                                                                                                                                                                                     | Required | Default      |
+| :----------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :----------- |
+| `releases`   | Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.<br>This workflow publishes the entries matching `include` from their dist payload.<br>An empty string or `[]` skips all work.<br>**Example:** `needs.ci.outputs.releases` | Yes      |              |
+| `include`    | Directory patterns of the entries to publish, one per line, matched against the entry `path`.<br>`*` matches one path segment.<br>**Default:** `packages/*`                                                                                                     | No       | `packages/*` |
+| `npm`        | Allow publishing to npmjs.<br>Packages opt in through `publishConfig.npm: true` in their `package.json`.<br>**Default:** `false`<br>**Authentication:** OIDC via [npm trusted publishing](https://docs.npmjs.com/trusted-publishers).                           | No       | _empty_      |
+| `ghpr`       | Allow publishing to GitHub Packages.<br>Packages opt in through `publishConfig.ghpr: true` in their `package.json` and must be scoped.<br>**Default:** `false`<br>**Authentication:** Uses `GITHUB_TOKEN` (automatically available)                             | No       | _empty_      |
+| `provenance` | Generate npm provenance attestations when publishing to npmjs.<br>**Default:** `true`                                                                                                                                                                           | No       | `true`       |

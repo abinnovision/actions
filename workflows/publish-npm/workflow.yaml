@@ -7,11 +7,19 @@ on:
         type: string
         required: true
         description: |-
-          Release list (schema 1) as a JSON array, the `npm` output of a stack.
-          Each entry names the tarball (`file`) inside the payload artifact (`artifact`).
-          All entries of one call must share the same artifact.
+          Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.
+          This workflow publishes the entries matching `include` from their dist payload.
           An empty string or `[]` skips all work.
-          **Example:** `needs.ci.outputs.npm`
+          **Example:** `needs.ci.outputs.releases`
+
+      include:
+        type: string
+        required: false
+        default: packages/*
+        description: |-
+          Directory patterns of the entries to publish, one per line, matched against the entry `path`.
+          `*` matches one path segment.
+          **Default:** `packages/*`
 
       npm:
         type: boolean
@@ -48,7 +56,7 @@ defaults:
     shell: bash
 
 jobs:
-  # Publish the packed tarballs of the release list.
+  # Publish the selected entries of the release list from the dist payload.
   publish:
     name: Packages
     runs-on: ubuntu-latest
@@ -59,31 +67,27 @@ jobs:
       id-token: write
       packages: write
     steps:
-      # Rejects the whole list before anything is published.
-      - name: Validate release list
+      - name: Select packages
+        id: select
         env:
           RELEASES: ${{ inputs.releases }}
+          INPUT_INCLUDE: ${{ inputs.include }}
         run: |
           set -euo pipefail
 
-          if ! jq -e 'type == "array"' <<< "$RELEASES" > /dev/null 2>&1; then
-            echo "::error::'releases' is not a JSON array"
-            exit 1
-          fi
+          # Each pattern becomes an anchored regex where "*" matches one path segment.
+          packages=$(jq -c --arg patterns "$INPUT_INCLUDE" '
+            ($patterns | split("\n")
+              | map(gsub("^\\s+|\\s+$"; "") | select(. != ""))
+              | map("^" + (gsub("(?<c>[.+?^${}()|\\[\\]\\\\])"; "\\\(.c)") | gsub("\\*"; "[^/]*")) + "$")) as $regexes
+            | [.[] | select(.path as $path | any($regexes[]; . as $re | $path | test($re)))]
+          ' <<< "$RELEASES")
 
           errors=$(jq -r '
-            (.[0].artifact // "") as $artifact
-            | to_entries[]
-            | .key as $i
-            | .value as $e
-            | if ($e | type) != "object" then "Entry #\($i) is not an object"
-              else
-                ($e.name // "#\($i)") as $id
-                | (if $e.schema != 1 then "Entry \($id) has schema \($e.schema // "none"), this workflow supports schema 1" else empty end),
-                  (["name", "version", "artifact", "file"][] | select(($e[.] // "") == "") | "Entry \($id) has no \(.)"),
-                  (if ($e.artifact // "") != $artifact then "Entry \($id) references artifact \($e.artifact // "none"), all entries must share \($artifact)" else empty end)
-              end
-          ' <<< "$RELEASES")
+            .[] | .name as $name
+            | (if .schema != 1 then "Entry \($name) has schema \(.schema // "none"), this workflow supports schema 1" else empty end),
+              (if .payloads.dist == null then "Entry \($name) has no dist payload" else empty end)
+          ' <<< "$packages")
 
           if [[ -n "$errors" ]]; then
             while IFS= read -r error; do
@@ -92,19 +96,31 @@ jobs:
             exit 1
           fi
 
-      - name: Download packages
+          {
+            echo "packages=$packages"
+            echo "artifact=$(jq -r '.[0].payloads.dist.artifact // ""' <<< "$packages")"
+          } >> "$GITHUB_OUTPUT"
+
+          if [[ "$packages" == "[]" ]]; then
+            echo "No entries match the include patterns, nothing to publish"
+          fi
+
+      - name: Download payload
+        if: steps.select.outputs.packages != '[]'
         uses: actions/download-artifact@v8
         with:
-          name: ${{ fromJSON(inputs.releases)[0].artifact }}
-          path: packages
+          name: ${{ steps.select.outputs.artifact }}
+          path: ${{ runner.temp }}/payload
 
       - name: Setup Node
+        if: steps.select.outputs.packages != '[]'
         uses: actions/setup-node@v6
         with:
           node-version: 24
 
       # Trusted publishing requires npm 11.5.1 or newer.
       - name: Setup npm
+        if: steps.select.outputs.packages != '[]'
         run: |
           current=$(npm --version)
           if [[ "$(printf '%s\n' "11.5.1" "$current" | sort -V | head -n1)" != "11.5.1" ]]; then
@@ -114,8 +130,9 @@ jobs:
 
       # A failing package is recorded and the loop continues; the step fails at the end.
       - name: Publish
+        if: steps.select.outputs.packages != '[]'
         env:
-          RELEASES: ${{ inputs.releases }}
+          PACKAGES: ${{ steps.select.outputs.packages }}
           INPUT_NPM: ${{ inputs.npm }}
           INPUT_GHPR: ${{ inputs.ghpr }}
           INPUT_PROVENANCE: ${{ inputs.provenance }}
@@ -123,12 +140,31 @@ jobs:
         run: |
           set -euo pipefail
 
+          payload="$RUNNER_TEMP/payload"
+          workdir="$RUNNER_TEMP/work"
           npm_registry="https://registry.npmjs.org"
           ghpr_registry="https://npm.pkg.github.com"
 
           # Holds the GitHub Packages auth line; npm resolves the token from the environment.
           npmrc=$(mktemp)
           echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > "$npmrc"
+
+          mapfile -t entries < <(jq -c '.[]' <<< "$PACKAGES")
+
+          # Extracts every tarball into its own directory and maps each package name to its
+          # tarball version ("old") and released version ("new").
+          version_map='{}'
+          for i in "${!entries[@]}"; do
+            file=$(jq -r '.payloads.dist.file' <<< "${entries[$i]}")
+            new=$(jq -r '.version' <<< "${entries[$i]}")
+            mkdir -p "$workdir/$i"
+            tar -xzf "$payload/$file" -C "$workdir/$i" 2> /dev/null || rm -rf "${workdir:?}/$i/package"
+
+            if [[ -f "$workdir/$i/package/package.json" ]]; then
+              version_map=$(jq -c --argjson map "$version_map" --arg new "$new" \
+                '$map + {(.name): {old: .version, new: $new}}' "$workdir/$i/package/package.json")
+            fi
+          done
 
           failures=()
 
@@ -154,6 +190,14 @@ jobs:
             fi
           }
 
+          # Records a package failure that happens before publishing.
+          fail_package() {
+            local name="$1" version="$2" tag="$3" reason="$4" label="$5"
+            echo "::error::$reason"
+            failures+=("$name@$version: $reason")
+            echo "| \`$name\` | \`$version\` | \`$tag\` | failed ($label) | failed ($label) |" >> "$GITHUB_STEP_SUMMARY"
+          }
+
           {
             echo "### npm packages"
             echo ""
@@ -161,54 +205,37 @@ jobs:
             echo "| :------ | :------ | :-- | :---- | :-------------- |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          mapfile -t entries < <(jq -c '.[]' <<< "$RELEASES")
-
-          for entry in "${entries[@]}"; do
+          for i in "${!entries[@]}"; do
+            entry="${entries[$i]}"
             entry_name=$(jq -r '.name' <<< "$entry")
-            artifact=$(jq -r '.artifact' <<< "$entry")
-            file=$(jq -r '.file' <<< "$entry")
-            entry_version=$(jq -r '.version' <<< "$entry")
+            file=$(jq -r '.payloads.dist.file' <<< "$entry")
+            version=$(jq -r '.version' <<< "$entry")
             channel=$(jq -r '.channel // ""' <<< "$entry")
             tag="${channel:-latest}"
 
-            tarball="./packages/$file"
-            manifest=""
-            if [[ -f "$tarball" ]]; then
-              manifest=$(tar -xOzf "$tarball" package/package.json 2> /dev/null || true)
-            fi
-            if [[ -z "$manifest" ]]; then
-              echo "::error::Tarball '$file' of entry $entry_name not found or unreadable in artifact '$artifact'"
-              failures+=("$entry_name: tarball '$file' not found or unreadable")
-              echo "| \`$entry_name\` | \`$entry_version\` | \`$tag\` | failed (tarball) | failed (tarball) |" >> "$GITHUB_STEP_SUMMARY"
+            manifest_file="$workdir/$i/package/package.json"
+            if [[ ! -f "$manifest_file" ]]; then
+              fail_package "$entry_name" "$version" "$tag" "Entry $entry_name has no tarball '$file' with a package/package.json in the payload" "tarball"
               continue
             fi
 
+            manifest=$(< "$manifest_file")
             name=$(jq -r '.name' <<< "$manifest")
-            version=$(jq -r '.version' <<< "$manifest")
             is_private=$(jq -r '.private // false' <<< "$manifest")
             publish_npm=$(jq -r '.publishConfig.npm // false' <<< "$manifest")
             publish_ghpr=$(jq -r '.publishConfig.ghpr // false' <<< "$manifest")
             npm_access=$(jq -r '.publishConfig.npmAccess // "public"' <<< "$manifest")
-
-            if [[ "$version" != "$entry_version" ]]; then
-              echo "::error::Tarball '$file' contains $name@$version, expected version $entry_version"
-              failures+=("$name: tarball version $version, expected $entry_version")
-              echo "| \`$name\` | \`$entry_version\` | \`$tag\` | failed (version mismatch) | failed (version mismatch) |" >> "$GITHUB_STEP_SUMMARY"
-              continue
-            fi
 
             if [[ "$is_private" == "true" ]]; then
               echo "::notice::Skipping private package $name"
               continue
             fi
 
-            echo "Processing $name@$version (tag: $tag)"
-
             ghpr_result="disabled"
+            use_ghpr="false"
             if [[ "$INPUT_GHPR" == "true" ]] && [[ "$publish_ghpr" == "true" ]]; then
               if [[ "$name" == @*/* ]]; then
-                publish_to "$ghpr_registry" "$name" "$version" "$tarball" --tag "$tag"
-                ghpr_result="$result"
+                use_ghpr="true"
               else
                 echo "::warning::Skipping GitHub Packages for unscoped package $name"
                 ghpr_result="skipped (unscoped)"
@@ -216,7 +243,61 @@ jobs:
             fi
 
             npm_result="disabled"
+            use_npm="false"
             if [[ "$INPUT_NPM" == "true" ]] && [[ "$publish_npm" == "true" ]]; then
+              use_npm="true"
+            fi
+
+            if [[ "$use_ghpr" != "true" ]] && [[ "$use_npm" != "true" ]]; then
+              echo "::notice::No registry applies to $name, skipping"
+              echo "| \`$name\` | \`$version\` | \`$tag\` | $npm_result | $ghpr_result |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            echo "Processing $name@$version (tag: $tag)"
+
+            # yarn pack replaces every workspace: range; a remaining one means the tarball was not created by it.
+            leftover=$(jq -r '
+              [(.dependencies, .peerDependencies, .optionalDependencies, .devDependencies)
+                | select(type == "object") | to_entries[]
+                | select((.value | type) == "string" and (.value | startswith("workspace:")))
+                | "\(.key)@\(.value)"]
+              | unique | join(", ")
+            ' <<< "$manifest")
+            if [[ -n "$leftover" ]]; then
+              fail_package "$name" "$version" "$tag" "$name has workspace: ranges, the tarball was not created with yarn pack: $leftover" "dependencies"
+              continue
+            fi
+
+            # Sets the released version and moves "<old>", "^<old>" and "~<old>" ranges of packages
+            # in the version map to their released version. Other ranges are kept as written.
+            jq --arg version "$version" --argjson map "$version_map" '
+              .version = $version
+              | reduce ("dependencies", "peerDependencies", "optionalDependencies", "devDependencies") as $field (.;
+                  if (.[$field] | type) == "object" then
+                    .[$field] |= with_entries(
+                      $map[.key] as $v
+                      | if $v != null and (.value | type) == "string" then
+                          (first(("", "^", "~") as $prefix | select(.value == $prefix + $v.old) | $prefix) // null) as $prefix
+                          | if $prefix != null then .value = $prefix + $v.new else . end
+                        else . end)
+                  else . end)
+            ' <<< "$manifest" > "$manifest_file"
+
+            # Re-creates the tarball with the members of the original tarball; no npm lifecycle runs.
+            tarball="$workdir/$i.tgz"
+            members="$workdir/$i.members"
+            if ! { tar -tzf "$payload/$file" > "$members" && tar -czf "$tarball" -C "$workdir/$i" --no-recursion -T "$members"; }; then
+              fail_package "$name" "$version" "$tag" "Re-creating the tarball of $name@$version failed" "tarball"
+              continue
+            fi
+
+            if [[ "$use_ghpr" == "true" ]]; then
+              publish_to "$ghpr_registry" "$name" "$version" "$tarball" --tag "$tag"
+              ghpr_result="$result"
+            fi
+
+            if [[ "$use_npm" == "true" ]]; then
               npm_args=(--access "$npm_access" --tag "$tag")
               if [[ "$INPUT_PROVENANCE" == "true" ]]; then
                 npm_args+=(--provenance)

@@ -49,12 +49,12 @@ jobs:
 
 ## Jobs
 
-| Job         | Runs                              | Does                                                                  |
-| :---------- | :-------------------------------- | :-------------------------------------------------------------------- |
-| `Configure` | Always                            | Resolves the event into `mode` and `trusted`, validates the inputs    |
-| `Check`     | Always                            | Repository checks and static checks of the stack, without credentials |
-| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, preview, deploy, plan, apply     |
-| `Status`    | Always                            | Fails when any other job failed or was cancelled                      |
+| Job         | Runs                              | Does                                                                        |
+| :---------- | :-------------------------------- | :-------------------------------------------------------------------------- |
+| `Configure` | Always                            | Resolves the event into `mode` and `trusted`, validates the inputs          |
+| `Check`     | Always                            | Repository checks and static checks of the stack, without credentials       |
+| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, releases, preview, deploy, plan, apply |
+| `Status`    | Always                            | Fails when any other job failed or was cancelled                            |
 
 - `mode` is `pr` for pull requests, `main` for pushes to the default branch and `none` otherwise.
 - `trusted` is `false` for pull requests from forks and from Dependabot. Lanes that need credentials are skipped for
@@ -83,40 +83,81 @@ Rulesets require exactly two contexts, independent of the kind:
 
 ## Publishing
 
-Stacks do not publish. A stack produces payloads per target format, uploads them as artifacts and exposes one release
-list per target as an output. Publish workflows own the registries and their credentials, and the caller wires one job
-per target. Every stack names its release-list outputs after the publish target: `npm`, `oci`, later `static`.
+Stacks do generic work only (prune, build, pack) and know no publish target. They upload payload artifacts and expose
+one release list as the `releases` output. Publish workflows own the registries and their credentials and do the
+target-specific last step without installing or building. The caller wires one job per publish workflow and passes the
+same `releases` value to each.
 
-| Workflow                                             | Publishes                                 | Stack output | Payload artifact |
-| :--------------------------------------------------- | :---------------------------------------- | :----------- | :--------------- |
-| [publish-npm](../../workflows/publish-npm/README.md) | Packages to npmjs and GitHub Packages     | `npm`        | `npm-packages`   |
-| [publish-oci](../../workflows/publish-oci/README.md) | Container images, then GitOps tag updates | `oci`        | `oci-context`    |
+### Units and patterns
+
+A unit is a directory that contains a `package.json`. Units are selected by directory patterns, one per line (blank
+lines ignored), where `*` matches exactly one path segment and never `/`: `apps/*` matches `apps/web` but not
+`apps/web/admin`. Stacks and publish workflows use the same semantics.
+
+- Stack inputs: `source-units` (default `apps/*`) and `dist-units` (default `packages/*`).
+- Publish workflow input: `include`, matched against the entry `path` (default `apps/*` for publish-oci, `packages/*`
+  for publish-npm).
+
+### Payloads
+
+| Kind   | Artifact         | File         | Contents                                                                                                     |
+| :----- | :--------------- | :----------- | :----------------------------------------------------------------------------------------------------------- |
+| source | `payload-source` | `source.tar` | Tracked source tree (including submodules) plus `out/<name>/` (`turbo prune --docker`) for every source unit |
+| dist   | `payload-dist`   | `<name>.tgz` | One `yarn pack` tarball per dist unit; yarn has replaced `workspace:` ranges                                 |
+
+`<name>` is the directory basename; the stack rejects duplicate basenames within the source units or within the dist
+units. Payloads are version-free and kept for 7 days. Artifacts are only shared within one workflow run, so the stack
+and the publish jobs must run in the same caller workflow.
 
 ### Release list
 
-Every publish workflow takes a `releases` input: a JSON array with one entry per released unit. An empty string or
-`[]` skips the workflow.
+`releases` is a JSON array with one entry per released unit, `[]` when nothing was released:
 
-| Field      | Required | Description                                                                           |
-| :--------- | :------- | :------------------------------------------------------------------------------------ |
-| `schema`   | Yes      | Protocol version, currently `1`                                                       |
-| `name`     | Yes      | Unique key of the unit within the run; used for job names, secrets and GitOps lookups |
-| `version`  | Yes      | Released version without build metadata                                               |
-| `channel`  | Yes      | Prerelease channel, `""` for a stable release                                         |
-| `sha`      | Yes      | Short commit SHA                                                                      |
-| `artifact` | Yes      | Name of the artifact holding the payload                                              |
-| `file`     | Yes      | File inside the artifact                                                              |
-| `oci`      | No       | Target block, only read by `publish-oci`                                              |
+```json
+{
+  "schema": 1,
+  "name": "backend",
+  "path": "apps/backend",
+  "version": "1.4.0-beta.5",
+  "channel": "beta",
+  "sha": "a3f2c1d",
+  "payloads": {
+    "source": { "artifact": "payload-source", "file": "source.tar" },
+    "dist": { "artifact": "payload-dist", "file": "backend.tgz" }
+  }
+}
+```
 
-A release is stable when `channel` is empty. The `oci` block:
+| Field      | Description                                                                                         |
+| :--------- | :-------------------------------------------------------------------------------------------------- |
+| `schema`   | Protocol version, currently `1`                                                                     |
+| `name`     | Directory basename                                                                                  |
+| `path`     | Unit path in the repository, the unique key                                                         |
+| `version`  | Released version without build metadata                                                             |
+| `channel`  | Prerelease channel, `""` for a stable release                                                       |
+| `sha`      | Short commit SHA                                                                                    |
+| `payloads` | Payloads that exist for the unit, may be `{}`: `source` and `dist`, each with `artifact` and `file` |
 
-| Field         | Required | Description                                                   |
-| :------------ | :------- | :------------------------------------------------------------ |
-| `image`       | Yes      | Image repository name, the single source for every registry   |
-| `file`        | Yes      | Dockerfile path relative to the context root                  |
-| `context`     | No       | Build context relative to the extracted tar root, default `.` |
-| `build-args`  | No       | Object of Docker build arguments                              |
-| `turbo-cache` | No       | Start the Turbo cache server for the build, default `false`   |
+Every released unit is listed. A unit gets `payloads.source` when it is a source unit and `payloads.dist` when it is a
+dist unit.
+
+### Publish workflows
+
+| Workflow                                             | Publishes                                 | Default `include` | Consumes          |
+| :--------------------------------------------------- | :---------------------------------------- | :---------------- | :---------------- |
+| [publish-oci](../../workflows/publish-oci/README.md) | Container images, then GitOps tag updates | `apps/*`          | `payloads.source` |
+| [publish-npm](../../workflows/publish-npm/README.md) | Packages to npmjs and GitHub Packages     | `packages/*`      | `payloads.dist`   |
+
+- An empty string or `[]` means nothing to do; the workflow skips without failing.
+- Entries whose `path` matches `include` are selected; all other entries are ignored silently.
+- A selected entry with `schema != 1` or without the consumed payload fails with an error naming the entry. Nothing
+  else is validated: the list comes from the caller's own stack in the same run.
+
+### Failure model
+
+The stack fails hard: a failing `yarn pack` fails `Check`, a failing prune fails `Pack`, and `Release` needs both, so
+nothing is released when a payload could not be produced. Publish jobs only need `needs: ci`: they run after a
+successful stack and skip when the list is empty.
 
 ### Evolution
 
@@ -124,18 +165,5 @@ A release is stable when `channel` is empty. The `oci` block:
 - Consumers ignore fields they do not know.
 - Removing or renaming a field, or changing its meaning, increments `schema` and the major version of every workflow
   involved.
-- A consumer fails with a clear error on an entry whose `schema` it does not support.
 
-### Payloads
-
-- Payload artifacts are kept for 7 days and are only shared within one workflow run, so the stack and the publish jobs
-  must run in the same caller workflow.
-- A unit that fails to pack is left out of its list and fails the stack after the lists are written. Publish jobs
-  therefore use `if: ${{ !cancelled() }}`, so the packed units are still published.
-- `npm-packages` holds one tarball per released package, created with `yarn pack` after the released versions are
-  written to the `package.json` files. `publish-npm` does not check out the repository and runs no repository code.
-- `oci-context` holds `context.tar`: the tracked source tree and the `turbo prune` output of every released app.
-  `publish-oci` does not check out the repository either, but the image build executes the repository's `Dockerfile`
-  inside BuildKit.
-
-A stack that emits the same release lists and artifacts can use the publish workflows without changes.
+A stack that emits the same release list and payloads can use the publish workflows without changes.

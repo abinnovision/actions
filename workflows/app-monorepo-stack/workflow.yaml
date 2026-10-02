@@ -1,7 +1,8 @@
 # CI for Yarn + Turborepo monorepos that mix Node.js, Python and Go.
-# Checks, builds and tests every change. On push to the default branch it creates releases and packs
-# the released workspaces into payload artifacts (npm tarballs and an OCI build context), exposed as
-# release lists through the `npm` and `oci` outputs. Publishing is wired by the caller.
+# Checks, builds and tests every change. On push to the default branch it packs the dist units into the
+# dist payload, prunes the source units into the source payload and creates releases. Both payloads are
+# target-neutral artifacts. The released units are exposed as one release list through the `releases`
+# output. Publishing is wired by the caller.
 
 name: App Monorepo Stack
 
@@ -77,27 +78,34 @@ on:
         default: ""
         description: |-
           Prerelease channel name (e.g., "beta", "canary", "rc").
-          When set, computes prerelease versions and sets the channel of prerelease entries in the release lists.
+          When set, computes prerelease versions and sets the channel of prerelease entries in the release list.
+      source-units:
+        type: string
+        required: false
+        default: "apps/*"
+        description: |-
+          Units pruned into the source payload, one directory pattern per line.
+          `*` matches exactly one path segment. Only directories with a `package.json` count.
+          **Default:** `apps/*`
+          **Example:** `apps/*` and `services/*` on separate lines
+      dist-units:
+        type: string
+        required: false
+        default: "packages/*"
+        description: |-
+          Units packed into the dist payload, one directory pattern per line.
+          `*` matches exactly one path segment. Only directories with a `package.json` count.
+          **Default:** `packages/*`
+          **Example:** `packages/*` and `libs/*` on separate lines
 
     outputs:
-      versions:
-        value: ${{ jobs.release.outputs.versions }}
+      releases:
+        value: ${{ jobs.releases.outputs.releases || '[]' }}
         description: |-
-          JSON object mapping released/prerelease package paths to version info.
-          Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease", sha: "short commit SHA"}.
-          Empty object {} when nothing was released.
-      npm:
-        value: ${{ jobs.pack.outputs.npm }}
-        description: |-
-          Release list (schema 1) of packed npm packages, a compact JSON array for `publish-npm`.
-          Each entry: {schema: 1, name, version, channel, sha, artifact: "npm-packages", file: "<name>.tgz"}.
-          Empty when nothing was packed.
-      oci:
-        value: ${{ jobs.pack.outputs.oci }}
-        description: |-
-          Release list (schema 1) of released apps with a Dockerfile, a compact JSON array for `publish-oci`.
-          Each entry: {schema: 1, name, version, channel, sha, artifact: "oci-context", file: "context.tar", oci: {image, file, context, build-args, turbo-cache}}.
-          Empty when nothing was packed.
+          Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.
+          Each entry: {schema: 1, name, path, version, channel, sha, payloads}.
+          `payloads.source` is set for source units, `payloads.dist` for dist units.
+          `[]` when nothing was released.
 
 permissions: {}
 
@@ -109,7 +117,7 @@ defaults:
     shell: bash
 
 jobs:
-  # Resolve the event, validate the repository and discover test types.
+  # Resolve the event, validate the repository, resolve the units and discover test types.
   configure:
     name: Configure
     runs-on: ubuntu-latest
@@ -123,6 +131,10 @@ jobs:
       # Pipeline mode (pr, main or none) and whether the run may use credentials.
       mode: ${{ steps.event.outputs.mode }}
       trusted: ${{ steps.event.outputs.trusted }}
+
+      # Unit paths as compact JSON arrays.
+      source-units: ${{ steps.units.outputs.source-units }}
+      dist-units: ${{ steps.units.outputs.dist-units }}
 
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
@@ -191,39 +203,54 @@ jobs:
             exit 1
           fi
 
-      - name: Validate checkout token configuration
-        if: inputs.checkout-token-resources != ''
+      # Every directory matching a pattern line that contains a package.json is a unit. The unquoted
+      # pattern is expanded by bash, so `*` matches one path segment.
+      - name: Resolve units
+        id: units
         env:
-          BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          INPUT_SOURCE_UNITS: ${{ inputs.source-units }}
+          INPUT_DIST_UNITS: ${{ inputs.dist-units }}
         run: |
-          if [[ -z "$BROKER_URL" ]]; then
-            echo "::error::token-broker-url is required when checkout-token-resources is provided"
-            exit 1
-          fi
+          set -euo pipefail
+          shopt -s nullglob
 
-      # Discover available apps and packages, parse test types.
+          resolve() {
+            local output="$1" patterns="$2" pattern dir units duplicates
+            units=$(
+              while read -r pattern; do
+                [[ -n "$pattern" ]] || continue
+                if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ ]]; then
+                  echo "::error::Invalid pattern '$pattern' in $output: only path segments and '*' are supported" >&2
+                  exit 1
+                fi
+                for dir in $pattern; do
+                  if [[ -f "$dir/package.json" ]]; then
+                    echo "${dir%/}"
+                  fi
+                done
+              done <<< "$patterns" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique'
+            )
+
+            duplicates=$(jq -r 'group_by(split("/") | last) | map(select(length > 1) | join(", ")) | join("; ")' <<< "$units")
+            if [[ -n "$duplicates" ]]; then
+              echo "::error::Duplicate basenames in $output: $duplicates"
+              exit 1
+            fi
+
+            echo "$output=$units" >> "$GITHUB_OUTPUT"
+            echo "$output: $units"
+          }
+
+          resolve source-units "$INPUT_SOURCE_UNITS"
+          resolve dist-units "$INPUT_DIST_UNITS"
+
+      # Parse test types.
       - name: Evaluate
         id: evaluate
         env:
           INPUT_TEST_TYPES: ${{ inputs.test-types }}
           INPUT_RUN_UNIT_TESTS_IN_BUILD: ${{ inputs.run-unit-tests-in-build }}
         run: |
-          # Collect apps
-          apps=()
-          for app_dir in apps/*/; do
-            if [ -d "$app_dir" ] && [ -f "$app_dir/package.json" ] && [ -f "$app_dir/Dockerfile" ]; then
-              apps+=("$(basename "$app_dir")")
-            fi
-          done
-
-          # Collect packages
-          packages=()
-          for pkg_dir in packages/*/; do
-            if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.json" ]; then
-              packages+=("$(basename "$pkg_dir")")
-            fi
-          done
-
           # Parse and validate test types
           test_types=()
           test_types_for_matrix=()
@@ -252,24 +279,18 @@ jobs:
           fi
 
           # Convert to JSON using jq
-          apps_json=$(printf '%s\n' "${apps[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          packages_json=$(printf '%s\n' "${packages[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
           test_types_json=$(printf '%s\n' "${test_types[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
           test_types_matrix_json=$(printf '%s\n' "${test_types_for_matrix[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
-          echo "apps_available=$apps_json" >> $GITHUB_OUTPUT
-          echo "packages_available=$packages_json" >> $GITHUB_OUTPUT
           echo "test_types=$test_types_json" >> $GITHUB_OUTPUT
           echo "test_types_for_matrix=$test_types_matrix_json" >> $GITHUB_OUTPUT
 
           # Debug output
-          echo "Found ${#apps[@]} apps: $apps_json"
-          echo "Found ${#packages[@]} packages: $packages_json"
-          echo ""
           echo "All test types: $test_types_json"
           echo "Test types for matrix: $test_types_matrix_json"
 
   # Install, check and build. Order controlled by the run-build-before-check input.
+  # On push to the default branch it then packs the dist units into the dist payload.
   check:
     name: Check
     runs-on: ubuntu-latest
@@ -322,6 +343,31 @@ jobs:
         if: ${{ inputs.run-unit-tests-in-build && contains(fromJSON(needs.configure.outputs.test-types), 'unit') }}
         run: yarn run test-unit
 
+      # One version-free tarball per dist unit, named after the directory basename.
+      - name: Pack dist units
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
+        env:
+          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$RUNNER_TEMP/dist"
+          mapfile -t units < <(jq -r '.[]' <<< "$DIST_UNITS")
+          for unit in "${units[@]}"; do
+            (cd "$unit" && yarn pack --out "$RUNNER_TEMP/dist/${unit##*/}.tgz")
+          done
+
+      - name: Upload dist payload
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
+        uses: actions/upload-artifact@v7
+        with:
+          name: payload-dist
+          path: ${{ runner.temp }}/dist
+          retention-days: 7
+          if-no-files-found: error
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
   # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
   # Runs concurrently with check: neither job consumes build artifacts from the other.
   test:
@@ -356,13 +402,14 @@ jobs:
           TEST_TYPE: ${{ matrix.test-type }}
         run: yarn run "test-$TEST_TYPE"
 
-  # Create releases for apps and packages via the release workflow.
+  # Create releases via the release workflow.
   release:
     name: Release
     needs:
       - configure
       - check
       - test
+      - pack
     uses: abinnovision/actions/.github/workflows/workflow.yaml@release-dev
     permissions:
       contents: read
@@ -372,25 +419,19 @@ jobs:
     # Only on push to the default branch. always() prevents skipping when the test job is skipped.
     if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.configure.outputs.mode == 'main'
 
-  # Pack the released workspaces into payload artifacts and emit the release lists.
-  # The npm and OCI halves run independently. Units that fail to pack are left out of the lists,
-  # and the final step fails the job after the lists have been written.
+  # Prune every source unit into the source payload, in parallel with check and test.
   pack:
     name: Pack
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
       - configure
-      - release
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.release.result == 'success' && needs.release.outputs.versions != '{}'
+    if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
     permissions:
       contents: read
       packages: read
       actions: write
       id-token: write
-    outputs:
-      npm: ${{ steps.payloads.outputs.npm }}
-      oci: ${{ steps.payloads.outputs.oci }}
     steps:
       - *checkout-token
       - *checkout
@@ -398,134 +439,9 @@ jobs:
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
 
-      - name: Install dependencies
-        run: make install-immutable
-
-      # Select the released packages and apps that produce a payload.
-      - name: Evaluate
-        id: evaluate
+      - name: Prune source units
         env:
-          VERSIONS: ${{ needs.release.outputs.versions }}
-          INPUT_PRERELEASE_CHANNEL: ${{ inputs.prerelease-channel }}
-        run: |
-          set -euo pipefail
-
-          # Release list entries (schema 1) for every released workspace under $prefix.
-          entries='[to_entries[] | select(.key | startswith($prefix)) | {
-            schema: 1,
-            name: (.key | ltrimstr($prefix)),
-            version: .value.packageVersion,
-            channel: (if .value.type == "prerelease" then $channel else "" end),
-            sha: .value.sha
-          }]'
-          released_packages=$(jq -c --arg prefix "packages/" --arg channel "$INPUT_PRERELEASE_CHANNEL" "$entries" <<< "$VERSIONS")
-          released_apps=$(jq -c --arg prefix "apps/" --arg channel "$INPUT_PRERELEASE_CHANNEL" "$entries" <<< "$VERSIONS")
-
-          packages='[]'
-          while read -r entry; do
-            [[ -z "$entry" ]] && continue
-            name=$(jq -r '.name' <<< "$entry")
-            package_json="packages/$name/package.json"
-
-            if [[ ! -f "$package_json" ]]; then
-              echo "::warning::No package.json found at packages/$name, skipping"
-              continue
-            fi
-
-            package_name=$(jq -r '.name' "$package_json")
-            if [[ "$(jq -r '.private // false' "$package_json")" == "true" ]]; then
-              echo "Skipping private package: $package_name"
-              continue
-            fi
-
-            package_language=$(jq -r '.publishConfig.language // "nodejs"' "$package_json")
-            if [[ "$package_language" != "nodejs" ]]; then
-              echo "Skipping non-nodejs package: $package_name (language: $package_language)"
-              continue
-            fi
-
-            echo "Selected package: $package_name (packages/$name)"
-            packages=$(jq -c --argjson e "$entry" '. + [$e + {artifact: "npm-packages", file: "\($e.name).tgz"}]' <<< "$packages")
-          done <<< "$(jq -c '.[]' <<< "$released_packages")"
-
-          apps='[]'
-          while read -r entry; do
-            [[ -z "$entry" ]] && continue
-            name=$(jq -r '.name' <<< "$entry")
-
-            if [[ ! -f "apps/$name/Dockerfile" ]]; then
-              echo "::notice::Released app '$name' has no Dockerfile, no image is built for it"
-              continue
-            fi
-
-            if [[ ! -f "apps/$name/package.json" ]]; then
-              echo "::warning::Released app '$name' has no package.json, skipping"
-              continue
-            fi
-
-            echo "Selected app: apps/$name"
-            apps=$(jq -c --argjson e "$entry" '. + [$e + {artifact: "oci-context", file: "context.tar"}]' <<< "$apps")
-          done <<< "$(jq -c '.[]' <<< "$released_apps")"
-
-          echo "packages=$packages" >> "$GITHUB_OUTPUT"
-          echo "apps=$apps" >> "$GITHUB_OUTPUT"
-          echo "has_packages=$(jq -c 'length > 0' <<< "$packages")" >> "$GITHUB_OUTPUT"
-          echo "has_apps=$(jq -c 'length > 0' <<< "$apps")" >> "$GITHUB_OUTPUT"
-
-          echo "Packages: $packages"
-          echo "Apps: $apps"
-
-      # npm half. Replays from the turbo cache populated by the check job.
-      - name: Build
-        id: npm-build
-        if: ${{ !cancelled() && steps.evaluate.outputs.has_packages == 'true' }}
-        run: yarn turbo build --filter="./packages/*"
-
-      # OCI half. Tool versions passed to image builds as build arguments.
-      - name: Evaluate tool versions
-        id: tools
-        if: ${{ !cancelled() && steps.evaluate.outputs.has_apps == 'true' }}
-        run: |
-          # Extract Node.js version from .tool-versions (required)
-          if [ ! -f ".tool-versions" ]; then
-            echo "::error::.tool-versions file not found"
-            exit 1
-          fi
-
-          node_version=$(grep "^nodejs" .tool-versions | awk '{print $2}')
-          if [ -z "$node_version" ]; then
-            echo "::error::nodejs version not found in .tool-versions"
-            exit 1
-          fi
-          echo "NODE_VERSION=$node_version" >> $GITHUB_OUTPUT
-          echo "Node.js version: $node_version"
-
-          # Extract optional tool versions from .tool-versions
-          python_version=$(grep "^python" .tool-versions | awk '{print $2}' || true)
-          if [ -n "$python_version" ]; then
-            echo "PYTHON_VERSION=$python_version" >> $GITHUB_OUTPUT
-            echo "Python version: $python_version"
-          fi
-
-          golang_version=$(grep "^golang" .tool-versions | awk '{print $2}' || true)
-          if [ -n "$golang_version" ]; then
-            echo "GOLANG_VERSION=$golang_version" >> $GITHUB_OUTPUT
-            echo "Go version: $golang_version"
-          fi
-
-          uv_version=$(grep "^uv" .tool-versions | awk '{print $2}' || true)
-          if [ -n "$uv_version" ]; then
-            echo "UV_VERSION=$uv_version" >> $GITHUB_OUTPUT
-            echo "UV version: $uv_version"
-          fi
-
-      # Created before any version stamping so image layer caches stay stable.
-      # An app whose prune fails is recorded and left out of the context.
-      - name: Prepare OCI context
-        id: oci
-        if: ${{ !cancelled() && steps.tools.outcome == 'success' }}
-        env:
-          APPS: ${{ steps.evaluate.outputs.apps }}
+          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
         run: |
           set -euo pipefail
 
@@ -539,189 +455,84 @@ jobs:
 
           echo "Turbo version: $TURBO_VERSION"
 
-          packed='[]'
-          while read -r entry; do
-            [[ -z "$entry" ]] && continue
-            APP=$(jq -r '.name' <<< "$entry")
-
-            # Package name of the app, used as the prune scope
-            SCOPE_NAME=$(jq -r '.name // empty' "apps/$APP/package.json" 2> /dev/null || true)
-            if [ -z "$SCOPE_NAME" ]; then
-              echo "::error::Package name not found in apps/$APP/package.json"
-              echo "oci $APP: package name not found" >> "$RUNNER_TEMP/pack-errors"
-              continue
+          mapfile -t units < <(jq -r '.[]' <<< "$SOURCE_UNITS")
+          for unit in "${units[@]}"; do
+            # Package name of the unit, used as the prune scope
+            scope=$(jq -r '.name // empty' "$unit/package.json")
+            if [[ -z "$scope" ]]; then
+              echo "::error::Package name not found in $unit/package.json"
+              exit 1
             fi
 
-            # Create app-specific output directory
-            OUTPUT_DIR="out/$APP"
-            rm -rf "$OUTPUT_DIR"
-            mkdir -p "$OUTPUT_DIR"
+            echo "Running turbo prune for scope: $scope"
+            yarn dlx turbo@"$TURBO_VERSION" prune --scope="$scope" --docker --out-dir="out/${unit##*/}"
+          done
 
-            echo "Running turbo prune for scope: $SCOPE_NAME"
-            if ! yarn dlx turbo@"$TURBO_VERSION" prune --scope="$SCOPE_NAME" --docker --out-dir="$OUTPUT_DIR"; then
-              echo "::error::Turbo prune failed for app '$APP' ($SCOPE_NAME)"
-              echo "oci $APP: turbo prune failed" >> "$RUNNER_TEMP/pack-errors"
-              rm -rf "$OUTPUT_DIR"
-              continue
-            fi
+          # Tracked source tree (including submodules) plus the pruned unit trees.
+          git ls-files --recurse-submodules -z | tar --null -T - -cf "$RUNNER_TEMP/source.tar"
+          tar -rf "$RUNNER_TEMP/source.tar" out
+          ls -lh "$RUNNER_TEMP/source.tar"
 
-            packed=$(jq -c --argjson e "$entry" '. + [$e]' <<< "$packed")
-          done <<< "$(jq -c '.[]' <<< "$APPS")"
-
-          if [[ "$(jq 'length' <<< "$packed")" -gt 0 ]]; then
-            # Tracked source tree (including submodules) plus the pruned app trees.
-            git ls-files --recurse-submodules -z | tar --null -T - -cf "$RUNNER_TEMP/context.tar"
-            tar -rf "$RUNNER_TEMP/context.tar" out
-            ls -lh "$RUNNER_TEMP/context.tar"
-          fi
-
-          echo "apps=$packed" >> "$GITHUB_OUTPUT"
-          echo "has_apps=$(jq -c 'length > 0' <<< "$packed")" >> "$GITHUB_OUTPUT"
-
-      - name: Upload OCI context
-        id: upload-oci
-        if: ${{ !cancelled() && steps.oci.outputs.has_apps == 'true' }}
+      - name: Upload source payload
         uses: actions/upload-artifact@v7
         with:
-          name: oci-context
-          path: ${{ runner.temp }}/context.tar
+          name: payload-source
+          path: ${{ runner.temp }}/source.tar
           retention-days: 7
           if-no-files-found: error
           # Allows re-running the job within the same workflow run.
           overwrite: true
 
-      # npm half. Stamps every released package first so workspace ranges resolve to the released versions.
-      # A package whose pack fails is recorded and left out of the artifact.
-      - name: Pack npm packages
-        id: npm
-        if: ${{ !cancelled() && steps.npm-build.outcome == 'success' }}
+  # Emit the release list (schema 1) with one entry per released unit.
+  releases:
+    name: Releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs:
+      - configure
+      - release
+    # always() is required because a skipped test or pack job upstream of release would skip this job.
+    if: always() && !cancelled() && needs.release.result == 'success' && needs.release.outputs.versions != '{}'
+    permissions: {}
+    outputs:
+      releases: ${{ steps.evaluate.outputs.releases }}
+    steps:
+      - name: Evaluate
+        id: evaluate
         env:
           VERSIONS: ${{ needs.release.outputs.versions }}
-          PACKAGES: ${{ steps.evaluate.outputs.packages }}
+          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
+          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+          INPUT_PRERELEASE_CHANNEL: ${{ inputs.prerelease-channel }}
         run: |
           set -euo pipefail
 
-          while IFS=$'\t' read -r path version; do
-            [[ -z "$path" ]] && continue
-            package_json="$path/package.json"
-            if [[ -f "$package_json" && -n "$version" ]]; then
-              jq --arg v "$version" '.version = $v' "$package_json" > "${package_json}.tmp" && mv "${package_json}.tmp" "$package_json"
-              echo "Stamped $path with $version"
-            fi
-          done <<< "$(jq -r 'to_entries[] | select(.key | startswith("packages/")) | "\(.key)\t\(.value.packageVersion)"' <<< "$VERSIONS")"
+          releases=$(jq -c \
+            --argjson source "$SOURCE_UNITS" \
+            --argjson dist "$DIST_UNITS" \
+            --arg channel "$INPUT_PRERELEASE_CHANNEL" \
+            '[to_entries[] | .key as $path | ($path | split("/") | last) as $name | {
+              schema: 1,
+              name: $name,
+              path: $path,
+              version: .value.packageVersion,
+              channel: (if .value.type == "prerelease" then $channel else "" end),
+              sha: .value.sha,
+              payloads: (
+                (if $path | IN($source[]) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
+                + (if $path | IN($dist[]) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
+              )
+            }]' <<< "$VERSIONS")
 
-          mkdir -p "$RUNNER_TEMP/npm"
-          packed='[]'
-          while read -r entry; do
-            [[ -z "$entry" ]] && continue
-            name=$(jq -r '.name' <<< "$entry")
-
-            if ! (cd "packages/$name" && yarn pack --out "$RUNNER_TEMP/npm/$name.tgz"); then
-              echo "::error::yarn pack failed for package '$name'"
-              echo "npm $name: yarn pack failed" >> "$RUNNER_TEMP/pack-errors"
-              rm -f "$RUNNER_TEMP/npm/$name.tgz"
-              continue
-            fi
-
-            packed=$(jq -c --argjson e "$entry" '. + [$e]' <<< "$packed")
-          done <<< "$(jq -c '.[]' <<< "$PACKAGES")"
-
-          ls -lh "$RUNNER_TEMP/npm"
-
-          echo "packages=$packed" >> "$GITHUB_OUTPUT"
-          echo "has_packages=$(jq -c 'length > 0' <<< "$packed")" >> "$GITHUB_OUTPUT"
-
-      - name: Upload npm packages
-        id: upload-npm
-        if: ${{ !cancelled() && steps.npm.outputs.has_packages == 'true' }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: npm-packages
-          path: ${{ runner.temp }}/npm
-          retention-days: 7
-          if-no-files-found: error
-          # Allows re-running the job within the same workflow run.
-          overwrite: true
-
-      # Release lists consumed by publish-npm and publish-oci. A list only contains units whose
-      # payload was uploaded.
-      - name: Write release lists
-        id: payloads
-        if: ${{ !cancelled() }}
-        env:
-          VERSIONS: ${{ needs.release.outputs.versions }}
-          NPM_RELEASES: ${{ steps.upload-npm.outcome == 'success' && steps.npm.outputs.packages || '[]' }}
-          OCI_RELEASES: ${{ steps.upload-oci.outcome == 'success' && steps.oci.outputs.apps || '[]' }}
-          NODE_VERSION: ${{ steps.tools.outputs.NODE_VERSION }}
-          PYTHON_VERSION: ${{ steps.tools.outputs.PYTHON_VERSION }}
-          GOLANG_VERSION: ${{ steps.tools.outputs.GOLANG_VERSION }}
-          UV_VERSION: ${{ steps.tools.outputs.UV_VERSION }}
-        run: |
-          set -euo pipefail
-
-          oci=$(jq -c \
-            --argjson versions "$VERSIONS" \
-            --arg node "$NODE_VERSION" \
-            --arg python "$PYTHON_VERSION" \
-            --arg golang "$GOLANG_VERSION" \
-            --arg uv "$UV_VERSION" \
-            'map(. + {
-              oci: {
-                image: "app-\(.name)",
-                file: "apps/\(.name)/Dockerfile",
-                context: ".",
-                "build-args": {
-                  app_name: .name,
-                  node_version: $node,
-                  python_version: $python,
-                  golang_version: $golang,
-                  uv_version: $uv,
-                  build_version: "v\($versions["apps/\(.name)"].version)",
-                  build_commit: .sha
-                },
-                "turbo-cache": true
-              }
-            })' <<< "$OCI_RELEASES")
-          npm=$(jq -c '.' <<< "$NPM_RELEASES")
-
-          echo "npm=$npm" >> "$GITHUB_OUTPUT"
-          echo "oci=$oci" >> "$GITHUB_OUTPUT"
-
-          echo "npm: $npm"
-          echo "oci: $oci"
-
-      - name: Fail on pack errors
-        if: ${{ !cancelled() }}
-        env:
-          NPM_FAILED: ${{ steps.evaluate.outputs.has_packages == 'true' && steps.upload-npm.outcome != 'success' }}
-          OCI_FAILED: ${{ steps.evaluate.outputs.has_apps == 'true' && steps.upload-oci.outcome != 'success' }}
-        run: |
-          failed="false"
-
-          if [[ -s "$RUNNER_TEMP/pack-errors" ]]; then
-            echo "Units that failed to pack:"
-            cat "$RUNNER_TEMP/pack-errors"
-            failed="true"
-          fi
-
-          if [[ "$NPM_FAILED" == "true" ]]; then
-            echo "::error::No npm payload was uploaded"
-            failed="true"
-          fi
-
-          if [[ "$OCI_FAILED" == "true" ]]; then
-            echo "::error::No OCI payload was uploaded"
-            failed="true"
-          fi
-
-          [[ "$failed" == "false" ]]
+          echo "releases=$releases" >> "$GITHUB_OUTPUT"
+          echo "Releases: $releases"
 
   # Single required status check for rulesets.
   status:
     name: Status
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [configure, check, test, release, pack]
+    needs: [configure, check, test, pack, release, releases]
     if: always()
     permissions: {}
     steps:
