@@ -86,17 +86,22 @@ jobs:
           token: ${{ steps.token.outputs.token }}
 
       - name: Setup Git config
+        env:
+          COMMITTER_NAME: ${{ steps.token.outputs.committer-name }}
+          COMMITTER_EMAIL: ${{ steps.token.outputs.committer-email }}
         run: |
-          git config --global user.name '${{ steps.token.outputs.committer-name }}'
-          git config --global user.email '${{ steps.token.outputs.committer-email }}'
+          git config --global user.name "$COMMITTER_NAME"
+          git config --global user.email "$COMMITTER_EMAIL"
 
       - name: Parse updates
+        env:
+          INPUT_UPDATES: ${{ inputs.updates }}
         run: |
           set -e
 
           PARSED_UPDATES=""
 
-          IFS=',' read -ra PAIRS <<< "${{ inputs.updates }}"
+          IFS=',' read -ra PAIRS <<< "$INPUT_UPDATES"
           for pair in "${PAIRS[@]}"; do
             # Trim whitespace
             pair=$(echo "$pair" | xargs)
@@ -136,13 +141,16 @@ jobs:
           kustomize: latest
 
       - name: Validate application
+        env:
+          INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
+          INPUT_APPLICATION: ${{ inputs.application }}
         run: |
-          app_dir="${{ inputs.applications-directory }}/${{ inputs.application }}"
+          app_dir="$INPUT_APPLICATIONS_DIRECTORY/$INPUT_APPLICATION"
 
           if [[ ! -d "$app_dir" ]]; then
             echo "::error::Application directory not found: $app_dir"
             echo "::error::Available applications:"
-            ls -1 "${{ inputs.applications-directory }}" || echo "  (none)"
+            ls -1 "$INPUT_APPLICATIONS_DIRECTORY" || echo "  (none)"
             exit 1
           fi
 
@@ -193,6 +201,8 @@ jobs:
           yarn format:fix
 
       - name: Build commit message
+        env:
+          INPUT_APPLICATION: ${{ inputs.application }}
         run: |
           COMMIT_BODY=""
 
@@ -202,7 +212,7 @@ jobs:
           done <<< "$PARSED_UPDATES"
 
           echo "COMMIT_MESSAGE<<EOF" >> "$GITHUB_ENV"
-          echo "fix(${{ inputs.application }}): update image tags" >> "$GITHUB_ENV"
+          echo "fix($INPUT_APPLICATION): update image tags" >> "$GITHUB_ENV"
           echo "" >> "$GITHUB_ENV"
           printf '%s' "$COMMIT_BODY" >> "$GITHUB_ENV"
           echo "EOF" >> "$GITHUB_ENV"
@@ -227,9 +237,11 @@ jobs:
           echo "::endgroup::"
 
       - name: Check automerge conditions
+        env:
+          INPUT_AUTOMERGE_IMAGES: ${{ inputs.automerge-images }}
         run: |
           # Skip if automerge-images is not configured
-          if [[ -z "${{ inputs.automerge-images }}" ]]; then
+          if [[ -z "$INPUT_AUTOMERGE_IMAGES" ]]; then
             echo "Automerge not configured (automerge-images is empty)"
             echo "AUTOMERGE_ENABLED=false" >> "$GITHUB_ENV"
             exit 0
@@ -239,12 +251,12 @@ jobs:
           UPDATED_IMAGES=$(echo "$PARSED_UPDATES" | cut -d: -f1 | sort -u | grep -v '^$')
 
           echo "::group::Automerge check"
-          echo "Required images: ${{ inputs.automerge-images }}"
+          echo "Required images: $INPUT_AUTOMERGE_IMAGES"
           echo "Updated images:"
           echo "$UPDATED_IMAGES"
 
           # Check if all required images are present
-          IFS=',' read -ra REQUIRED <<< "${{ inputs.automerge-images }}"
+          IFS=',' read -ra REQUIRED <<< "$INPUT_AUTOMERGE_IMAGES"
           ALL_PRESENT=true
           MISSING=""
           for img in "${REQUIRED[@]}"; do
@@ -304,9 +316,14 @@ jobs:
 
       - name: Write job summary
         if: steps.create-pull-request.outputs.pull-request-number != ''
+        env:
+          INPUT_APPLICATION: ${{ inputs.application }}
+          INPUT_AUTOMERGE_IMAGES: ${{ inputs.automerge-images }}
+          PR_NUMBER: ${{ steps.create-pull-request.outputs.pull-request-number }}
+          PR_URL: ${{ steps.create-pull-request.outputs.pull-request-url }}
         run: |
           {
-            echo "## 🔄 Image Tag Update — \`${{ inputs.application }}\`"
+            echo "## 🔄 Image Tag Update — \`${INPUT_APPLICATION}\`"
             echo ""
             echo "Tag updates included in the pull request:"
             echo ""
@@ -317,11 +334,11 @@ jobs:
               echo "| \`${image}\` | \`${tag}\` |"
             done <<< "$PARSED_UPDATES"
             echo ""
-            echo "**Pull Request:** [#${{ steps.create-pull-request.outputs.pull-request-number }}](${{ steps.create-pull-request.outputs.pull-request-url }})"
+            echo "**Pull Request:** [#${PR_NUMBER}](${PR_URL})"
             echo ""
             if [[ "$AUTOMERGE_ENABLED" == "true" ]]; then
               echo "**Automerge:** ✅ enabled — all required images updated"
-            elif [[ -n "${{ inputs.automerge-images }}" ]]; then
+            elif [[ -n "$INPUT_AUTOMERGE_IMAGES" ]]; then
               echo "**Automerge:** ⏳ pending — waiting for: ${AUTOMERGE_MISSING:-unknown}"
             else
               echo "**Automerge:** not configured"
@@ -330,4 +347,4 @@ jobs:
 
           # Headline annotation, surfaced in the run list and the PR checks tab
           SUMMARY=$(echo "$PARSED_UPDATES" | grep -v '^$' | paste -sd ',' -)
-          echo "::notice title=Tag Update::${{ inputs.application }}: ${SUMMARY} (PR #${{ steps.create-pull-request.outputs.pull-request-number }})"
+          echo "::notice title=Tag Update::${INPUT_APPLICATION}: ${SUMMARY} (PR #${PR_NUMBER})"
