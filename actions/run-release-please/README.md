@@ -31,6 +31,7 @@ The `versions` output is a JSON object mapping package paths to version info, wh
 - **Simplified output**: a single `versions` JSON object instead of flat key-value pairs (e.g., `path--version`, `releases_created`).
 - **No `releases-created` output**: callers check `versions != '{}'` or inspect the `type` field instead.
 - **Config-driven**: all release-please configuration comes from `release-please-config.json` in the repository; no action-level config inputs beyond `token`, `prerelease-channel`, and `target-branch`.
+- **Always-updated release PRs**: `always-update` is enforced, so every run rebuilds open release PRs on the latest target branch. This keeps separate release PRs from going stale and running into merge conflicts. Manual commits on release PR branches are overwritten.
 
 ## Usage
 
