@@ -14,8 +14,7 @@ the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish
 | `Check`     | Always                                                     | `install-immutable`, dependency checks, `check`, `build` and unit tests; on push to `default-branch` also packs the dist units |
 | `Test`      | One job per test type not already covered by `Check`       | `install-immutable`, `build` and `test-<type>`                                                                                 |
 | `Pack`      | Push to `default-branch`, in parallel with `Check`         | Prunes the source units into the source payload                                                                                |
-| `Release`   | Push to `default-branch`, after `Check`, `Test` and `Pack` | Runs the [`release`](../release/README.md) workflow, which creates or lands release PRs                                        |
-| `Releases`  | After `Release`, when a workspace was released             | Emits the `releases` list                                                                                                      |
+| `Release`   | Push to `default-branch`, after `Check`, `Test` and `Pack` | Runs release-please, which creates or lands release PRs and creates the releases, then writes the `releases` list              |
 | `Status`    | Always                                                     | Single required status check, fails when any other job failed or was cancelled                                                 |
 
 - `pull_request_target` is rejected
@@ -111,7 +110,7 @@ jobs:
 [//]: # "x-release-please-end"
 
 The resulting check contexts are `CI / Configure`, `CI / Check`, `CI / Test / <type>`,
-`CI / Release`, `CI / Pack`, `CI / Releases` and `CI / Status`. Require `CI / Status` and
+`CI / Release`, `CI / Pack` and `CI / Status`. Require `CI / Status` and
 `Commitlint` in your rulesets.
 
 The workflow takes no secrets. To read other private repositories during checkout, use
@@ -119,12 +118,12 @@ The workflow takes no secrets. To read other private repositories during checkou
 
 ## Triggers
 
-| Event                        | Runs                                                   | Actions cache                                                      |
-| ---------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------ |
-| `pull_request`               | `Configure`, `Check`, `Test`                           | Read/write in the PR scope, restores from the default branch       |
-| `merge_group`                | `Configure`, `Check`, `Test`                           | Read/write in the queue scope, restores from the default branch    |
-| `push` to the default branch | everything, including `Pack`, `Release` and `Releases` | Read/write in the default branch scope, the cache PRs restore from |
-| `pull_request_target`        | Nothing, `Configure` fails                             |                                                                    |
+| Event                        | Runs                                       | Actions cache                                                      |
+| ---------------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
+| `pull_request`               | `Configure`, `Check`, `Test`               | Read/write in the PR scope, restores from the default branch       |
+| `merge_group`                | `Configure`, `Check`, `Test`               | Read/write in the queue scope, restores from the default branch    |
+| `push` to the default branch | everything, including `Pack` and `Release` | Read/write in the default branch scope, the cache PRs restore from |
+| `pull_request_target`        | Nothing, `Configure` fails                 |                                                                    |
 
 Releasing and packing are gated inside the workflow on `push` to `default-branch`, so a pull request
 can never reach them.
@@ -161,7 +160,7 @@ caller must grant the union:
 | `contents: read`  | Every checkout                                                          |
 | `packages: read`  | Private GitHub Package Registry dependencies during install             |
 | `actions: write`  | Saving entries to the Actions cache and uploading the payload artifacts |
-| `id-token: write` | The checkout token exchange and the release workflow's token exchange   |
+| `id-token: write` | The checkout token exchange and the release token exchange              |
 
 A called workflow can never exceed its caller's permissions. The publish jobs declare their own
 permissions, see [`publish-npm`](../publish-npm/README.md) and [`publish-oci`](../publish-oci/README.md).

@@ -25,7 +25,7 @@
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
 		"exchange-github-token": "workspace:^",
-		"release": "workspace:^",
+		"run-release-please": "workspace:^",
 		"setup-tools": "workspace:^"
 	},
 	"devDependencies": {

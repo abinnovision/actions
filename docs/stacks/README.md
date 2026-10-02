@@ -49,12 +49,12 @@ jobs:
 
 ## Jobs
 
-| Job         | Runs                              | Does                                                                        |
-| :---------- | :-------------------------------- | :-------------------------------------------------------------------------- |
-| `Configure` | Always                            | Resolves the event into `mode` and `trusted`, validates the inputs          |
-| `Check`     | Always                            | Repository checks and static checks of the stack, without credentials       |
-| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, releases, preview, deploy, plan, apply |
-| `Status`    | Always                            | Fails when any other job failed or was cancelled                            |
+| Job         | Runs                              | Does                                                                  |
+| :---------- | :-------------------------------- | :-------------------------------------------------------------------- |
+| `Configure` | Always                            | Resolves the event into `mode` and `trusted`, validates the inputs    |
+| `Check`     | Always                            | Repository checks and static checks of the stack, without credentials |
+| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, preview, deploy, plan, apply     |
+| `Status`    | Always                            | Fails when any other job failed or was cancelled                      |
 
 - `mode` is `pr` for pull requests, `main` for pushes to the default branch and `none` otherwise.
 - `trusted` is `false` for pull requests from forks and from Dependabot. Lanes that need credentials are skipped for

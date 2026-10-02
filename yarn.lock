@@ -1885,7 +1885,7 @@ __metadata:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     exchange-github-token: "workspace:^"
     prettier: "npm:^3.9.9"
-    release: "workspace:^"
+    run-release-please: "workspace:^"
     setup-tools: "workspace:^"
   languageName: unknown
   linkType: soft
