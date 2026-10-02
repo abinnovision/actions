@@ -1,0 +1,235 @@
+name: Publish npm
+
+on:
+  workflow_call:
+    inputs:
+      releases:
+        type: string
+        required: true
+        description: |-
+          Release list (schema 1) as a JSON array, the `npm` output of a stack.
+          Each entry names the tarball (`file`) inside the payload artifact (`artifact`).
+          All entries of one call must share the same artifact.
+          An empty string or `[]` skips all work.
+          **Example:** `needs.ci.outputs.npm`
+
+      npm:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Allow publishing to npmjs.
+          Packages opt in through `publishConfig.npm: true` in their `package.json`.
+          **Default:** `false`
+          **Authentication:** OIDC via [npm trusted publishing](https://docs.npmjs.com/trusted-publishers).
+
+      ghpr:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Allow publishing to GitHub Packages.
+          Packages opt in through `publishConfig.ghpr: true` in their `package.json` and must be scoped.
+          **Default:** `false`
+          **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
+
+      provenance:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Generate npm provenance attestations when publishing to npmjs.
+          **Default:** `true`
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Publish the packed tarballs of the release list.
+  publish:
+    name: Packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: inputs.releases != '' && inputs.releases != '[]'
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      # Rejects the whole list before anything is published.
+      - name: Validate release list
+        env:
+          RELEASES: ${{ inputs.releases }}
+        run: |
+          set -euo pipefail
+
+          if ! jq -e 'type == "array"' <<< "$RELEASES" > /dev/null 2>&1; then
+            echo "::error::'releases' is not a JSON array"
+            exit 1
+          fi
+
+          errors=$(jq -r '
+            (.[0].artifact // "") as $artifact
+            | to_entries[]
+            | .key as $i
+            | .value as $e
+            | if ($e | type) != "object" then "Entry #\($i) is not an object"
+              else
+                ($e.name // "#\($i)") as $id
+                | (if $e.schema != 1 then "Entry \($id) has schema \($e.schema // "none"), this workflow supports schema 1" else empty end),
+                  (["name", "version", "artifact", "file"][] | select(($e[.] // "") == "") | "Entry \($id) has no \(.)"),
+                  (if ($e.artifact // "") != $artifact then "Entry \($id) references artifact \($e.artifact // "none"), all entries must share \($artifact)" else empty end)
+              end
+          ' <<< "$RELEASES")
+
+          if [[ -n "$errors" ]]; then
+            while IFS= read -r error; do
+              echo "::error::$error"
+            done <<< "$errors"
+            exit 1
+          fi
+
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ fromJSON(inputs.releases)[0].artifact }}
+          path: packages
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # Trusted publishing requires npm 11.5.1 or newer.
+      - name: Setup npm
+        run: |
+          current=$(npm --version)
+          if [[ "$(printf '%s\n' "11.5.1" "$current" | sort -V | head -n1)" != "11.5.1" ]]; then
+            npm install --global npm@11
+          fi
+          echo "npm $(npm --version)"
+
+      # A failing package is recorded and the loop continues; the step fails at the end.
+      - name: Publish
+        env:
+          RELEASES: ${{ inputs.releases }}
+          INPUT_NPM: ${{ inputs.npm }}
+          INPUT_GHPR: ${{ inputs.ghpr }}
+          INPUT_PROVENANCE: ${{ inputs.provenance }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          npm_registry="https://registry.npmjs.org"
+          ghpr_registry="https://npm.pkg.github.com"
+
+          # Holds the GitHub Packages auth line; npm resolves the token from the environment.
+          npmrc=$(mktemp)
+          echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > "$npmrc"
+
+          failures=()
+
+          # Sets "result" to "published", "skipped (exists)" or "failed".
+          publish_to() {
+            local registry="$1" name="$2" version="$3" tarball="$4"
+            shift 4
+
+            local existing
+            existing=$(npm view "$name@$version" version --registry "$registry" --userconfig "$npmrc" 2> /dev/null || true)
+            if [[ "$existing" == "$version" ]]; then
+              echo "::notice::$name@$version already exists on $registry, skipping"
+              result="skipped (exists)"
+              return
+            fi
+
+            if npm publish "$tarball" --registry "$registry" --userconfig "$npmrc" "$@"; then
+              result="published"
+            else
+              echo "::error::Publishing $name@$version to $registry failed"
+              failures+=("$name@$version on $registry")
+              result="failed"
+            fi
+          }
+
+          {
+            echo "### npm packages"
+            echo ""
+            echo "| Package | Version | Tag | npmjs | GitHub Packages |"
+            echo "| :------ | :------ | :-- | :---- | :-------------- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          mapfile -t entries < <(jq -c '.[]' <<< "$RELEASES")
+
+          for entry in "${entries[@]}"; do
+            entry_name=$(jq -r '.name' <<< "$entry")
+            artifact=$(jq -r '.artifact' <<< "$entry")
+            file=$(jq -r '.file' <<< "$entry")
+            entry_version=$(jq -r '.version' <<< "$entry")
+            channel=$(jq -r '.channel // ""' <<< "$entry")
+            tag="${channel:-latest}"
+
+            tarball="./packages/$file"
+            manifest=""
+            if [[ -f "$tarball" ]]; then
+              manifest=$(tar -xOzf "$tarball" package/package.json 2> /dev/null || true)
+            fi
+            if [[ -z "$manifest" ]]; then
+              echo "::error::Tarball '$file' of entry $entry_name not found or unreadable in artifact '$artifact'"
+              failures+=("$entry_name: tarball '$file' not found or unreadable")
+              echo "| \`$entry_name\` | \`$entry_version\` | \`$tag\` | failed (tarball) | failed (tarball) |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            name=$(jq -r '.name' <<< "$manifest")
+            version=$(jq -r '.version' <<< "$manifest")
+            is_private=$(jq -r '.private // false' <<< "$manifest")
+            publish_npm=$(jq -r '.publishConfig.npm // false' <<< "$manifest")
+            publish_ghpr=$(jq -r '.publishConfig.ghpr // false' <<< "$manifest")
+            npm_access=$(jq -r '.publishConfig.npmAccess // "public"' <<< "$manifest")
+
+            if [[ "$version" != "$entry_version" ]]; then
+              echo "::error::Tarball '$file' contains $name@$version, expected version $entry_version"
+              failures+=("$name: tarball version $version, expected $entry_version")
+              echo "| \`$name\` | \`$entry_version\` | \`$tag\` | failed (version mismatch) | failed (version mismatch) |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if [[ "$is_private" == "true" ]]; then
+              echo "::notice::Skipping private package $name"
+              continue
+            fi
+
+            echo "Processing $name@$version (tag: $tag)"
+
+            ghpr_result="disabled"
+            if [[ "$INPUT_GHPR" == "true" ]] && [[ "$publish_ghpr" == "true" ]]; then
+              if [[ "$name" == @*/* ]]; then
+                publish_to "$ghpr_registry" "$name" "$version" "$tarball" --tag "$tag"
+                ghpr_result="$result"
+              else
+                echo "::warning::Skipping GitHub Packages for unscoped package $name"
+                ghpr_result="skipped (unscoped)"
+              fi
+            fi
+
+            npm_result="disabled"
+            if [[ "$INPUT_NPM" == "true" ]] && [[ "$publish_npm" == "true" ]]; then
+              npm_args=(--access "$npm_access" --tag "$tag")
+              if [[ "$INPUT_PROVENANCE" == "true" ]]; then
+                npm_args+=(--provenance)
+              fi
+              publish_to "$npm_registry" "$name" "$version" "$tarball" "${npm_args[@]}"
+              npm_result="$result"
+            fi
+
+            echo "| \`$name\` | \`$version\` | \`$tag\` | $npm_result | $ghpr_result |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          if [[ ${#failures[@]} -gt 0 ]]; then
+            echo "Failed:"
+            printf '  - %s\n' "${failures[@]}"
+            exit 1
+          fi
