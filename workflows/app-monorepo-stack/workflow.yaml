@@ -100,7 +100,7 @@ on:
 
     outputs:
       releases:
-        value: ${{ jobs.releases.outputs.releases || '[]' }}
+        value: ${{ jobs.release.outputs.releases || '[]' }}
         description: |-
           Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.
           Each entry: {schema: 1, name, path, version, channel, sha, payloads}.
@@ -183,13 +183,41 @@ jobs:
           echo "Mode: $mode"
           echo "Trusted: $trusted"
 
-      # Check out resolved commit for evaluation.
+      # Check out the root files of the resolved commit only; blobs are fetched on demand.
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
           ref: ${{ steps.event.outputs.commit_sha }}
           submodules: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/*/
+
+      # Add the package.json of every directory matching a unit pattern to the sparse checkout.
+      - name: Checkout unit manifests
+        env:
+          INPUT_SOURCE_UNITS: ${{ inputs.source-units }}
+          INPUT_DIST_UNITS: ${{ inputs.dist-units }}
+        run: |
+          set -euo pipefail
+
+          manifests() {
+            local output="$1" patterns="$2" pattern
+            while read -r pattern; do
+              [[ -n "$pattern" ]] || continue
+              if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ ]]; then
+                echo "::error::Invalid pattern '$pattern' in $output: only path segments and '*' are supported" >&2
+                exit 1
+              fi
+              echo "/${pattern%/}/package.json"
+            done <<< "$patterns"
+          }
+
+          paths=$(manifests source-units "$INPUT_SOURCE_UNITS"; manifests dist-units "$INPUT_DIST_UNITS")
+          echo "$paths"
+          git sparse-checkout add --stdin <<< "$paths"
 
       - name: Validate Makefile
         run: |
@@ -204,7 +232,7 @@ jobs:
           fi
 
       # Every directory matching a pattern line that contains a package.json is a unit. The unquoted
-      # pattern is expanded by bash, so `*` matches one path segment.
+      # pattern, validated by the previous step, is expanded by bash, so `*` matches one path segment.
       - name: Resolve units
         id: units
         env:
@@ -219,10 +247,6 @@ jobs:
             units=$(
               while read -r pattern; do
                 [[ -n "$pattern" ]] || continue
-                if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ ]]; then
-                  echo "::error::Invalid pattern '$pattern' in $output: only path segments and '*' are supported" >&2
-                  exit 1
-                fi
                 for dir in $pattern; do
                   if [[ -f "$dir/package.json" ]]; then
                     echo "${dir%/}"
@@ -402,22 +426,73 @@ jobs:
           TEST_TYPE: ${{ matrix.test-type }}
         run: yarn run "test-$TEST_TYPE"
 
-  # Create releases via the release workflow.
+  # Create releases with release-please and emit the release list (schema 1) with one entry per released unit.
   release:
     name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs:
       - configure
       - check
       - test
       - pack
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-dev
+    # Only on push to the default branch. always() prevents skipping when the test job is skipped.
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.configure.outputs.mode == 'main'
     permissions:
       contents: read
       id-token: write
-    with:
-      prerelease-channel: ${{ inputs.prerelease-channel }}
-    # Only on push to the default branch. always() prevents skipping when the test job is skipped.
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.configure.outputs.mode == 'main'
+    outputs:
+      releases: ${{ steps.releases.outputs.releases }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: token
+        name: Exchange token for release
+        uses: abinnovision/actions@exchange-github-token-dev
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          scope: contents:write pull_requests:write
+
+      - id: release
+        name: Run release-please
+        uses: abinnovision/actions@run-release-please-dev
+        with:
+          token: ${{ steps.token.outputs.token }}
+          prerelease-channel: ${{ inputs.prerelease-channel }}
+
+      # `[]` when release-please released nothing.
+      - id: releases
+        name: Write release list
+        env:
+          VERSIONS: ${{ steps.release.outputs.versions }}
+          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
+          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+          INPUT_PRERELEASE_CHANNEL: ${{ inputs.prerelease-channel }}
+        run: |
+          set -euo pipefail
+
+          releases=$(jq -c \
+            --argjson source "$SOURCE_UNITS" \
+            --argjson dist "$DIST_UNITS" \
+            --arg channel "$INPUT_PRERELEASE_CHANNEL" \
+            '[to_entries[] | .key as $path | ($path | split("/") | last) as $name | {
+              schema: 1,
+              name: $name,
+              path: $path,
+              version: .value.packageVersion,
+              channel: (if .value.type == "prerelease" then $channel else "" end),
+              sha: .value.sha,
+              payloads: (
+                (if $path | IN($source[]) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
+                + (if $path | IN($dist[]) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
+              )
+            }]' <<< "$VERSIONS")
+
+          echo "releases=$releases" >> "$GITHUB_OUTPUT"
+          echo "Releases: $releases"
 
   # Prune every source unit into the source payload, in parallel with check and test.
   pack:
@@ -483,56 +558,12 @@ jobs:
           # Allows re-running the job within the same workflow run.
           overwrite: true
 
-  # Emit the release list (schema 1) with one entry per released unit.
-  releases:
-    name: Releases
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    needs:
-      - configure
-      - release
-    # always() is required because a skipped test or pack job upstream of release would skip this job.
-    if: always() && !cancelled() && needs.release.result == 'success' && needs.release.outputs.versions != '{}'
-    permissions: {}
-    outputs:
-      releases: ${{ steps.evaluate.outputs.releases }}
-    steps:
-      - name: Evaluate
-        id: evaluate
-        env:
-          VERSIONS: ${{ needs.release.outputs.versions }}
-          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
-          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
-          INPUT_PRERELEASE_CHANNEL: ${{ inputs.prerelease-channel }}
-        run: |
-          set -euo pipefail
-
-          releases=$(jq -c \
-            --argjson source "$SOURCE_UNITS" \
-            --argjson dist "$DIST_UNITS" \
-            --arg channel "$INPUT_PRERELEASE_CHANNEL" \
-            '[to_entries[] | .key as $path | ($path | split("/") | last) as $name | {
-              schema: 1,
-              name: $name,
-              path: $path,
-              version: .value.packageVersion,
-              channel: (if .value.type == "prerelease" then $channel else "" end),
-              sha: .value.sha,
-              payloads: (
-                (if $path | IN($source[]) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
-                + (if $path | IN($dist[]) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
-              )
-            }]' <<< "$VERSIONS")
-
-          echo "releases=$releases" >> "$GITHUB_OUTPUT"
-          echo "Releases: $releases"
-
   # Single required status check for rulesets.
   status:
     name: Status
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [configure, check, test, pack, release, releases]
+    needs: [configure, check, test, pack, release]
     if: always()
     permissions: {}
     steps:
