@@ -1,98 +1,70 @@
 # publish-oci
 
-Builds and pushes container images from a build context produced by a stack, and optionally
-dispatches GitOps tag updates. It never checks out the repository: each image is built from the
-extracted context tar of the payload artifact. The build executes the repository's `Dockerfile`
-inside BuildKit, so repository code does run here; only `publish-npm` runs no repository code.
+Builds and pushes container images from the source payload of a stack and optionally dispatches
+GitOps tag updates. It never checks out the repository; each image is built from the extracted
+source payload. The image build executes the repository's `Dockerfile` inside BuildKit, so
+repository code runs here.
+
+`releases` is the release list of a stack, see
+[Publishing](../../docs/stacks/README.md#publishing). This workflow consumes `payloads.source` of
+the entries whose `path` matches `include`.
 
 ## Behavior
 
-| Job              | Runs                                                    | Does                                                                            |
-| :--------------- | :------------------------------------------------------ | :------------------------------------------------------------------------------ |
-| `<name>`         | Once per release list entry, unless `releases` is empty | Extracts the context, builds and pushes the image, writes an image summary      |
-| `GitOps Updates` | When `gitops-config` is set and every image was pushed  | Dispatches one `gitops-workflow-file` run per target repository and application |
+| Job              | Runs                                                  | Does                                                                            |
+| :--------------- | :---------------------------------------------------- | :------------------------------------------------------------------------------ |
+| `Prepare`        | Once, unless `releases` is empty or `[]`              | Selects the entries matching `include`, validates them and the configuration    |
+| `<name>`         | Once per selected entry                               | Extracts the payload, builds and pushes the image, writes an image summary      |
+| `GitOps Updates` | When `gitops-config` is set and no image build failed | Dispatches one `gitops-workflow-file` run per target repository and application |
 
-- Skips all work when `releases` is empty or `[]`
-- Validates every entry before building and fails on an unsupported `schema` or a missing `name`,
-  `version`, `sha`, `artifact`, `file`, `oci.image` or `oci.file`
-- Fails when neither `registry` nor `ghcr` is configured, or when a `gitops-config` line is malformed
-- Images are built with SBOM attestations
+- `include` holds directory patterns, one per line; `*` matches exactly one path segment
+  (default `apps/*`)
+- `Prepare` fails when a selected entry has a `schema` other than `1` or no `payloads.source`
+- `image` is resolved per unit by plain string replacement: `{path}` becomes the entry's `path`,
+  `{name}` its `name` (e.g. `app-{name}` -> `app-backend`)
 
-## Release list
+## Conventions
 
-`releases` is a JSON array following the
-[release list protocol](../../docs/stacks/README.md#release-list) (schema 1), the `oci` output of a
-stack:
+- The Dockerfile is `<path>/Dockerfile`, relative to the payload root
+- The build context is the payload root
+- The turbo remote cache is enabled when the payload root contains `turbo.json`
+- A unit without a Dockerfile gets no image (notice), unless it has a `gitops-config` line, which
+  fails its build
 
-```json
-[
-  {
-    "schema": 1,
-    "name": "backend",
-    "version": "1.4.0-beta.5",
-    "channel": "beta",
-    "sha": "a3f2c1d",
-    "artifact": "oci-context",
-    "file": "context.tar",
-    "oci": {
-      "image": "app-backend",
-      "file": "apps/backend/Dockerfile",
-      "context": ".",
-      "build-args": { "app_name": "backend", "node_version": "24.20.0" },
-      "turbo-cache": true
-    }
-  }
-]
-```
+## Build arguments
 
-The artifact holds the build context tar named by `file`. It is extracted with `tar -xf`, so file
-modes are kept.
+| Build arg                                | Value                                                     |
+| :--------------------------------------- | :-------------------------------------------------------- |
+| `app_name`                               | Entry `name`                                              |
+| `node_version`                           | `nodejs` version from `.tool-versions`, empty when absent |
+| `python_version`                         | `python` version from `.tool-versions`, empty when absent |
+| `golang_version`                         | `golang` version from `.tool-versions`, empty when absent |
+| `uv_version`                             | `uv` version from `.tool-versions`, empty when absent     |
+| `<tool>_version`                         | Every other tool listed in `.tool-versions`               |
+| `build_version`                          | `v<version>+<sha>`                                        |
+| `build_commit`                           | `<sha>`                                                   |
+| `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` | Only with the turbo remote cache enabled                  |
 
-| `oci` field   | Required | Meaning                                                                        |
-| :------------ | :------- | :----------------------------------------------------------------------------- |
-| `image`       | Yes      | Image repository name, used for every registry                                 |
-| `file`        | Yes      | Dockerfile path relative to the context root                                   |
-| `context`     | No       | Build context relative to the extracted tar root, default `.`                  |
-| `build-args`  | No       | Object passed as Docker build args, one per key                                |
-| `turbo-cache` | No       | Starts the turbo cache server and passes `TURBO_*` build args, default `false` |
+`.tool-versions` is read from the payload root.
 
 ## Images and tags
 
-| Registry                  | Image                         |
-| :------------------------ | :---------------------------- |
-| GCP Artifact Registry     | `<registry>/<oci.image>`      |
-| GitHub Container Registry | `ghcr.io/<owner>/<oci.image>` |
+| Registry                  | Image                     |
+| :------------------------ | :------------------------ |
+| GCP Artifact Registry     | `<registry>/<image>`      |
+| GitHub Container Registry | `ghcr.io/<owner>/<image>` |
 
-Every image gets these tags:
-
-- `sha-<sha>`
-- `<version>` (semver)
-- `release-<version>` when `channel` is empty, `prerelease-<version>` otherwise, e.g. `release-1.4.0`
-  or `prerelease-1.4.0-beta.5`
+Tags: `sha-<sha>`, `<version>` (semver) and `release-<version>` for a stable release (empty
+`channel`) or `prerelease-<version>` otherwise. Images get SBOM attestations.
 
 ## Caches
 
-- **Registry layer cache:** with `registry` set, layers are cached in `<registry>/<oci.image>-cache:latest`
-  (`mode=max`)
-- **Turbo remote cache:** with `oci.turbo-cache`, a local turbo cache server backed by the GitHub Actions
-  cache is started on the runner. The builder runs with host networking, and `TURBO_API`, `TURBO_TEAM`
-  and `TURBO_TOKEN` are passed as build args. Declare them as `ARG` in the Dockerfile to use the cache in
-  `turbo` builds. These are plain build args, not BuildKit secrets.
+- **Registry layer cache:** with `registry` set, `<registry>/<image>-cache:latest` (`mode=max`)
+- **Turbo remote cache:** with `turbo.json` in the payload root, a local cache server backed by the
+  GitHub Actions cache runs on the runner. `TURBO_API`, `TURBO_TEAM` and `TURBO_TOKEN` are plain
+  build args; declare them as `ARG` in the Dockerfile.
 
-## Build secrets
-
-Per-app build-time secrets come from the `APP_IMAGE_SECRETS` secret, in CSV format, one per line:
-
-```
-backend,NPM_TOKEN,npm_abc123xyz
-```
-
-Each secret is a BuildKit secret mount, available at `/run/secrets/<name>`:
-
-```dockerfile
-RUN --mount=type=secret,id=NPM_TOKEN \
-    npm config set //registry.npmjs.org/:_authToken $(cat /run/secrets/NPM_TOKEN)
-```
+Per-app BuildKit secrets come from `APP_IMAGE_SECRETS`, see [Secrets](#secrets).
 
 ## GitOps updates
 
@@ -102,21 +74,18 @@ RUN --mount=type=secret,id=NPM_TOKEN \
 name,target-repo,dev-application,release-application[,image-name]
 ```
 
-- `name` matches the entry's `name`; units without a line are skipped with a warning
+- Units without a line are not dispatched; a unit with a line but without a Dockerfile fails its
+  build, so nothing is dispatched
 - `target-repo` without an owner is resolved against the repository owner
-- Stable releases (empty `channel`) deploy to `release-application`, prereleases to `dev-application`
-- `image-name` defaults to the entry's `oci.image`
-- Updates are `<image-name>:<version>`; units targeting the same repository and application are
-  batched into one dispatch with comma-separated `updates`
-- Lines with fewer than 4 or more than 5 columns, or with empty columns, fail the run before any
-  image is built
-- The dispatch token is exchanged at the token broker (`token-broker-url` or `vars.TOKEN_BROKER_URL`)
-  with `contents:read actions:write` on the target repositories
+- Stable releases deploy to `release-application`, prereleases to `dev-application`
+- `image-name` defaults to the resolved `image`; updates are `<image-name>:<version>`, batched per
+  target repository and application
+- Lines with fewer than 4 or more than 5 columns, or with empty columns, fail `Prepare`
+- The dispatch token comes from the token broker (`token-broker-url` or `vars.TOKEN_BROKER_URL`)
 
 ## Usage
 
-This is a `workflow_call` workflow, so it can't be triggered directly. Call it after the stack job
-that produced the release list and artifact.
+This is a `workflow_call` workflow. Call it after the stack job that produced the release list.
 
 [//]: # "x-release-please-start-major"
 
@@ -147,13 +116,11 @@ The calling job needs `id-token: write` (GCP and token broker), `packages: write
 ```yaml
 jobs:
   ci:
-    # ...stack call with outputs.oci
+    # ...stack call with outputs.releases
 
   publish-oci:
     name: Publish OCI
     needs: ci
-    # Publishes the successfully packed units even when the stack partially failed.
-    if: ${{ !cancelled() }}
     uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v0
     permissions:
       contents: read
@@ -162,25 +129,31 @@ jobs:
       actions: write
     secrets: inherit
     with:
-      releases: ${{ needs.ci.outputs.oci }}
+      releases: ${{ needs.ci.outputs.releases }}
+      image: app-{name}
       registry: ${{ vars.FOUNDRY_REGISTRY_DOCKER }}
       gcp-workload-identity-provider: ${{ vars.FOUNDRY_WIF_PROVIDER }}
+      gitops-config: |
+        backend,my-gitops-repo,backend-dev,backend-prod
+        worker,my-gitops-repo,worker-dev,worker-prod,worker
 ```
 
 [//]: # "x-release-please-end"
 
 ## Inputs
 
-| Input                            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Required | Default            |
-| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------- | :----------------- |
-| `releases`                       | Release list (schema 1) as a JSON array, the `oci` output of a stack.<br>Each entry carries an `oci` block and names the build context tar (`file`) inside the payload artifact (`artifact`).<br>An empty string or `[]` skips all work.<br>**Example:** `needs.ci.outputs.oci`                                                                                                                                                                                                                                                                               | Yes      |                    |
-| `registry`                       | GCP Artifact Registry repository URL for the images.<br>**Default:** _empty_ (GCP Artifact Registry disabled)<br>**Requires:** `gcp-workload-identity-provider` or `gcp-auth`<br>**Example:** `europe-docker.pkg.dev/project-id/repository-name`                                                                                                                                                                                                                                                                                                              | No       | _empty_            |
-| `gcp-workload-identity-provider` | Full Workload Identity Federation provider resource name.<br>Authenticates directly as the repository without a service account.<br>This is public configuration, not a secret.<br>**Required:** When `registry` is set, unless `gcp-auth` is set<br>**Note:** Mutually exclusive with `gcp-auth`<br>**Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`                                                                                                                                                   | No       | _empty_            |
-| `gcp-auth`                       | **Deprecated:** Use `gcp-workload-identity-provider`.<br>The `GCP_AUTH` variable, authenticating as a service account.<br>This is public configuration, not a secret.<br>**Note:** Mutually exclusive with `gcp-workload-identity-provider`                                                                                                                                                                                                                                                                                                                   | No       | _empty_            |
-| `ghcr`                           | Publish images to GitHub Container Registry (GHCR).<br>**Default:** `false`<br>**Authentication:** Uses `GITHUB_TOKEN` (automatically available)                                                                                                                                                                                                                                                                                                                                                                                                              | No       | _empty_            |
-| `gitops-config`                  | Per-unit GitOps configuration in **CSV format** (one per line).<br>**Format:** `name,target-repo,dev-application,release-application[,image-name]`<br>**Example:**<br>`my-api,my-gitops-repo,my-api-dev,my-api-prod`<br>`my-worker,my-gitops-repo,worker-dev,worker-prod,worker`<br>**Image name:** Defaults to the entry's `oci.image`<br>**Deployment tags:** Dev and release deployments use the clean semver version as tag<br>**Note:** Lines with fewer than 4 or more than 5 columns, or empty columns, fail the run. Units without a line are skipped | No       | _empty_            |
-| `gitops-workflow-file`           | GitOps workflow file to dispatch for deployment updates.<br>**Default:** `update-tags.yaml`<br>**Example:** `update-tags.yaml`, `deploy.yaml`<br>**Note:** Only used when `gitops-config` is provided                                                                                                                                                                                                                                                                                                                                                         | No       | `update-tags.yaml` |
-| `token-broker-url`               | URL of the token broker for OIDC token exchange.<br>**Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.<br>**Note:** Only used when `gitops-config` is provided                                                                                                                                                                                                                                                                                                                                                                               | No       | _empty_            |
+| Input                            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Required | Default            |
+| :------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :----------------- |
+| `releases`                       | Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.<br>This workflow builds the entries whose `path` matches `include` from their `payloads.source`.<br>An empty string, `[]` or a list without matching entries skips all work.<br>**Example:** `needs.ci.outputs.releases`                                                                                                                                                                                                                                                                                                                             | Yes      |                    |
+| `include`                        | Directory patterns selecting the entries by `path`, one per line. `*` matches exactly one path segment.<br>**Default:** `apps/*`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | No       | `apps/*`           |
+| `image`                          | Image repository name, used for every registry. `{path}` and `{name}` are replaced per unit.<br>**Default:** `{name}`<br>**Example:** `app-{name}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | No       | `{name}`           |
+| `registry`                       | GCP Artifact Registry repository URL for the images.<br>**Default:** _empty_ (GCP Artifact Registry disabled)<br>**Requires:** `gcp-workload-identity-provider` or `gcp-auth`<br>**Example:** `europe-docker.pkg.dev/project-id/repository-name`                                                                                                                                                                                                                                                                                                                                                                                           | No       | _empty_            |
+| `gcp-workload-identity-provider` | Full Workload Identity Federation provider resource name.<br>Authenticates directly as the repository without a service account.<br>This is public configuration, not a secret.<br>**Required:** When `registry` is set, unless `gcp-auth` is set<br>**Note:** Mutually exclusive with `gcp-auth`<br>**Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`                                                                                                                                                                                                                                | No       | _empty_            |
+| `gcp-auth`                       | **Deprecated:** Use `gcp-workload-identity-provider`.<br>The `GCP_AUTH` variable, authenticating as a service account.<br>This is public configuration, not a secret.<br>**Note:** Mutually exclusive with `gcp-workload-identity-provider`                                                                                                                                                                                                                                                                                                                                                                                                | No       | _empty_            |
+| `ghcr`                           | Publish images to GitHub Container Registry (GHCR).<br>**Default:** `false`<br>**Authentication:** Uses `GITHUB_TOKEN` (automatically available)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | No       | _empty_            |
+| `gitops-config`                  | Per-unit GitOps configuration in **CSV format** (one per line).<br>**Format:** `name,target-repo,dev-application,release-application[,image-name]`<br>**Example:**<br>`my-api,my-gitops-repo,my-api-dev,my-api-prod`<br>`my-worker,my-gitops-repo,worker-dev,worker-prod,worker`<br>**Image name:** Defaults to the resolved `image` of the unit<br>**Deployment tags:** Dev and release deployments use the clean semver version as tag<br>**Note:** Lines with fewer than 4 or more than 5 columns, or empty columns, fail the run. A unit with a line but without a Dockerfile fails its build. Units without a line are not dispatched | No       | _empty_            |
+| `gitops-workflow-file`           | GitOps workflow file to dispatch for deployment updates.<br>**Default:** `update-tags.yaml`<br>**Example:** `update-tags.yaml`, `deploy.yaml`<br>**Note:** Only used when `gitops-config` is provided                                                                                                                                                                                                                                                                                                                                                                                                                                      | No       | `update-tags.yaml` |
+| `token-broker-url`               | URL of the token broker for OIDC token exchange.<br>**Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.<br>**Note:** Only used when `gitops-config` is provided                                                                                                                                                                                                                                                                                                                                                                                                                                                            | No       | _empty_            |
 
 ## Secrets
 
