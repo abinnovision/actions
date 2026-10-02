@@ -621,7 +621,14 @@ const computePrereleaseVersions = async (
 		defaultBranch: resolvedBranch,
 	});
 
-	const manifest = await Manifest.fromManifest(github, resolvedBranch);
+	// Always refresh open release PRs so they are rebuilt on the latest target branch.
+	const manifest = await Manifest.fromManifest(
+		github,
+		resolvedBranch,
+		undefined,
+		undefined,
+		{ alwaysUpdate: true },
+	);
 
 	// Run release-please (create releases + create/update PRs).
 	const createdReleases = await runReleasePlease(manifest);
