@@ -134,7 +134,7 @@ jobs:
       github-token-scope: ${{ steps.evaluate.outputs.github_token_scope }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Validate working directory
         run: |
@@ -220,7 +220,7 @@ jobs:
     steps:
       - &checkout
         name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Sets up the tools from .tool-versions and runs the Node repo checks.
       - name: Run repo checks
