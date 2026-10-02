@@ -1,19 +1,20 @@
 # {{name}}
 
-Checks, plans and applies an OpenTofu root module with GCS state and encrypted state files.
+Checks, plans and applies an OpenTofu root module with GCS state and encrypted state files, next to the Node repo checks.
 
 ## Behavior
 
-| Job         | Runs on                                   | Does                                                                                                |
-| :---------- | :---------------------------------------- | :-------------------------------------------------------------------------------------------------- |
-| `Configure` | Always                                    | Resolves the mode (`plan`, `apply` or none) and validates the configuration                        |
-| `Check`     | Always                                    | `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate`                          |
-| `Plan`      | Pull requests from the same repository    | `tofu plan` and one sticky PR comment per `working-directory` with the summary and a collapsible diff |
-| `Apply`     | Push to `default-branch`                  | Fresh `tofu plan -out` and `tofu apply` in `apply-environment`; runs for one root never overlap     |
+| Job         | Runs on                                      | Does                                                                                                            |
+| :---------- | :------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
+| `Configure` | Always                                       | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, and validates the configuration    |
+| `Check`     | Always                                       | Node repo checks (`yarn install --immutable`, `yarn dedupe --check`, `yarn check`), `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate` |
+| `Plan`      | Trusted pull requests                        | `tofu plan` and one sticky PR comment per `working-directory` with the summary and a collapsible diff           |
+| `Apply`     | Push to `default-branch`                     | Fresh `tofu plan -out` and `tofu apply` in `apply-environment`; runs for one root never overlap                 |
+| `Status`    | Always                                       | Fails when any other job failed or was cancelled; use it as the single required status check                    |
 
 - State and plan files are always encrypted with OpenTofu's `gcp_kms` key provider
 - Optional GitHub token exchange via the token broker, passed as `GITHUB_TOKEN` to the GitHub provider
-- Pull requests from forks only run `Check`, since they cannot authenticate to GCP
+- Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to GCP
 - `pull_request_target` is rejected
 - Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 
@@ -22,6 +23,7 @@ Checks, plans and applies an OpenTofu root module with GCS state and encrypted s
 - The repository is provisioned by foundry with `foundry-state-backend: true`, which publishes the
   `FOUNDRY_WIF_PROVIDER`, `FOUNDRY_STATE_BUCKET` and `FOUNDRY_STATE_KEY` variables. The
   `gcp-workload-identity-provider`, `state-bucket` and `state-key` inputs override them
+- The repository has a `.tool-versions` file with `nodejs` and `opentofu`, and a `package.json` with a `check` script
 - The `apply-environment` environment (default `production`) is restricted to the default branch
 - The root module declares an empty GCS backend:
 
@@ -44,23 +46,28 @@ This is a `workflow_call` workflow, so it can't be triggered directly. Call it f
 
 ### Example Workflow File
 
-Complete, copyable caller workflow (e.g. `.github/workflows/tofu.yaml`):
+Complete, copyable caller workflow (`.github/workflows/ci.yaml`):
 
 [//]: # "x-release-please-start-major"
 
 ```yaml
-name: OpenTofu
+name: CI
 
 on:
   pull_request:
+    branches: [main]
   push:
     branches: [main]
 
+permissions: {}
+
 jobs:
-  tofu:
+  ci:
+    name: CI
     uses: abinnovision/actions/.github/workflows/workflow.yaml@{{name}}-v{{version.major}}
     permissions:
       contents: read
+      packages: read
       id-token: write
       pull-requests: write
     with:
@@ -70,6 +77,12 @@ jobs:
 [//]: # "x-release-please-end"
 
 Repositories with several roots call the workflow once per root with different `working-directory` values.
+
+## Migrating from opentofu-stack
+
+- Change the caller tag from `@opentofu-stack-v1` to `@{{name}}-v{{version.major}}`
+- The required status check becomes `CI / Status` (with the caller convention above)
+- The Node repo checks now run inside `Check`, so a separate repo checks job can be removed
 
 ## Advanced Configuration
 

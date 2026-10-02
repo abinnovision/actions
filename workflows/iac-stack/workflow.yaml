@@ -1,4 +1,4 @@
-name: OpenTofu Stack
+name: IaC Stack
 
 on:
   workflow_call:
@@ -113,7 +113,7 @@ defaults:
     shell: bash
 
 jobs:
-  # Resolve the operation for this event and validate the configuration.
+  # Resolve the mode and trust for this event and validate the configuration.
   configure:
     name: Configure
     runs-on: ubuntu-latest
@@ -121,8 +121,14 @@ jobs:
     permissions:
       contents: read
     outputs:
-      # Operation against the backend: plan, apply or none.
+      # Commit under test: PR head, merge group head or the pushed commit.
+      commit-sha: ${{ steps.evaluate.outputs.commit_sha }}
+
+      # Operation against the backend: pr, main or none.
       mode: ${{ steps.evaluate.outputs.mode }}
+
+      # Whether credentialed jobs may run: false for fork and Dependabot pull requests.
+      trusted: ${{ steps.evaluate.outputs.trusted }}
 
       # Token broker scopes for the GitHub provider token of this mode.
       github-token-scope: ${{ steps.evaluate.outputs.github_token_scope }}
@@ -142,6 +148,10 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
           DEFAULT_BRANCH: ${{ inputs.default-branch }}
           HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           REPOSITORY: ${{ github.repository }}
@@ -150,24 +160,34 @@ jobs:
           BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
         run: |
           mode="none"
+          trusted="false"
+          commit_sha="$SHA"
           github_token_scope=""
 
           if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
-            echo "::error::'pull_request_target' is not supported by opentofu-stack. Switch the caller to 'pull_request'."
+            echo "::error::'pull_request_target' is not supported by iac-stack. Switch the caller to 'pull_request'."
             exit 1
           elif [[ "$EVENT_NAME" == "pull_request" ]]; then
-            if [[ "$HEAD_REPOSITORY" == "$REPOSITORY" ]]; then
-              mode="plan"
+            mode="pr"
+            commit_sha="$PR_HEAD_SHA"
+            if [[ "$HEAD_REPOSITORY" == "$REPOSITORY" && "$ACTOR" != "dependabot[bot]" ]]; then
+              trusted="true"
               github_token_scope="$PLAN_SCOPE"
             else
-              echo "::notice::Pull requests from forks cannot authenticate to GCP, skipping plan"
+              echo "::notice::Pull requests from forks and Dependabot cannot authenticate to GCP, skipping plan"
             fi
-          elif [[ "$EVENT_NAME" == "push" && "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
-            mode="apply"
-            github_token_scope="$APPLY_SCOPE"
+          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
+            trusted="true"
+            commit_sha="$MERGE_GROUP_HEAD_SHA"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            trusted="true"
+            if [[ "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
+              mode="main"
+              github_token_scope="$APPLY_SCOPE"
+            fi
           fi
 
-          if [[ "$mode" != "none" ]]; then
+          if [[ "$mode" == "main" || ( "$mode" == "pr" && "$trusted" == "true" ) ]]; then
             if [[ -z "$WIF_PROVIDER" || -z "$STATE_BUCKET" || -z "$STATE_KEY" ]]; then
               echo "::error::A workload identity provider, state bucket and state key are required. Enable the foundry-state-backend custom property or set the inputs."
               exit 1
@@ -179,28 +199,32 @@ jobs:
             fi
           fi
 
+          echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
           # Scopes may be newline-separated; outputs must be single-line.
           echo "github_token_scope=$(echo "$github_token_scope" | xargs)" >> "$GITHUB_OUTPUT"
 
           echo "Mode: $mode"
           echo "State: gs://$STATE_BUCKET/$STATE_PREFIX"
 
-  # Static checks without backend access.
+  # Repo checks and static OpenTofu checks without backend or credentials.
   check:
     name: Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+      # Private GitHub Package Registry dependencies during install.
+      packages: read
     steps:
       - &checkout
         name: Checkout
         uses: actions/checkout@v6
 
-      - &setup-tools
-        name: Setup Tools
-        uses: abinnovision/actions@setup-tools-dev
+      # Sets up the tools from .tool-versions and runs the Node repo checks.
+      - name: Run repo checks
+        uses: abinnovision/actions@run-repo-checks-dev
 
       - name: Check formatting
         run: tofu -chdir="$WORKING_DIR" fmt -check -recursive
@@ -219,7 +243,7 @@ jobs:
     needs:
       - configure
       - check
-    if: needs.configure.outputs.mode == 'plan'
+    if: needs.configure.outputs.mode == 'pr' && needs.configure.outputs.trusted == 'true'
     concurrency:
       group: opentofu-plan-${{ github.repository }}-${{ github.ref }}-${{ inputs.working-directory }}
       cancel-in-progress: true
@@ -229,7 +253,10 @@ jobs:
       pull-requests: write
     steps:
       - *checkout
-      - *setup-tools
+
+      - &setup-tools
+        name: Setup Tools
+        uses: abinnovision/actions@setup-tools-dev
 
       - &configure-state-encryption
         name: Configure state encryption
@@ -346,7 +373,7 @@ jobs:
     needs:
       - configure
       - check
-    if: needs.configure.outputs.mode == 'apply'
+    if: needs.configure.outputs.mode == 'main'
     environment: ${{ inputs.apply-environment || null }}
     concurrency:
       group: opentofu-apply-${{ github.repository }}-${{ inputs.working-directory }}
@@ -371,3 +398,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
         run: tofu -chdir="$WORKING_DIR" apply -input=false tfplan
+
+  # Single required status check for rulesets.
+  status:
+    name: Status
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [configure, check, plan, apply]
+    if: always()
+    permissions: {}
+    steps:
+      - name: Evaluate status
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
