@@ -47,6 +47,59 @@ jobs:
 - Callers must not use `paths:` filters. A workflow that does not start never reports the required check.
 - Repositories with a merge queue also trigger on `merge_group`.
 
+## Naming
+
+Workflows in this repository live in `workflows/<name>/workflow.yaml` and are called by the same reference everywhere,
+only the tag changes:
+
+```yaml
+uses: abinnovision/actions/.github/workflows/workflow.yaml@<name>-v<major>
+```
+
+| Tag                               | Meaning                                  | Used by                                     |
+| :-------------------------------- | :--------------------------------------- | :------------------------------------------ |
+| `<name>-v<major>`                 | Floating major, moves with every release | Consumer repositories                       |
+| `<name>-v<major>.<minor>.<patch>` | Exact pin                                | Repositories that must freeze a version     |
+| `<name>-dev`                      | Tip of `main`                            | References inside this repository, rollouts |
+
+The name tells the family of the workflow:
+
+| Family    | Pattern                  | Examples                                          | Rule                                                                                              |
+| :-------- | :----------------------- | :------------------------------------------------ | :------------------------------------------------------------------------------------------------ |
+| Stack     | `<kind>[-<shape>]-stack` | `app-monorepo-stack`, `gitops-stack`, `iac-stack` | One per repository kind. `<shape>` only when a kind has more than one repository layout           |
+| Publisher | `publish-<target>`       | `publish-oci`, `publish-npm`                      | `<target>` is the artifact or registry type, not a vendor product name when a generic term exists |
+| Helper    | `<kind>-<verb>-<object>` | `gitops-update-tags`                              | Dispatched by other workflows, never called from `ci.yaml`                                        |
+
+Composite actions follow `actions/<verb>-<object>` (`run-repo-checks`, `exchange-github-token`, `setup-tools`) with the
+same tag scheme.
+
+### Caller files
+
+File names are lowercase kebab with `.yaml`; the workflow `name:` is the title-cased file name.
+
+| File                                 | `name:`       | Triggers                                                              | Contains                                                                                           |
+| :----------------------------------- | :------------ | :-------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------- |
+| `.github/workflows/ci.yaml`          | `CI`          | `pull_request` and `push` on `main`, `merge_group` with a merge queue | Exactly one stack job plus one job per publish target                                              |
+| `.github/workflows/pr-utils.yaml`    | `PR Utils`    | `pull_request`                                                        | Commit linting and Dependabot automation, never checks out pull request code                       |
+| `.github/workflows/update-tags.yaml` | `Update Tags` | `workflow_dispatch`                                                   | Gitops repositories only, target of the dispatch from `publish-oci` (input `gitops-workflow-file`) |
+
+### Caller jobs
+
+The job `name:` of a reusable-workflow call is the prefix of every check context it produces, so job ids and names are
+fixed. The workflow `name:` never appears in check contexts.
+
+| Job            | id                 | `name:`            | Check contexts                                                                                           |
+| :------------- | :----------------- | :----------------- | :------------------------------------------------------------------------------------------------------- |
+| Stack call     | `ci`               | `CI`               | `CI / Configure`, `CI / Check`, `CI / Status` and the lanes, for example `CI / Test / <type>`            |
+| Publisher call | `publish-<target>` | `Publish <Target>` | `Publish OCI / Prepare`, `Publish OCI / Build / <name>`, `Publish OCI / GitOps`, `Publish npm / Publish` |
+| Commit lint    | `commitlint`       | `Commitlint`       | `Commitlint`                                                                                             |
+
+- The job id is the kebab form of the job name. For publishers it equals the name of the called workflow: job
+  `publish-oci` calls `publish-oci`.
+- `<Target>` is written the way its ecosystem writes it: `npm`, `OCI`.
+- Inputs and outputs are kebab-case (`token-broker-url`, `releases`), secrets are upper snake case
+  (`APP_IMAGE_SECRETS`), placeholders use braces (`{name}`, `{path}`).
+
 ## Jobs
 
 | Job         | Runs                              | Does                                                                  |
