@@ -114,7 +114,7 @@ jobs:
 
       - name: Setup Node
         if: steps.select.outputs.packages != '[]'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
