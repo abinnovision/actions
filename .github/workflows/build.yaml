@@ -27,14 +27,19 @@ jobs:
       commit-sha: ${{ env.COMMIT_SHA }}
     steps:
       - name: Evaluate commit
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              echo "PR is #${{ github.event.number }}..."
-              echo "PR Head SHA is ${{ github.event.pull_request.head.sha }}..."
-              echo "COMMIT_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+              echo "PR is #$PR_NUMBER..."
+              echo "PR Head SHA is $PR_HEAD_SHA..."
+              echo "COMMIT_SHA=$PR_HEAD_SHA" >> $GITHUB_ENV
           else
-              echo "Head SHA is ${{ github.sha }}..."
-              echo "COMMIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
+              echo "Head SHA is $HEAD_SHA..."
+              echo "COMMIT_SHA=$HEAD_SHA" >> $GITHUB_ENV
           fi
 
   # Build and checks are unified into one job. This is because the build
@@ -69,6 +74,8 @@ jobs:
           git diff --exit-code || (echo "README files are not up to date, run 'yarn readme:generate'" && exit 1)
       - name: Check Action References
         run: yarn tsx scripts/check-action-refs.ts
+      - name: Check Run Interpolation
+        run: yarn tsx scripts/check-run-interpolation.ts
       - name: Check Dependencies
         run: |
           yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
@@ -119,20 +126,23 @@ jobs:
         shell: bash
         env:
           VERSIONS: ${{ needs.release.outputs.versions }}
+          COMMITTER_NAME: ${{ steps.token.outputs.committer-name }}
+          COMMITTER_EMAIL: ${{ steps.token.outputs.committer-email }}
+          PUSH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           set -euo pipefail
 
-          git config --global user.name "${{ steps.token.outputs.committer-name }}"
-          git config --global user.email "${{ steps.token.outputs.committer-email }}"
+          git config --global user.name "$COMMITTER_NAME"
+          git config --global user.email "$COMMITTER_EMAIL"
 
-          WORKSPACE="${{ github.workspace }}"
+          WORKSPACE="$GITHUB_WORKSPACE"
           PACK_DIR="/opt/temporary/packs"
           SCRATCH="/opt/temporary/publish"
 
           # Shared object database for the whole run. Every item becomes an orphan
           # commit in here and all refs go out in a single push at the end.
           git init -q -b main "$SCRATCH"
-          git --git-dir="$SCRATCH/.git" remote add origin https://x-access-token:${{ steps.token.outputs.token }}@github.com/$GITHUB_REPOSITORY
+          git --git-dir="$SCRATCH/.git" remote add origin https://x-access-token:${PUSH_TOKEN}@github.com/$GITHUB_REPOSITORY
 
           # Runs git against the shared object database.
           pgit() {

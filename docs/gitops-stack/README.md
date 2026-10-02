@@ -20,8 +20,9 @@ gitops-repo/
 │   └── base/
 │       └── <shared-resources>/
 ├── .github/workflows/
-│   ├── deploy.yaml
+│   ├── ci.yaml
 │   └── update-tags.yaml
+├── .tool-versions
 ├── package.json
 └── yarn.lock
 ```
@@ -60,6 +61,14 @@ images:
 
 ## Root files
 
+### .tool-versions
+
+Node.js version used by the `Check` job (see [setup-tools](../../actions/setup-tools/README.md)):
+
+```
+nodejs 24.18.0
+```
+
 ### package.json
 
 ```json
@@ -92,14 +101,20 @@ images:
 
 ## Workflows
 
-### gitops-deploy
+### gitops-stack
 
-Validates manifests and deploys to ArgoCD.
+Checks the repository, validates manifests and deploys to ArgoCD. Runs the jobs `Configure`, `Check`, `Preview`,
+`Deploy` and `Status`.
 
 - Pull requests: Validates manifests, posts ArgoCD diff as PR comment
-- Main branch: Validates manifests, syncs to ArgoCD, waits for health
+- Main branch: Validates manifests, triggers an ArgoCD sync without waiting for health
+- Pull requests from forks and from Dependabot only run `Configure` and `Check`
+- Triggered by `pull_request` and `push`; `pull_request_target` is rejected
+- The required status check is `CI / Status`
 
-**Reference:** [`workflows/gitops-deploy`](../../workflows/gitops-deploy/README.md)
+Repositories using `gitops-deploy` follow the migration steps in the reference.
+
+**Reference:** [`workflows/gitops-stack`](../../workflows/gitops-stack/README.md)
 
 ### gitops-update-tags
 
@@ -113,29 +128,30 @@ Updates image tags in kustomization files and creates PRs.
 
 ## Workflow Examples
 
-### deploy.yaml
+### ci.yaml
 
 ```yaml
-name: Deploy
+name: CI
 
 on:
+  pull_request:
+    branches: [main]
   push:
-    branches:
-      - main
-  pull_request_target:
-    branches:
-      - main
+    branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.number) || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
 
 jobs:
-  deploy:
-    name: GitOps Deploy
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-deploy-v1
+  ci:
+    name: CI
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-stack-v1
     permissions:
       contents: read
+      packages: read
       id-token: write
       pull-requests: write
       deployments: write

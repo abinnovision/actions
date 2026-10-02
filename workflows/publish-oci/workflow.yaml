@@ -1,0 +1,548 @@
+name: Publish OCI
+
+on:
+  workflow_call:
+    secrets:
+      APP_IMAGE_SECRETS:
+        required: false
+        description: |-
+          App-specific build secrets for image builds in **CSV format** (one per line).
+          **Format:** `app-name,secret-name,secret-value`
+          **Example:**
+          ```
+          my-api,NPM_TOKEN,npm_abc123xyz
+          my-api,API_KEY,secret_key_here
+          my-frontend,BUILD_KEY,value,with,commas,is,ok
+          ```
+          **Note:** Only the first two commas are delimiters; the secret value can contain commas.
+
+          Each secret is passed to Docker BuildKit as an individual secret mount with its own ID.
+
+          **Usage in Dockerfile:** `--mount=type=secret,id=NPM_TOKEN` (available at `/run/secrets/NPM_TOKEN`)
+    inputs:
+      releases:
+        type: string
+        required: true
+        description: |-
+          Release list (schema 1) as a JSON array, the `oci` output of a stack.
+          Each entry carries an `oci` block and names the build context tar (`file`) inside the payload artifact (`artifact`).
+          An empty string or `[]` skips all work.
+          **Example:** `needs.ci.outputs.oci`
+
+      registry:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          GCP Artifact Registry repository URL for the images.
+          **Default:** _empty_ (GCP Artifact Registry disabled)
+          **Requires:** `gcp-workload-identity-provider` or `gcp-auth`
+          **Example:** `europe-docker.pkg.dev/project-id/repository-name`
+
+      gcp-workload-identity-provider:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Full Workload Identity Federation provider resource name.
+          Authenticates directly as the repository without a service account.
+          This is public configuration, not a secret.
+          **Required:** When `registry` is set, unless `gcp-auth` is set
+          **Note:** Mutually exclusive with `gcp-auth`
+          **Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`
+
+      gcp-auth:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          **Deprecated:** Use `gcp-workload-identity-provider`.
+          The `GCP_AUTH` variable, authenticating as a service account.
+          This is public configuration, not a secret.
+          **Note:** Mutually exclusive with `gcp-workload-identity-provider`
+
+      ghcr:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Publish images to GitHub Container Registry (GHCR).
+          **Default:** `false`
+          **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
+
+      gitops-config:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Per-unit GitOps configuration in **CSV format** (one per line).
+          **Format:** `name,target-repo,dev-application,release-application[,image-name]`
+          **Example:**
+          `my-api,my-gitops-repo,my-api-dev,my-api-prod`
+          `my-worker,my-gitops-repo,worker-dev,worker-prod,worker`
+          **Image name:** Defaults to the entry's `oci.image`
+          **Deployment tags:** Dev and release deployments use the clean semver version as tag
+          **Note:** Lines with fewer than 4 or more than 5 columns, or empty columns, fail the run. Units without a line are skipped
+
+      gitops-workflow-file:
+        type: string
+        required: false
+        default: "update-tags.yaml"
+        description: |-
+          GitOps workflow file to dispatch for deployment updates.
+          **Default:** `update-tags.yaml`
+          **Example:** `update-tags.yaml`, `deploy.yaml`
+          **Note:** Only used when `gitops-config` is provided
+
+      token-broker-url:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          URL of the token broker for OIDC token exchange.
+          **Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.
+          **Note:** Only used when `gitops-config` is provided
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Build and push one image per release list entry.
+  build:
+    name: ${{ matrix.entry.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: inputs.releases != '' && inputs.releases != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        entry: ${{ fromJSON(inputs.releases) }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      actions: write
+    steps:
+      # Validates the whole release list in every leg, so no image is built when any entry is invalid.
+      - name: Validate configuration
+        env:
+          RELEASES: ${{ inputs.releases }}
+          INPUT_REGISTRY: ${{ inputs.registry }}
+          INPUT_GHCR: ${{ inputs.ghcr }}
+          INPUT_GCP_AUTH: ${{ inputs.gcp-auth }}
+          INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.gcp-workload-identity-provider }}
+          INPUT_GITOPS_CONFIG: ${{ inputs.gitops-config }}
+          TOKEN_BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+        run: |
+          if [[ -z "$INPUT_REGISTRY" ]] && [[ "$INPUT_GHCR" != "true" ]]; then
+            echo "::error::No registry configured. Set 'registry' and/or 'ghcr'."
+            exit 1
+          fi
+
+          if [[ -n "$INPUT_REGISTRY" ]] && [[ -z "$INPUT_GCP_AUTH" ]] && [[ -z "$INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER" ]]; then
+            echo "::error::'registry' requires 'gcp-workload-identity-provider' or 'gcp-auth'"
+            exit 1
+          fi
+
+          errors=$(jq -r '
+            to_entries[]
+            | .key as $i
+            | .value as $e
+            | if ($e | type) != "object" then "Entry #\($i) is not an object"
+              else
+                ($e.name // "#\($i)") as $id
+                | (if $e.schema != 1 then "Entry \($id) has schema \($e.schema // "none"), this workflow supports schema 1" else empty end),
+                  (["name", "version", "sha", "artifact", "file"][] | select(($e[.] // "") == "") | "Entry \($id) has no \(.)"),
+                  (["image", "file"][] | select(($e.oci[.]? // "") == "") | "Entry \($id) has no oci.\(.)")
+              end
+          ' <<< "$RELEASES")
+
+          if [[ -n "$errors" ]]; then
+            while IFS= read -r error; do
+              echo "::error::$error"
+            done <<< "$errors"
+            exit 1
+          fi
+
+          if [[ -n "$INPUT_GITOPS_CONFIG" ]] && [[ -z "$TOKEN_BROKER_URL" ]]; then
+            echo "::error::token-broker-url is required when gitops-config is provided"
+            exit 1
+          fi
+
+          # gitops-config: name,target-repo,dev-application,release-application[,image-name]
+          invalid_lines=0
+          while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            columns=$(awk -F, '{ print NF }' <<< "$line")
+            if [[ "$columns" -lt 4 || "$columns" -gt 5 || "$line" == ,* || "$line" == *, || "$line" == *,,* ]]; then
+              echo "::error::Invalid gitops-config line '$line': expected 'name,target-repo,dev-application,release-application[,image-name]' without empty columns"
+              invalid_lines=$((invalid_lines + 1))
+            fi
+          done <<< "$INPUT_GITOPS_CONFIG"
+
+          if [[ "$invalid_lines" -gt 0 ]]; then
+            exit 1
+          fi
+
+      - name: Download build context
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.entry.artifact }}
+          path: artifact
+
+      - name: Extract build context
+        env:
+          FILE: ${{ matrix.entry.file }}
+        run: |
+          mkdir -p context
+          tar -xf "artifact/$FILE" -C context
+
+      - name: Setup Turbo cache
+        if: matrix.entry.oci['turbo-cache']
+        uses: rharkor/caching-for-turbo@v2.3.13
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            network=host
+
+      - name: Setup GCP Authentication
+        if: inputs.registry != '' && (inputs.gcp-auth != '' || inputs.gcp-workload-identity-provider != '')
+        id: gcp-auth
+        uses: abinnovision/actions@setup-gcp-dev
+        with:
+          auth: ${{ inputs.gcp-auth }}
+          workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
+
+      - name: Setup gcloud
+        if: inputs.registry != ''
+        uses: google-github-actions/setup-gcloud@v3
+
+      # Uses the gcloud credential helper so tokens are refreshed during long builds.
+      - name: Login to GCP Artifact Registry
+        if: inputs.registry != ''
+        env:
+          INPUT_REGISTRY: ${{ inputs.registry }}
+        run: gcloud auth configure-docker "${INPUT_REGISTRY%%/*}" --quiet
+
+      - name: Login to GitHub Container Registry
+        if: inputs.ghcr
+        uses: docker/login-action@v4
+        with:
+          registry: "ghcr.io"
+          username: "${{ github.actor }}"
+          password: "${{ github.token }}"
+
+      - name: Prepare image names
+        id: image-names
+        env:
+          OCI_IMAGE: ${{ matrix.entry.oci.image }}
+          INPUT_REGISTRY: ${{ inputs.registry }}
+          INPUT_GHCR: ${{ inputs.ghcr }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          images=()
+          cache_from=""
+          cache_to=""
+
+          # GCP Artifact Registry, with registry caching
+          if [[ -n "$INPUT_REGISTRY" ]]; then
+            gcpar_image="$INPUT_REGISTRY/$OCI_IMAGE"
+            gcpar_cache="$INPUT_REGISTRY/$OCI_IMAGE-cache"
+            images+=("$gcpar_image")
+            cache_from="type=registry,ref=$gcpar_cache:latest"
+            cache_to="type=registry,ref=$gcpar_cache:latest,mode=max"
+            echo "GCP AR image: $gcpar_image"
+          fi
+
+          # GitHub Container Registry
+          if [[ "$INPUT_GHCR" == "true" ]]; then
+            ghcr_image="ghcr.io/$REPOSITORY_OWNER/$OCI_IMAGE"
+            images+=("$ghcr_image")
+            echo "GHCR image: $ghcr_image"
+          fi
+
+          echo "IMAGES<<EOF" >> $GITHUB_OUTPUT
+          printf '%s\n' "${images[@]}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "CACHE_FROM=$cache_from" >> $GITHUB_OUTPUT
+          echo "CACHE_TO=$cache_to" >> $GITHUB_OUTPUT
+          echo "Configured registries: ${#images[@]}"
+
+      # Build args from the release entry, plus the turbo remote-cache passthrough when enabled.
+      - name: Prepare build args
+        id: build-args
+        env:
+          BUILD_ARGS: ${{ toJSON(matrix.entry.oci['build-args']) }}
+          TURBO_CACHE: ${{ matrix.entry.oci['turbo-cache'] }}
+        run: |
+          set -euo pipefail
+
+          delimiter="EOF_$(openssl rand -hex 8)"
+          {
+            echo "BUILD_ARGS<<$delimiter"
+            jq -r '(. // {}) | to_entries[] | "\(.key)=\(.value)"' <<< "$BUILD_ARGS"
+            if [[ "$TURBO_CACHE" == "true" ]]; then
+              echo "TURBO_API=${TURBO_API/localhost/127.0.0.1}"
+              echo "TURBO_TEAM=$TURBO_TEAM"
+              echo "TURBO_TOKEN=$TURBO_TOKEN"
+            fi
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.image-names.outputs.IMAGES }}
+          tags: |
+            type=raw,value=sha-${{ matrix.entry.sha }}
+            type=semver,pattern={{version}},value=v${{ matrix.entry.version }}
+            type=raw,value=${{ matrix.entry.channel == '' && 'release' || 'prerelease' }}-${{ matrix.entry.version }}
+
+      - name: Prepare app-specific secrets
+        id: app-secrets
+        env:
+          APP: ${{ matrix.entry.name }}
+          # CSV format: app-name,secret-name,secret-value (one per line)
+          APP_IMAGE_SECRETS: ${{ secrets.APP_IMAGE_SECRETS }}
+        run: |
+          if [[ -n "$APP_IMAGE_SECRETS" ]]; then
+            # Parse CSV and create individual temp files for each secret
+            # Format: app-name,secret-name,secret-value
+            # Only first two commas are delimiters; value can contain commas
+
+            secrets_mounts=()
+            secrets_dir=$(mktemp -d)
+
+            while IFS= read -r line; do
+              # Skip empty lines
+              [[ -z "$line" ]] && continue
+
+              # Check if line starts with our app name followed by comma
+              if [[ "$line" == "$APP,"* ]]; then
+                # Remove "app-name," prefix
+                rest="${line#"$APP",}"
+
+                # Split on first comma only: secret-name,secret-value
+                secret_name="${rest%%,*}"
+                secret_value="${rest#*,}"
+
+                # Create individual temp file for this secret
+                secret_file="$secrets_dir/secret_${secret_name}"
+                echo -n "$secret_value" > "$secret_file"
+                secrets_mounts+=("${secret_name}=${secret_file}")
+                echo "Prepared secret: $secret_name"
+              fi
+            done <<< "$APP_IMAGE_SECRETS"
+
+            if [[ ${#secrets_mounts[@]} -gt 0 ]]; then
+              echo "HAS_SECRETS=true" >> $GITHUB_OUTPUT
+              echo "SECRETS_MOUNT_STRING<<EOF" >> $GITHUB_OUTPUT
+              printf '%s\n' "${secrets_mounts[@]}" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              echo "App-specific secrets prepared for $APP"
+            else
+              echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
+              rm -rf "$secrets_dir"
+            fi
+          else
+            echo "HAS_SECRETS=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v7
+        env:
+          # Replaced by the "Write image summary" step.
+          DOCKER_BUILD_SUMMARY: "false"
+        with:
+          context: context/${{ matrix.entry.oci.context || '.' }}
+          file: context/${{ matrix.entry.oci.file }}
+          push: true
+          sbom: true
+          cache-from: ${{ steps.image-names.outputs.CACHE_FROM }}
+          cache-to: ${{ steps.image-names.outputs.CACHE_TO }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: ${{ steps.build-args.outputs.BUILD_ARGS }}
+          secret-files: |
+            ${{ steps.app-secrets.outputs.HAS_SECRETS == 'true' && steps.app-secrets.outputs.SECRETS_MOUNT_STRING || '' }}
+          allow: network.host
+
+      - name: Write image summary
+        env:
+          APP: ${{ matrix.entry.name }}
+          APP_VERSION: ${{ matrix.entry.version }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          BUILD_REF: ${{ fromJSON(steps.build.outputs.metadata)['buildx.build.ref'] }}
+          CACHE_FROM: ${{ steps.image-names.outputs.CACHE_FROM }}
+        run: |
+          echo "Successfully built and pushed the following images for $APP:"
+          echo "$TAGS" | while IFS= read -r tag; do
+            echo "  - $tag"
+          done
+          echo ""
+          echo "Image digest: $DIGEST"
+
+          # Compressed size per platform, read from the registry. Attestation manifests are skipped.
+          first_tag=$(echo "$TAGS" | head -n1)
+          repo="${first_tag%:*}"
+          sizes=$(
+            raw=$(docker buildx imagetools inspect --raw "$repo@$DIGEST") || exit 0
+            if echo "$raw" | jq -e '.manifests' > /dev/null; then
+              echo "$raw" | jq -r '.manifests[] | select(.platform.os != "unknown")
+                | "\(.platform.os)/\(.platform.architecture)\(if .platform.variant then "/" + .platform.variant else "" end) \(.digest)"'
+            else
+              echo "single $DIGEST"
+            fi | while read -r platform digest; do
+              size=$(docker buildx imagetools inspect --raw "$repo@$digest" | jq '.config.size + ([.layers[].size] | add)') || size=""
+              echo "| $platform | $(numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "n/a") |"
+            done
+          ) || true
+
+          # Build duration and cache usage from the buildx build record.
+          build_info="n/a"
+          if history=$(docker buildx history inspect --builder "${BUILD_REF%%/*}" "${BUILD_REF##*/}" --format json 2>/dev/null); then
+            build_info=$(echo "$history" | jq -r '"\(.Duration / 1e9 | floor | "\(. / 60 | floor)m \(. % 60)s") · \(.NumCachedSteps)/\(.NumTotalSteps) steps cached"') || build_info="n/a"
+          fi
+
+          {
+            echo "### 📦 \`$APP\` \`v$APP_VERSION\`"
+            echo ""
+            echo "| Platform | Size (compressed) |"
+            echo "| :------- | ----------------: |"
+            echo "${sizes:-| n/a | n/a |}"
+            echo ""
+            echo "**Build:** $build_info"
+            echo ""
+            if [[ -n "$CACHE_FROM" ]]; then
+              echo "**Registry cache:** \`${CACHE_FROM#*ref=}\`"
+            else
+              echo "**Registry cache:** none"
+            fi
+            echo ""
+            echo "**Digest:** \`$DIGEST\`"
+            echo ""
+            echo "**Tags:**"
+            echo ""
+            echo "$TAGS" | sed '/^$/d; s/.*/- `&`/'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Dispatch GitOps updates for the whole release.
+  # Apps deploying to the same (target-repo, application) pair are batched into a single dispatch.
+  gitops:
+    name: GitOps Updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: build
+    # All-or-nothing: dispatch only when every image of this release was published.
+    if: needs.build.result == 'success' && inputs.gitops-config != ''
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Group GitOps deployments by target
+        id: gitops-config
+        env:
+          # CSV format: name,target-repo,dev-application,release-application[,image-name]
+          GITOPS_APP_CONFIG: ${{ inputs.gitops-config }}
+          RELEASES: ${{ inputs.releases }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          entries_file=$(mktemp)
+          resolved_file=$(mktemp)
+          echo "$RELEASES" | jq -c '.[]' > "$entries_file"
+
+          while read -r entry; do
+            app=$(echo "$entry" | jq -r '.name')
+            deployment_tag=$(echo "$entry" | jq -r '.version')
+            channel=$(echo "$entry" | jq -r '.channel // ""')
+            oci_image=$(echo "$entry" | jq -r '.oci.image')
+
+            # Columns were validated by the build job.
+            config_line=""
+            while IFS= read -r line; do
+              if [[ "$line" == "$app,"* ]]; then
+                config_line="$line"
+                break
+              fi
+            done <<< "$GITOPS_APP_CONFIG"
+
+            if [[ -z "$config_line" ]]; then
+              echo "::warning::No GitOps configuration for '$app'. Skipping GitOps deployment."
+              continue
+            fi
+
+            IFS=, read -r _ target_repo dev_app release_app image_name <<< "$config_line"
+            image_name="${image_name:-$oci_image}"
+
+            if [[ "$target_repo" != *"/"* ]]; then
+              target_repo="$REPOSITORY_OWNER/$target_repo"
+            fi
+
+            # Stable releases deploy to the release application, prereleases to the dev application
+            if [[ -z "$channel" ]]; then
+              deploy_app="$release_app"
+            else
+              deploy_app="$dev_app"
+            fi
+
+            jq -n -c --arg repo "$target_repo" --arg application "$deploy_app" --arg update "$image_name:$deployment_tag" \
+              '{targetRepo: $repo, application: $application, update: $update}' >> "$resolved_file"
+            echo "Collected $app -> $target_repo ($deploy_app): $image_name:$deployment_tag"
+          done < "$entries_file"
+
+          # Batch all updates targeting the same repository and application into one entry
+          groups=$(jq -s -c 'group_by(.targetRepo + "|" + .application)
+            | map({targetRepo: .[0].targetRepo, application: .[0].application, updates: (map(.update) | join(","))})' "$resolved_file")
+
+          target_resources=$(echo "$groups" | jq -r '[.[].targetRepo] | unique | map("repo:" + .) | join(" ")')
+
+          echo "groups=$groups" >> $GITHUB_OUTPUT
+          echo "target-resources=$target_resources" >> $GITHUB_OUTPUT
+          echo "has-groups=$(echo "$groups" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
+
+          echo "Deployment groups: $groups"
+
+      # One token covering every target repository; the dispatch loop cannot call an action per group.
+      - id: gitops-token
+        name: Exchange token for GitOps dispatch
+        if: steps.gitops-config.outputs.has-groups == 'true'
+        uses: abinnovision/actions@exchange-github-token-dev
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          resources: ${{ steps.gitops-config.outputs.target-resources }}
+          scope: contents:read actions:write
+
+      - name: Update GitOps deployments
+        if: steps.gitops-config.outputs.has-groups == 'true'
+        env:
+          GH_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          GITOPS_GROUPS: ${{ steps.gitops-config.outputs.groups }}
+          GITOPS_WORKFLOW_FILE: ${{ inputs.gitops-workflow-file }}
+        run: |
+          set -euo pipefail
+
+          groups_file=$(mktemp)
+          echo "$GITOPS_GROUPS" | jq -c '.[]' > "$groups_file"
+
+          while read -r group; do
+            target_repo=$(echo "$group" | jq -r '.targetRepo')
+            application=$(echo "$group" | jq -r '.application')
+            updates=$(echo "$group" | jq -r '.updates')
+
+            echo "Dispatching GitOps update to $target_repo for $application: $updates"
+
+            gh workflow run "$GITOPS_WORKFLOW_FILE" \
+              --repo "$target_repo" \
+              --field "application=$application" \
+              --field "updates=$updates"
+          done < "$groups_file"

@@ -1878,6 +1878,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"app-monorepo-stack@workspace:workflows/app-monorepo-stack":
+  version: 0.0.0-use.local
+  resolution: "app-monorepo-stack@workspace:workflows/app-monorepo-stack"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    exchange-github-token: "workspace:^"
+    prettier: "npm:^3.9.9"
+    release: "workspace:^"
+    setup-tools: "workspace:^"
+  languageName: unknown
+  linkType: soft
+
 "argparse@npm:^2.0.1":
   version: 2.0.1
   resolution: "argparse@npm:2.0.1"
@@ -2992,14 +3004,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"gitops-deploy@workspace:workflows/gitops-deploy":
+"gitops-stack@workspace:workflows/gitops-stack":
   version: 0.0.0-use.local
-  resolution: "gitops-deploy@workspace:workflows/gitops-deploy"
+  resolution: "gitops-stack@workspace:workflows/gitops-stack"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     prettier: "npm:^3.9.9"
+    run-repo-checks: "workspace:^"
     setup-k8s-tools: "workspace:^"
-    setup-node: "workspace:^"
     setup-oidc-token-cli: "workspace:^"
   languageName: unknown
   linkType: soft
@@ -3187,6 +3199,19 @@ __metadata:
   checksum: 10/c2412753f15695db369634ba70f50f5c0b7e5cb13b673d0826c411ec1bd9ddef08c1dad89ea154f57da2521d2605bd64308af748749b27d08c5f563bcd89975f
   languageName: node
   linkType: hard
+
+"iac-stack@workspace:workflows/iac-stack":
+  version: 0.0.0-use.local
+  resolution: "iac-stack@workspace:workflows/iac-stack"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    exchange-github-token: "workspace:^"
+    prettier: "npm:^3.9.9"
+    run-repo-checks: "workspace:^"
+    setup-gcp: "workspace:^"
+    setup-tools: "workspace:^"
+  languageName: unknown
+  linkType: soft
 
 "ignore@npm:^5.2.0":
   version: 5.3.2
@@ -3730,18 +3755,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"opentofu-stack@workspace:workflows/opentofu-stack":
-  version: 0.0.0-use.local
-  resolution: "opentofu-stack@workspace:workflows/opentofu-stack"
-  dependencies:
-    "@abinnovision/prettier-config": "npm:^2.2.0"
-    exchange-github-token: "workspace:^"
-    prettier: "npm:^3.9.9"
-    setup-gcp: "workspace:^"
-    setup-tools: "workspace:^"
-  languageName: unknown
-  linkType: soft
-
 "optionator@npm:^0.9.3":
   version: 0.9.4
   resolution: "optionator@npm:0.9.4"
@@ -3918,6 +3931,26 @@ __metadata:
   checksum: 10/97cd9f4a8a0d84e42ee91e106e5ba5edcb954521e8dbe26ee6ad31396e5c12cc2be5e5b6be7b53fa5a69959afbacd32719106e2d6f45802e34b31d9a3a01ec20
   languageName: node
   linkType: hard
+
+"publish-npm@workspace:workflows/publish-npm":
+  version: 0.0.0-use.local
+  resolution: "publish-npm@workspace:workflows/publish-npm"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    prettier: "npm:^3.9.9"
+  languageName: unknown
+  linkType: soft
+
+"publish-oci@workspace:workflows/publish-oci":
+  version: 0.0.0-use.local
+  resolution: "publish-oci@workspace:workflows/publish-oci"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    exchange-github-token: "workspace:^"
+    prettier: "npm:^3.9.9"
+    setup-gcp: "workspace:^"
+  languageName: unknown
+  linkType: soft
 
 "punycode@npm:^2.1.0":
   version: 2.3.1
@@ -4176,6 +4209,16 @@ __metadata:
     release-please: "patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch"
     semver: "npm:^7.8.5"
     typescript: "npm:^6.0.3"
+  languageName: unknown
+  linkType: soft
+
+"run-repo-checks@workspace:^, run-repo-checks@workspace:actions/run-repo-checks":
+  version: 0.0.0-use.local
+  resolution: "run-repo-checks@workspace:actions/run-repo-checks"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    prettier: "npm:^3.9.9"
+    setup-tools: "workspace:^"
   languageName: unknown
   linkType: soft
 

@@ -1,0 +1,144 @@
+# {{name}}
+
+Validates manifests and deploys ArgoCD applications.
+
+> For repository setup, see [GitOps Stack documentation](../../docs/gitops-stack/README.md).
+
+## Behavior
+
+| Job         | Runs on                                                           | Does                                                                                                                  |
+| :---------- | :---------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
+| `Configure` | Always                                                            | Resolves the mode (`pr`, `main` or none) and discovers applications in `applications-directory`                      |
+| `Check`     | Always                                                            | Repository baseline checks via [run-repo-checks](../../actions/run-repo-checks/README.md), without credentials       |
+| `Preview`   | Pull requests from the same repository, one job per application  | Validates manifests and posts the ArgoCD diff as a PR comment                                                        |
+| `Deploy`    | Push to `default-branch`, one job per application                 | Validates manifests, triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health) |
+| `Status`    | Always                                                            | Single required status check, fails if any other job failed or was cancelled                                         |
+
+- Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to ArgoCD
+- `pull_request_target` is rejected
+- Application directory names must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
+- Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
+
+## Requirements
+
+- The repository has a `.tool-versions` file with `nodejs` and a `package.json` with a `check` script
+- The caller grants `contents: read`, `packages: read`, `id-token: write`, `pull-requests: write` and `deployments: write`
+- ArgoCD (or DEX) accepts the GitHub Actions OIDC token of `pull_request` and `push` runs, or an ArgoCD token is provided
+
+## Usage
+
+This is a `workflow_call` workflow, so it can't be triggered directly. Call it from a workflow triggered by
+`pull_request` and `push` (never `pull_request_target`).
+
+{{{usage-example type="workflow" name=name inputs=inputs secrets=secrets version=version}}}
+
+### Latest versions
+
+{{{version-examples type="workflow" name=name version=version}}}
+
+### Example Workflow File
+
+Complete, copyable caller workflow (`.github/workflows/ci.yaml`). The required status check is `CI / Status`.
+
+[//]: # "x-release-please-start-major"
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: $\{{ github.workflow }}-$\{{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: $\{{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+jobs:
+  ci:
+    name: CI
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@{{name}}-v{{version.major}}
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+      pull-requests: write
+      deployments: write
+    with:
+      argocd-server: $\{{ vars.ARGOCD_SERVER }}
+      auth-method: dex
+    secrets:
+      DEX_ENDPOINT: $\{{ vars.DEX_ENDPOINT }}
+      DEX_GITHUB_ACTIONS_CLIENT: $\{{ vars.DEX_GITHUB_ACTIONS_CLIENT }}
+      DEX_GITHUB_ACTIONS_CONNECTOR: $\{{ vars.DEX_GITHUB_ACTIONS_CONNECTOR }}
+```
+
+[//]: # "x-release-please-end"
+
+### Migrating from gitops-deploy
+
+- Replace the `gitops-deploy-v1` tag with `{{name}}-v{{version.major}}`
+- Switch the caller trigger from `pull_request_target` to `pull_request`
+- Make `CI / Status` the required status check
+- Add a `.tool-versions` file with `nodejs`
+- Pull request runs now authenticate with the OIDC identity of a `pull_request` event (subject
+  `repo:<owner>/<repo>:pull_request`). ArgoCD and DEX RBAC rules must accept it
+
+## Validation Tools
+
+| Tool          | Purpose           | Impact            |
+|---------------|-------------------|-------------------|
+| `kustomize`   | Build manifests   | Required          |
+| `kubeconform` | Schema validation | Blocks deployment |
+| `kube-score`  | Best practices    | Warning only      |
+
+## Advanced Configuration
+
+### Custom Validation Schema Locations
+
+```yaml
+with:
+kubeconform-schema-locations: |
+	default
+	https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/\{{.Group}}/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
+	https://storage.googleapis.com/my-company-crds/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
+```
+
+### Disable Specific Validations
+
+```yaml
+with:
+	enable-kubeconform: false
+	enable-kube-score: false
+```
+
+### Adjust Timeouts
+
+```yaml
+with:
+	sync-timeout: 300 # bounds only the immediate post-trigger error check, not the full sync
+```
+
+### Conditional Pruning
+
+`sync-prune` is a plain boolean input, so it can be set to any expression evaluated by the calling workflow:
+
+```yaml
+with:
+	sync-prune: $\{{ github.ref == 'refs/heads/main' }}
+```
+
+## Inputs
+
+{{> inputs-table inputs}}
+
+## Secrets
+
+{{> secrets-table secrets}}
+
+## Outputs
+
+{{> outputs-table outputs}}

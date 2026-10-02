@@ -148,19 +148,29 @@ on:
 
     outputs: {}
 
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  # Configure the workflow and discover applications
-  check:
-    name: Check
+  # Resolve the event, validate the configuration and discover applications
+  configure:
+    name: Configure
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     outputs:
       # Commit SHA to check out
-      commit-sha: ${{ steps.commit.outputs.commit_sha }}
+      commit-sha: ${{ steps.evaluate.outputs.commit_sha }}
 
-      # Event type flags
-      is-main-push: ${{ steps.event.outputs.is_main_push }}
-      is-pr: ${{ steps.event.outputs.is_pr }}
+      # Operation for this event: pr, main or none
+      mode: ${{ steps.evaluate.outputs.mode }}
+
+      # Whether credentialed jobs may run for this event
+      trusted: ${{ steps.evaluate.outputs.trusted }}
 
       # Application discovery outputs
       applications: ${{ steps.discover.outputs.applications }}
@@ -172,65 +182,74 @@ jobs:
       has-argocd-applications: ${{ fromJSON(steps.discover.outputs.argocd_applications)[0] != null }}
 
     steps:
-      # Determine commit SHA based on event type
-      - name: Evaluate commit
-        id: commit
+      - name: Evaluate
+        id: evaluate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ inputs.default-branch }}
+          PR_NUMBER: ${{ github.event.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
-            echo "PR is #${{ github.event.number }}..."
-            echo "PR Head SHA is ${{ github.event.pull_request.head.sha }}..."
-            echo "commit_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            echo "Merge group SHA is ${{ github.event.merge_group.head_sha }}..."
-            echo "commit_sha=${{ github.event.merge_group.head_sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "Head SHA is ${{ github.sha }}..."
-            echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          mode="none"
+          trusted="false"
+          commit_sha="$SHA"
+
+          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
+            echo "::error::'pull_request_target' is not supported by gitops-stack. Switch the caller to 'pull_request'."
+            exit 1
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            mode="pr"
+            commit_sha="$HEAD_SHA"
+            echo "PR is #$PR_NUMBER"
+
+            if [[ "$HEAD_REPOSITORY" == "$REPOSITORY" && "$ACTOR" != "dependabot[bot]" ]]; then
+              trusted="true"
+            else
+              echo "::notice::Pull requests from forks or Dependabot cannot authenticate to ArgoCD, skipping preview"
+            fi
+          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
+            trusted="true"
+            commit_sha="$MERGE_GROUP_HEAD_SHA"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            trusted="true"
+            if [[ "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
+              mode="main"
+            fi
           fi
 
-      # Determine event type
-      - name: Evaluate event type
-        id: event
-        run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/${{ inputs.default-branch }}" ]]; then
-            echo "is_main_push=true" >> $GITHUB_OUTPUT
-            echo "is_pr=false" >> $GITHUB_OUTPUT
-            echo "Event: Push to main branch"
-          elif [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
-            echo "is_main_push=false" >> $GITHUB_OUTPUT
-            echo "is_pr=true" >> $GITHUB_OUTPUT
-            echo "Event: Pull request"
-          else
-            echo "is_main_push=false" >> $GITHUB_OUTPUT
-            echo "is_pr=false" >> $GITHUB_OUTPUT
-            echo "Event: Other (no deployment)"
-          fi
+          echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
 
-      # Security check for fork PRs
-      - name: Security check for pull requests from forks
-        if: steps.event.outputs.is_pr == 'true'
-        run: |
-          if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
-            echo "::warning::Pull request from fork detected"
-            echo "Fork repository: ${{ github.event.pull_request.head.repo.full_name }}"
-            echo "Base repository: ${{ github.repository }}"
-            echo "::notice::Diff preview will be shown but deployment permissions may be limited"
-          fi
+          echo "Event: $EVENT_NAME"
+          echo "Commit: $commit_sha"
+          echo "Mode: $mode"
+          echo "Trusted: $trusted"
 
-      # Checkout repository
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ steps.commit.outputs.commit_sha }}
+          ref: ${{ steps.evaluate.outputs.commit_sha }}
 
       # Discover applications using .argocd-app marker files
       - name: Discover applications
         id: discover
+        env:
+          INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
         run: |
           set -euo pipefail
 
-          applications_dir="${{ inputs.applications-directory }}"
+          applications_dir="$INPUT_APPLICATIONS_DIRECTORY"
+
+          # Application names flow into job names, paths and shell variables of later jobs
+          name_pattern='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 
           # Validate directory exists
           if [[ ! -d "$applications_dir" ]]; then
@@ -248,6 +267,12 @@ jobs:
           for dir in "$applications_dir"/*; do
             if [[ -d "$dir" ]]; then
               app_name="$(basename "$dir")"
+
+              if [[ ! "$app_name" =~ $name_pattern ]]; then
+                printf '::error::Invalid application directory name %q, names must match %s\n' "$app_name" "$name_pattern"
+                exit 1
+              fi
+
               applications+=("$app_name")
 
               # Check for ArgoCD application marker
@@ -273,22 +298,26 @@ jobs:
           echo "::notice::Found ${#applications[@]} total applications"
           echo "::notice::Found ${#argocd_applications[@]} ArgoCD applications"
 
-      - name: Setup Node.js
-        uses: abinnovision/actions@setup-node-dev
-      - name: Install dependencies
-        run: |
-          yarn install --immutable
-      - name: Run checks
-        run: |
-          yarn check
-      - name: Check dependencies
-        run: |
-          if yarn dedupe --check; then
-            echo "::notice::Dependencies are consistent"
-          else
-            echo "::error::yarn.lock is not up to date - run 'yarn dedupe'"
-            exit 1
-          fi
+  # Repository baseline checks without credentials
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - configure
+    permissions:
+      contents: read
+      # Private GitHub Package Registry dependencies during install.
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          persist-credentials: false
+
+      - name: Check
+        uses: abinnovision/actions@run-repo-checks-dev
 
   # Preview changes for pull requests
   preview:
@@ -296,12 +325,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
-      - check
-    if: needs.check.outputs.is-pr == 'true' && needs.check.outputs.has-argocd-applications == 'true'
+      - configure
+    if: needs.configure.outputs.mode == 'pr' && needs.configure.outputs.trusted == 'true' && needs.configure.outputs.has-argocd-applications == 'true'
     strategy:
       fail-fast: false
       matrix:
-        application: ${{ fromJSON(needs.check.outputs.argocd-applications) }}
+        application: ${{ fromJSON(needs.configure.outputs.argocd-applications) }}
     permissions:
       contents: read
       id-token: write
@@ -310,7 +339,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.check.outputs.commit-sha }}
+          ref: ${{ needs.configure.outputs.commit-sha }}
 
       - name: Setup k8s tools
         uses: abinnovision/actions@setup-k8s-tools-dev
@@ -324,11 +353,17 @@ jobs:
       - &validate-application
         name: Validate application
         id: validate
+        env:
+          APPLICATION: ${{ matrix.application }}
+          INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
+          INPUT_ENABLE_KUBECONFORM: ${{ inputs.enable-kubeconform }}
+          INPUT_ENABLE_KUBE_SCORE: ${{ inputs.enable-kube-score }}
+          INPUT_KUBECONFORM_SCHEMA_LOCATIONS: ${{ inputs.kubeconform-schema-locations }}
         run: |
           set -euo pipefail
 
-          application="${{ matrix.application }}"
-          working_dir="${{ inputs.applications-directory }}"
+          application="$APPLICATION"
+          working_dir="$INPUT_APPLICATIONS_DIRECTORY"
           app_path="$working_dir/$application"
 
           echo "::group::Validating application: $application"
@@ -354,7 +389,7 @@ jobs:
           validation_failed=0
 
           # kubeconform (critical)
-          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+          if [[ "$INPUT_ENABLE_KUBECONFORM" == "true" ]]; then
             (
               echo "=== kubeconform validation ===" > "$manifests_dir/__kubeconform.log"
 
@@ -363,7 +398,7 @@ jobs:
               while IFS= read -r location; do
                 [[ -z "$location" ]] && continue
                 schema_args="$schema_args -schema-location $location"
-              done <<< "${{ inputs.kubeconform-schema-locations }}"
+              done <<< "$INPUT_KUBECONFORM_SCHEMA_LOCATIONS"
 
               if kubeconform -strict $schema_args -summary "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kubeconform.log" 2>&1; then
                 echo "KUBECONFORM_SUCCESS" > "$manifests_dir/.kubeconform-status"
@@ -375,7 +410,7 @@ jobs:
           fi
 
           # kube-score (warnings only)
-          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+          if [[ "$INPUT_ENABLE_KUBE_SCORE" == "true" ]]; then
             (
               echo "=== kube-score validation ===" > "$manifests_dir/__kube-score.log"
               if kube-score score "$manifests_dir/manifests.yaml" >> "$manifests_dir/__kube-score.log" 2>&1; then
@@ -392,7 +427,7 @@ jobs:
           [[ -n "${KUBE_SCORE_PID:-}" ]] && wait $KUBE_SCORE_PID
 
           # Evaluate results
-          if [[ "${{ inputs.enable-kubeconform }}" == "true" ]]; then
+          if [[ "$INPUT_ENABLE_KUBECONFORM" == "true" ]]; then
             if [[ -f "$manifests_dir/.kubeconform-status" ]]; then
               kubeconform_status=$(cat "$manifests_dir/.kubeconform-status")
             else
@@ -409,7 +444,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.enable-kube-score }}" == "true" ]]; then
+          if [[ "$INPUT_ENABLE_KUBE_SCORE" == "true" ]]; then
             if [[ -f "$manifests_dir/.kube-score-status" ]]; then
               kube_score_status=$(cat "$manifests_dir/.kube-score-status")
             else
@@ -446,8 +481,11 @@ jobs:
 
       - name: Read ArgoCD application name
         id: argocd-app
+        env:
+          APPLICATION: ${{ matrix.application }}
+          INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
         run: |
-          argocd_app_file="${{ inputs.applications-directory }}/${{ matrix.application }}/.argocd-app"
+          argocd_app_file="$INPUT_APPLICATIONS_DIRECTORY/$APPLICATION/.argocd-app"
 
           if [[ ! -f "$argocd_app_file" ]]; then
             echo "::error::ArgoCD application file not found: $argocd_app_file"
@@ -518,8 +556,11 @@ jobs:
         name: Authenticate with ArgoCD (Token)
         if: inputs.auth-method == 'token'
         id: auth-token
+        env:
+          ARGOCD_SERVER: ${{ inputs.argocd-server }}
+          ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
         run: |
-          ARGOCD_CLI_ARGS="--grpc-web --server ${{ inputs.argocd-server }} --auth-token ${{ secrets.ARGOCD_TOKEN }}"
+          ARGOCD_CLI_ARGS="--grpc-web --server $ARGOCD_SERVER --auth-token $ARGOCD_TOKEN"
           echo "::add-mask::$ARGOCD_CLI_ARGS"
 
           echo "argocd_cli_args=$ARGOCD_CLI_ARGS" >> $GITHUB_OUTPUT
@@ -529,7 +570,7 @@ jobs:
       - name: Perform ArgoCD diff
         id: argocd-diff
         env:
-          REVISION: ${{ needs.check.outputs.commit-sha }}
+          REVISION: ${{ needs.configure.outputs.commit-sha }}
           ARGOCD_APP: ${{ steps.argocd-app.outputs.application_name }}
         run: |
           set +e  # Don't exit on non-zero
@@ -587,12 +628,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
-      - check
-    if: needs.check.outputs.is-main-push == 'true' && needs.check.outputs.has-argocd-applications == 'true'
+      - configure
+    if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.trusted == 'true' && needs.configure.outputs.has-argocd-applications == 'true'
     strategy:
       fail-fast: false
       matrix:
-        application: ${{ fromJSON(needs.check.outputs.argocd-applications) }}
+        application: ${{ fromJSON(needs.configure.outputs.argocd-applications) }}
     concurrency:
       group: deploy-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: false
@@ -604,7 +645,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.check.outputs.commit-sha }}
+          ref: ${{ needs.configure.outputs.commit-sha }}
 
       - name: Setup k8s tools
         uses: abinnovision/actions@setup-k8s-tools-dev
@@ -629,8 +670,11 @@ jobs:
 
       - name: Read ArgoCD application name
         id: argocd-app
+        env:
+          APPLICATION: ${{ matrix.application }}
+          INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
         run: |
-          argocd_app_file="${{ inputs.applications-directory }}/${{ matrix.application }}/.argocd-app"
+          argocd_app_file="$INPUT_APPLICATIONS_DIRECTORY/$APPLICATION/.argocd-app"
 
           if [[ ! -f "$argocd_app_file" ]]; then
             echo "::error::ArgoCD application file not found: $argocd_app_file"
@@ -656,6 +700,7 @@ jobs:
         id: check-sync
         env:
           ARGOCD_APP: ${{ steps.argocd-app.outputs.application_name }}
+          INPUT_SKIP_IF_SYNCED: ${{ inputs.skip-if-synced }}
         run: |
           set -euo pipefail
 
@@ -669,7 +714,7 @@ jobs:
           echo "  Health Status: $health_status"
           echo "  Sync Revision: $sync_revision"
 
-          if [[ "${{ inputs.skip-if-synced }}" == "true" && "$sync_status" == "Synced" ]]; then
+          if [[ "$INPUT_SKIP_IF_SYNCED" == "true" && "$sync_status" == "Synced" ]]; then
             echo "::notice::Application is already in sync - skipping deployment"
             echo "sync_required=false" >> $GITHUB_OUTPUT
           else
@@ -694,12 +739,19 @@ jobs:
         if: steps.check-sync.outputs.sync_required == 'true'
         env:
           ARGOCD_APP: ${{ steps.argocd-app.outputs.application_name }}
+          INPUT_SYNC_PRUNE: ${{ inputs.sync-prune }}
+          INPUT_SYNC_TIMEOUT: ${{ inputs.sync-timeout }}
         run: |
           set -euo pipefail
 
           echo "::group::Syncing ArgoCD application: $ARGOCD_APP"
 
-          if ! argocd $ARGOCD_CLI_ARGS app sync $ARGOCD_APP --async${{ inputs.sync-prune && ' --prune' || '' }}; then
+          sync_args=(--async)
+          if [[ "$INPUT_SYNC_PRUNE" == "true" ]]; then
+            sync_args+=(--prune)
+          fi
+
+          if ! argocd $ARGOCD_CLI_ARGS app sync $ARGOCD_APP "${sync_args[@]}"; then
             echo "::error::Failed to trigger sync operation"
             echo "status=failure" >> $GITHUB_OUTPUT
             exit 1
@@ -708,7 +760,7 @@ jobs:
           echo "::notice::Sync operation triggered"
 
           # Bounded wait for the sync operation only (not health) to catch immediate errors
-          argocd $ARGOCD_CLI_ARGS app wait $ARGOCD_APP --operation --timeout ${{ inputs.sync-timeout }} || true
+          argocd $ARGOCD_CLI_ARGS app wait $ARGOCD_APP --operation --timeout "$INPUT_SYNC_TIMEOUT" || true
 
           operation_status=$(argocd $ARGOCD_CLI_ARGS app get $ARGOCD_APP -o json)
           operation_phase=$(echo "$operation_status" | jq -r '.status.operationState.phase // "Unknown"')
@@ -756,44 +808,15 @@ jobs:
           description: Application deployment failed
 
   # Workflow status consolidation
-  workflow-status:
-    name: Workflow Status
+  # Single required status check for rulesets.
+  status:
+    name: Status
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs:
-      - check
-      - preview
-      - deploy
+    timeout-minutes: 2
+    needs: [configure, check, preview, deploy]
     if: always()
+    permissions: {}
     steps:
-      - name: Evaluate workflow status
-        run: |
-          check_result="${{ needs.check.result }}"
-          preview_result="${{ needs.preview.result }}"
-          deploy_result="${{ needs.deploy.result }}"
-
-          overall_success=true
-
-          # Check job (app discovery + code checks) must succeed
-          if [[ "$check_result" == "failure" ]]; then
-            echo "::error::Check failed (app discovery or code checks)"
-            overall_success=false
-          fi
-
-          # For PRs, preview failures are critical
-          if [[ "${{ needs.check.outputs.is-pr }}" == "true" && "$preview_result" == "failure" ]]; then
-            echo "::error::Preview failed on PR"
-            overall_success=false
-          fi
-
-          # For main branch, deployment must succeed
-          if [[ "${{ needs.check.outputs.is-main-push }}" == "true" && "$deploy_result" == "failure" ]]; then
-            echo "::error::Deployment failed on main branch"
-            overall_success=false
-          fi
-
-          if [[ "$overall_success" == "false" ]]; then
-            exit 1
-          fi
-
-          echo "::notice::Workflow completed successfully"
+      - name: Evaluate status
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
