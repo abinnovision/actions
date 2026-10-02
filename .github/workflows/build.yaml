@@ -80,8 +80,10 @@ jobs:
     needs:
       - configure
       - check_build
-    uses: abinnovision/workflows/.github/workflows/release-v2.yaml@main
-    secrets: inherit
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-dev
+    permissions:
+      contents: read
+      id-token: write
     # Only run on push to "main" branch.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -93,39 +95,20 @@ jobs:
       - release
     if: github.ref == 'refs/heads/main'
     permissions:
-      contents: "write"
-      id-token: "write"
+      contents: read
+      id-token: write
     steps:
-      - id: gh-app-token
-        name: "Generate GitHub App Token"
-        uses: actions/create-github-app-token@v3
+      - id: token
+        name: Generate GitHub App token
+        uses: abinnovision/actions@exchange-github-token-dev
         with:
-          app-id: ${{ secrets.APP_RELASER_CUSTOM_ID }}
-          private-key: ${{ secrets.APP_RELASER_CUSTOM_PK }}
-          permission-contents: "write"
-          permission-issues: "write"
-          permission-pull-requests: "write"
-          permission-workflows: "write"
-          permission-actions: "write"
-      - id: gh-app-details
-        name: "Get GitHub App Details"
-        env:
-          GH_TOKEN: ${{ steps.gh-app-token.outputs.token }}
-        shell: bash
-        run: |
-          # Fetch the id of the bot user.
-          response=$(gh api "/users/${{ steps.gh-app-token.outputs.app-slug }}[bot]") >> "$GITHUB_OUTPUT"
-
-          # Extract the id of the bot user.
-          user_id=$(echo "$response" | jq -cr ".id")
-
-          echo "committer-email=${{ steps.gh-app-token.outputs.app-slug }}[bot] <$user_id+${{ steps.gh-app-token.outputs.app-slug }}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
-          echo "committer-name=${{ steps.gh-app-token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
+          broker-url: ${{ vars.TOKEN_BROKER_URL }}
+          scope: contents:write workflows:write
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
-          token: ${{ steps.gh-app-token.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
       - name: Setup Node
         uses: abinnovision/actions@setup-node-dev
       - name: Install dependencies
@@ -134,11 +117,13 @@ jobs:
         run: yarn run build
       - name: Publish
         shell: bash
+        env:
+          VERSIONS: ${{ needs.release.outputs.versions }}
         run: |
           set -euo pipefail
 
-          git config --global user.name "${{ steps.gh-app-details.outputs.committer-name }}"
-          git config --global user.email "${{ steps.gh-app-details.outputs.committer-email }}"
+          git config --global user.name "${{ steps.token.outputs.committer-name }}"
+          git config --global user.email "${{ steps.token.outputs.committer-email }}"
 
           WORKSPACE="${{ github.workspace }}"
           PACK_DIR="/opt/temporary/packs"
@@ -147,7 +132,7 @@ jobs:
           # Shared object database for the whole run. Every item becomes an orphan
           # commit in here and all refs go out in a single push at the end.
           git init -q -b main "$SCRATCH"
-          git --git-dir="$SCRATCH/.git" remote add origin https://x-access-token:${{ steps.gh-app-token.outputs.token }}@github.com/$GITHUB_REPOSITORY
+          git --git-dir="$SCRATCH/.git" remote add origin https://x-access-token:${{ steps.token.outputs.token }}@github.com/$GITHUB_REPOSITORY
 
           # Runs git against the shared object database.
           pgit() {
@@ -271,7 +256,7 @@ jobs:
           }
 
           # Phase 1: Stage releases (if any were created)
-          if [[ "${{ needs.release.outputs.releases-created }}" == "true" ]]; then
+          if [[ -n "$VERSIONS" && "$VERSIONS" != "{}" ]]; then
             echo "==> Staging versioned releases..."
             while read -r path; do
               [[ -n "$path" ]] || continue
@@ -281,7 +266,7 @@ jobs:
                 continue
               fi
               stage_item "$path" "release"
-            done <<< "$(echo '${{ needs.release.outputs.paths-released }}' | jq -cr '.[]')"
+            done <<< "$(echo "$VERSIONS" | jq -r 'keys[]')"
           else
             echo "==> No releases created, skipping versioned publishing"
           fi
