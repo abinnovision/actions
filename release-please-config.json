@@ -14,6 +14,9 @@
 		"actions/run-release-please": {
 			"extra-files": ["README.md"]
 		},
+		"actions/run-repo-checks": {
+			"extra-files": ["README.md"]
+		},
 		"actions/setup-gcp": {
 			"extra-files": ["README.md"]
 		},
@@ -35,16 +38,25 @@
 		"workflows/release": {
 			"extra-files": ["README.md"]
 		},
-		"workflows/gitops-deploy": {
+		"workflows/app-monorepo-stack": {
+			"extra-files": ["README.md"]
+		},
+		"workflows/gitops-stack": {
 			"extra-files": ["README.md"]
 		},
 		"workflows/gitops-update-tags": {
 			"extra-files": ["README.md"]
 		},
-		"workflows/opentofu-stack": {
+		"workflows/iac-stack": {
 			"extra-files": ["README.md"]
 		},
 		"workflows/polyglot-monorepo-stack": {
+			"extra-files": ["README.md"]
+		},
+		"workflows/publish-npm": {
+			"extra-files": ["README.md"]
+		},
+		"workflows/publish-oci": {
 			"extra-files": ["README.md"]
 		},
 		"packages/action-tool-installer": {}
