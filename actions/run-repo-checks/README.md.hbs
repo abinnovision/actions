@@ -1,0 +1,22 @@
+# {{name}}
+
+{{description}}
+
+## Steps
+
+1. `Setup Tools`: installs the tools from `.tool-versions` with [setup-tools](../setup-tools/README.md)
+2. `Install dependencies`: runs `install-command`
+3. `Check dependencies`: runs `yarn dedupe --check`
+4. `Check`: runs `check-command`
+
+## Usage
+
+{{{usage-example type="action" name=name inputs=inputs version=version}}}
+
+## Latest versions
+
+{{{version-examples type="action" name=name version=version}}}
+
+## Inputs
+
+{{> inputs-table inputs}}
