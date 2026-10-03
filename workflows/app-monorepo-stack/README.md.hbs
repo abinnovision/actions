@@ -11,7 +11,7 @@ the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish
 | Job         | Runs                                                       | Does                                                                                                                            |
 | :---------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
 | `Configure` | Always                                                     | Resolves the commit, mode and trust level, validates the Makefile, resolves the units, discovers test types                     |
-| `Check`     | Always                                                     | `install-immutable`, dependency checks, `check`, `build` and unit tests; on push to `default-branch` also packs the dist units |
+| `Check`     | Always                                                     | `install-immutable`, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also packs the dist units |
 | `Test`      | One job per test type not already covered by `Check`       | `install-immutable`, `build` and `test-<type>`                                                                                  |
 | `Pack`      | Push to `default-branch`, in parallel with `Check`         | Prunes the source units into the source payload                                                                                 |
 | `Release`   | Push to `default-branch`, after `Check`, `Test` and `Pack` | Runs release-please, which creates or lands release PRs and creates the releases, then writes the `releases` list               |
@@ -21,9 +21,8 @@ the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish
 - Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 - Unit tests run inside `Check` by default, which avoids a second install and build. Set
   `run-unit-tests-in-build: false` to move them into the `Test` matrix
-- If your linter or formatter config lives in a workspace package that has to be compiled first, set
-  `run-build-before-check: true`. The order then becomes install, dependency check, build, check,
-  unit tests
+- `Check` builds before it checks, so linter and formatter config that lives in a compiled workspace
+  package is always available
 
 ## Usage
 
@@ -100,7 +99,7 @@ jobs:
 
 The resulting check contexts are `CI / Configure`, `CI / Check`, `CI / Test / <type>`,
 `CI / Release`, `CI / Pack` and `CI / Status`. Require `CI / Status` and
-`Commitlint` in your rulesets.
+`Lint commits` in your rulesets.
 
 The workflow takes no secrets. To read other private repositories during checkout, use
 [`checkout-token-resources`](#checking-out-other-repositories).
@@ -288,7 +287,7 @@ Package Registry dependencies use the job `GITHUB_TOKEN` and are unaffected.
 - Rename the caller to `.github/workflows/ci.yaml` with `name: CI`, trigger it on `pull_request`
   and `push`, and follow the [example](#example-workflow-file). `pull_request_target` now fails in
   `Configure`.
-- The required status check becomes `CI / Status` (plus `Commitlint`).
+- The required status check becomes `CI / Status` (plus `Lint commits`).
 - Publishing moved to separate workflows that the caller wires to this workflow's `releases` output.
   Images keep the name `app-<name>` when `publish-oci` is called with `image: app-{name}`.
 
