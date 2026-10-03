@@ -212,7 +212,7 @@ dist unit.
 
 ### Failure model
 
-The stack fails hard: a failing `yarn pack` fails `Check`, a failing prune fails `Pack`, and `Release` needs both, so
+The stack fails hard: a failing `yarn pack` or prune fails `Check`, and `Release` needs it, so
 nothing is released when a payload could not be produced. Publish jobs only need `needs: ci`: they run after a
 successful stack and skip when the list is empty.
 
