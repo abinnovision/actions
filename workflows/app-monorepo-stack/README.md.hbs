@@ -99,7 +99,7 @@ jobs:
 
 The resulting check contexts are `CI / Configure`, `CI / Check`, `CI / Test / <type>`,
 `CI / Release`, `CI / Pack` and `CI / Status`. Require `CI / Status` and
-`Commitlint` in your rulesets.
+`Lint commits` in your rulesets.
 
 The workflow takes no secrets. To read other private repositories during checkout, use
 [`checkout-token-resources`](#checking-out-other-repositories).
@@ -287,7 +287,7 @@ Package Registry dependencies use the job `GITHUB_TOKEN` and are unaffected.
 - Rename the caller to `.github/workflows/ci.yaml` with `name: CI`, trigger it on `pull_request`
   and `push`, and follow the [example](#example-workflow-file). `pull_request_target` now fails in
   `Configure`.
-- The required status check becomes `CI / Status` (plus `Commitlint`).
+- The required status check becomes `CI / Status` (plus `Lint commits`).
 - Publishing moved to separate workflows that the caller wires to this workflow's `releases` output.
   Images keep the name `app-<name>` when `publish-oci` is called with `image: app-{name}`.
 

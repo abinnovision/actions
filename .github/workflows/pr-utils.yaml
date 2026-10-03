@@ -8,8 +8,8 @@ on:
       - main
 
 jobs:
-  commitlint:
-    name: Commitlint
+  lint-commits:
+    name: Lint commits
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:

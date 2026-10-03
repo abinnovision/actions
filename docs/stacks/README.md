@@ -92,11 +92,15 @@ fixed. The workflow `name:` never appears in check contexts.
 | :------------- | :----------------- | :----------------- | :------------------------------------------------------------------------------------------------------- |
 | Stack call     | `ci`               | `CI`               | `CI / Configure`, `CI / Check`, `CI / Status` and the lanes, for example `CI / Test / <type>`            |
 | Publisher call | `publish-<target>` | `Publish <Target>` | `Publish OCI / Prepare`, `Publish OCI / Build / <name>`, `Publish OCI / GitOps`, `Publish npm / Publish` |
-| Commit lint    | `commitlint`       | `Commitlint`       | `Commitlint`                                                                                             |
+| Commit lint    | `lint-commits`     | `Lint commits`     | `Lint commits`                                                                                           |
 
 - The job id is the kebab form of the job name. For publishers it equals the name of the called workflow: job
   `publish-oci` calls `publish-oci`.
 - `<Target>` is written the way its ecosystem writes it: `npm`, `OCI`.
+- Job names describe what is verified, not the tool that verifies it: `Check`, `Test`, `Lint commits`. Tool names
+  belong in action names (`run-commitlint`, `run-release-please`). A publish target is the subject itself, so
+  `Publish OCI` and `Publish npm` are fine.
+- Utility jobs in `pr-utils.yaml` are named verb plus subject in sentence case.
 - Inputs and outputs are kebab-case (`token-broker-url`, `releases`), secrets are upper snake case
   (`APP_IMAGE_SECRETS`), placeholders use braces (`{name}`, `{path}`).
 
@@ -118,7 +122,7 @@ fixed. The workflow `name:` never appears in check contexts.
 Rulesets require exactly two contexts, independent of the kind:
 
 - `CI / Status`
-- `Commitlint`
+- `Lint commits`
 
 ### Repository checks
 
