@@ -70,7 +70,7 @@ The name tells the family of the workflow:
 | Publisher | `publish-<target>`       | `publish-oci`, `publish-npm`                      | `<target>` is the artifact or registry type, not a vendor product name when a generic term exists |
 | Helper    | `<kind>-<verb>-<object>` | `gitops-update-tags`                              | Dispatched by other workflows, never called from `ci.yaml`                                        |
 
-Composite actions follow `actions/<verb>-<object>` (`run-repo-checks`, `exchange-github-token`, `setup-tools`) with the
+Composite actions follow `actions/<verb>-<object>` (`run-commitlint`, `exchange-github-token`, `setup-tools`) with the
 same tag scheme.
 
 ### Caller files
@@ -126,9 +126,9 @@ Rulesets require exactly two contexts, independent of the kind:
 
 ### Repository checks
 
-`Check` runs the same baseline in every stack through
-[run-repo-checks](../../actions/run-repo-checks/README.md): tool setup from `.tool-versions`, `yarn install --immutable`,
-`yarn dedupe --check` and `yarn check`. Every repository therefore needs a `.tool-versions` with `nodejs` and a
+`Check` runs the same baseline in every stack: tool setup from `.tool-versions`, `yarn install --immutable`,
+`yarn dedupe --check` and `yarn check`. `app-monorepo-stack` installs through `make install-immutable`, also runs
+`turbo boundaries` and builds before `check`. Every repository therefore needs a `.tool-versions` with `nodejs` and a
 `check` script in its `package.json`.
 
 ## Conventions inside the workflows

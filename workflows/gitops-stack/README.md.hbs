@@ -9,7 +9,7 @@ Validates manifests and deploys ArgoCD applications.
 | Job         | Runs on                                                           | Does                                                                                                                  |
 | :---------- | :---------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
 | `Configure` | Always                                                            | Resolves the mode (`pr`, `main` or none) and discovers applications in `applications-directory`                      |
-| `Check`     | Always                                                            | Repository baseline checks via [run-repo-checks](../../actions/run-repo-checks/README.md), without credentials       |
+| `Check`     | Always                                                            | Repository baseline checks (install, dedupe, `check`), without credentials       |
 | `Preview`   | Pull requests from the same repository, one job per application  | Validates manifests and posts the ArgoCD diff as a PR comment                                                        |
 | `Deploy`    | Push to `default-branch`, one job per application                 | Validates manifests, triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health) |
 | `Status`    | Always                                                            | Single required status check, fails if any other job failed or was cancelled                                         |

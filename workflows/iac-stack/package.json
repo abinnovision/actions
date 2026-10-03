@@ -25,7 +25,6 @@
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
 		"exchange-github-token": "workspace:^",
-		"run-repo-checks": "workspace:^",
 		"setup-gcp": "workspace:^",
 		"setup-tools": "workspace:^"
 	},

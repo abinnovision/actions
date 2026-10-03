@@ -316,8 +316,14 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           persist-credentials: false
 
+      - name: Setup Tools
+        uses: abinnovision/actions@setup-tools-dev
+      - name: Install dependencies
+        run: yarn install --immutable
+      - name: Check dependencies
+        run: yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
       - name: Check
-        uses: abinnovision/actions@run-repo-checks-dev
+        run: yarn run check
 
   # Preview changes for pull requests
   preview:

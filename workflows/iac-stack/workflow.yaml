@@ -222,9 +222,14 @@ jobs:
         name: Checkout
         uses: actions/checkout@v6
 
-      # Sets up the tools from .tool-versions and runs the Node repo checks.
-      - name: Run repo checks
-        uses: abinnovision/actions@run-repo-checks-dev
+      - name: Setup Tools
+        uses: abinnovision/actions@setup-tools-dev
+      - name: Install dependencies
+        run: yarn install --immutable
+      - name: Check dependencies
+        run: yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
+      - name: Check
+        run: yarn run check
 
       - name: Check formatting
         run: tofu -chdir="$WORKING_DIR" fmt -check -recursive
