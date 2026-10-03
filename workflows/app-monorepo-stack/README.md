@@ -8,14 +8,13 @@ the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish
 
 ## Behavior
 
-| Job         | Runs                                                       | Does                                                                                                                           |
-| :---------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
-| `Configure` | Always                                                     | Resolves the commit, mode and trust level, validates the Makefile, resolves the units, discovers test types                    |
-| `Check`     | Always                                                     | `install-immutable`, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also packs the dist units |
-| `Test`      | One job per test type not already covered by `Check`       | `install-immutable`, `build` and `test-<type>`                                                                                 |
-| `Pack`      | Push to `default-branch`, in parallel with `Check`         | Prunes the source units into the source payload                                                                                |
-| `Release`   | Push to `default-branch`, after `Check`, `Test` and `Pack` | Runs release-please, which creates or lands release PRs and creates the releases, then writes the `releases` list              |
-| `Status`    | Always                                                     | Single required status check, fails when any other job failed or was cancelled                                                 |
+| Job         | Runs                                                 | Does                                                                                                                                                       |
+| :---------- | :--------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure` | Always                                               | Resolves the commit, mode and trust level, validates the Makefile, resolves the units, discovers test types                                                |
+| `Check`     | Always                                               | `install-immutable`, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also prunes the source units and packs the dist units |
+| `Test`      | One job per test type not already covered by `Check` | `install-immutable`, `build` and `test-<type>`                                                                                                             |
+| `Release`   | Push to `default-branch`, after `Check` and `Test`   | Runs release-please, which creates or lands release PRs and creates the releases, then writes the `releases` list                                          |
+| `Status`    | Always                                               | Single required status check, fails when any other job failed or was cancelled                                                                             |
 
 - `pull_request_target` is rejected
 - Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
@@ -109,7 +108,7 @@ jobs:
 [//]: # "x-release-please-end"
 
 The resulting check contexts are `CI / Configure`, `CI / Check`, `CI / Test: <type>`,
-`CI / Release`, `CI / Pack` and `CI / Status`. Require `CI / Status` and
+`CI / Release` and `CI / Status`. Require `CI / Status` and
 `Lint commits` in your rulesets.
 
 The workflow takes no secrets. To read other private repositories during checkout, use
@@ -117,12 +116,12 @@ The workflow takes no secrets. To read other private repositories during checkou
 
 ## Triggers
 
-| Event                        | Runs                                       | Actions cache                                                      |
-| ---------------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
-| `pull_request`               | `Configure`, `Check`, `Test`               | Read/write in the PR scope, restores from the default branch       |
-| `merge_group`                | `Configure`, `Check`, `Test`               | Read/write in the queue scope, restores from the default branch    |
-| `push` to the default branch | everything, including `Pack` and `Release` | Read/write in the default branch scope, the cache PRs restore from |
-| `pull_request_target`        | Nothing, `Configure` fails                 |                                                                    |
+| Event                        | Runs                            | Actions cache                                                      |
+| ---------------------------- | ------------------------------- | ------------------------------------------------------------------ |
+| `pull_request`               | `Configure`, `Check`, `Test`    | Read/write in the PR scope, restores from the default branch       |
+| `merge_group`                | `Configure`, `Check`, `Test`    | Read/write in the queue scope, restores from the default branch    |
+| `push` to the default branch | everything, including `Release` | Read/write in the default branch scope, the cache PRs restore from |
+| `pull_request_target`        | Nothing, `Configure` fails      |                                                                    |
 
 Releasing and packing are gated inside the workflow on `push` to `default-branch`, so a pull request
 can never reach them.
@@ -236,7 +235,7 @@ where `*` matches exactly one path segment:
 
 | Input          | Default      | On push to `default-branch`                                             |
 | :------------- | :----------- | :---------------------------------------------------------------------- |
-| `source-units` | `apps/*`     | `Pack` runs `turbo prune --docker` per unit into the source payload     |
+| `source-units` | `apps/*`     | `Check` runs `turbo prune --docker` per unit into the source payload    |
 | `dist-units`   | `packages/*` | `Check` runs `yarn pack` per unit after its build into the dist payload |
 
 ```yaml

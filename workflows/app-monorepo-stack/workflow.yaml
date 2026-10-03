@@ -305,11 +305,12 @@ jobs:
           echo "Test types for matrix: $test_types_matrix_json"
 
   # Install, build and check. Builds first so linter config in compiled workspace packages is available.
-  # On push to the default branch it then packs the dist units into the dist payload.
+  # On push to the default branch it also prunes the source units into the source payload and packs the
+  # dist units into the dist payload.
   check:
     name: Check
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     needs:
       - configure
     permissions:
@@ -340,6 +341,44 @@ jobs:
           token: ${{ steps.checkout-token.outputs.token || github.token }}
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
+
+      # Runs before install and build so the pruned trees only contain tracked sources.
+      - name: Prune source units
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
+        env:
+          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
+        run: |
+          set -euo pipefail
+
+          # Get turbo version from package.json (required)
+          TURBO_VERSION=$(jq -r '.devDependencies.turbo // .dependencies.turbo // empty' package.json)
+
+          if [ -z "$TURBO_VERSION" ]; then
+            echo "::error::Turbo not found in package.json devDependencies or dependencies"
+            exit 1
+          fi
+
+          echo "Turbo version: $TURBO_VERSION"
+
+          mapfile -t units < <(jq -r '.[]' <<< "$SOURCE_UNITS")
+          for unit in "${units[@]}"; do
+            # Package name of the unit, used as the prune scope
+            scope=$(jq -r '.name // empty' "$unit/package.json")
+            if [[ -z "$scope" ]]; then
+              echo "::error::Package name not found in $unit/package.json"
+              exit 1
+            fi
+
+            # Outside the workspace so later check steps don't pick up the pruned trees.
+            echo "Running turbo prune for scope: $scope"
+            yarn dlx turbo@"$TURBO_VERSION" prune --scope="$scope" --docker --out-dir="$RUNNER_TEMP/out/${unit##*/}"
+          done
+
+          # Tracked source tree (including submodules) plus the pruned unit trees under out/.
+          git ls-files --recurse-submodules -z | tar --null -T - -cf "$RUNNER_TEMP/source.tar"
+          tar -rf "$RUNNER_TEMP/source.tar" -C "$RUNNER_TEMP" out
+          ls -lh "$RUNNER_TEMP/source.tar"
+
       - name: Install dependencies
         run: make install-immutable
       - name: Check dependencies
@@ -374,6 +413,17 @@ jobs:
         with:
           name: payload-dist
           path: ${{ runner.temp }}/dist
+          retention-days: 7
+          if-no-files-found: error
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+      - name: Upload source payload
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
+        uses: actions/upload-artifact@v7
+        with:
+          name: payload-source
+          path: ${{ runner.temp }}/source.tar
           retention-days: 7
           if-no-files-found: error
           # Allows re-running the job within the same workflow run.
@@ -422,7 +472,6 @@ jobs:
       - configure
       - check
       - test
-      - pack
     # Only on push to the default branch. always() prevents skipping when the test job is skipped.
     if: always() && !cancelled() && !contains(needs.*.result, 'failure') && needs.configure.outputs.mode == 'main'
     permissions:
@@ -481,76 +530,12 @@ jobs:
           echo "releases=$releases" >> "$GITHUB_OUTPUT"
           echo "Releases: $releases"
 
-  # Prune every source unit into the source payload, in parallel with check and test.
-  pack:
-    name: Pack
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs:
-      - configure
-    if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
-    permissions:
-      contents: read
-      packages: read
-      actions: write
-      id-token: write
-    steps:
-      - *checkout-token
-      - *checkout
-
-      - name: Setup Tools
-        uses: abinnovision/actions@setup-tools-dev
-
-      - name: Prune source units
-        env:
-          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
-        run: |
-          set -euo pipefail
-
-          # Get turbo version from package.json (required)
-          TURBO_VERSION=$(jq -r '.devDependencies.turbo // .dependencies.turbo // empty' package.json)
-
-          if [ -z "$TURBO_VERSION" ]; then
-            echo "::error::Turbo not found in package.json devDependencies or dependencies"
-            exit 1
-          fi
-
-          echo "Turbo version: $TURBO_VERSION"
-
-          mapfile -t units < <(jq -r '.[]' <<< "$SOURCE_UNITS")
-          for unit in "${units[@]}"; do
-            # Package name of the unit, used as the prune scope
-            scope=$(jq -r '.name // empty' "$unit/package.json")
-            if [[ -z "$scope" ]]; then
-              echo "::error::Package name not found in $unit/package.json"
-              exit 1
-            fi
-
-            echo "Running turbo prune for scope: $scope"
-            yarn dlx turbo@"$TURBO_VERSION" prune --scope="$scope" --docker --out-dir="out/${unit##*/}"
-          done
-
-          # Tracked source tree (including submodules) plus the pruned unit trees.
-          git ls-files --recurse-submodules -z | tar --null -T - -cf "$RUNNER_TEMP/source.tar"
-          tar -rf "$RUNNER_TEMP/source.tar" out
-          ls -lh "$RUNNER_TEMP/source.tar"
-
-      - name: Upload source payload
-        uses: actions/upload-artifact@v7
-        with:
-          name: payload-source
-          path: ${{ runner.temp }}/source.tar
-          retention-days: 7
-          if-no-files-found: error
-          # Allows re-running the job within the same workflow run.
-          overwrite: true
-
   # Single required status check for rulesets.
   status:
     name: Status
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [configure, check, test, pack, release]
+    needs: [configure, check, test, release]
     if: always()
     permissions: {}
     steps:
