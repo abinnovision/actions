@@ -433,7 +433,6 @@ jobs:
           overwrite: true
 
       - name: Wait for source payload
-        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
         wait: [upload-source]
 
   # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
