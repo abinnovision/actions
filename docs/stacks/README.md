@@ -213,7 +213,8 @@ dist unit.
 ### Failure model
 
 The stack fails hard: a failing `yarn pack` or prune fails `Check`, and `Release` needs it, so
-nothing is released when a payload could not be produced. Publish jobs only need `needs: ci`: they run after a
+nothing is released when a payload could not be produced. A payload artifact can exist for a failed run, since uploads
+overlap later steps; nothing references it. Publish jobs only need `needs: ci`: they run after a
 successful stack and skip when the list is empty.
 
 ### Evolution
