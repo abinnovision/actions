@@ -4050,7 +4050,7 @@ __metadata:
 
 "release-please@patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch":
   version: 17.2.1
-  resolution: "release-please@patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch::version=17.2.1&hash=697b58"
+  resolution: "release-please@patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch::version=17.2.1&hash=1ada33"
   dependencies:
     "@conventional-commits/parser": "npm:^0.4.1"
     "@google-automations/git-file-utils": "npm:^3.0.0"
@@ -4085,7 +4085,7 @@ __metadata:
     yargs: "npm:^17.0.0"
   bin:
     release-please: build/src/bin/release-please.js
-  checksum: 10/a23abab461c7e9f6ef81b17f2eaa4e3ca90d78dbd880568252686e0f0c3575af85e9363e2f1f7c40ef4460de4b97befc1871b94293ce87f7c25219b8589b80b7
+  checksum: 10/d6828917893ded53b7989646595f2cb9dde157363fa419f2d3bf6c91edee765731a8a021abde9c051a975b6919c612fc2a6e97f138866442989537c0f8372668
   languageName: node
   linkType: hard
 

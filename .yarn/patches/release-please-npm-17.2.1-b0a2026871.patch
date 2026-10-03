@@ -27,6 +27,28 @@ index db31d247db8a017ff3200e51c936628e68817bde..ecbfa227d30489ab51a397d45719d1ec
          // backfill latest release tags from manifest
          for (const path in this.repositoryConfig) {
              const latestRelease = releasesByPath[path];
+diff --git a/build/src/util/pull-request-body.js b/build/src/util/pull-request-body.js
+index 420d0818a92e0e940c6e6603974fbfd7516c8fa1..ba850b02410e7d6ad0380eb1eb5af63b8304975c 100644
+--- a/build/src/util/pull-request-body.js
++++ b/build/src/util/pull-request-body.js
+@@ -104,7 +104,7 @@ function extractMultipleReleases(notes, logger) {
+         const match = summary.match(SUMMARY_PATTERN);
+         if (match === null || match === void 0 ? void 0 : match.groups) {
+             detail.removeChild(summaryNode);
+-            const notes = detail.textContent.trim();
++            const notes = detail.rawText.trim();
+             data.push({
+                 component: match.groups.component,
+                 version: version_1.Version.parse(match.groups.version),
+@@ -118,7 +118,7 @@ function extractMultipleReleases(notes, logger) {
+                 continue;
+             }
+             detail.removeChild(summaryNode);
+-            const notes = detail.textContent.trim();
++            const notes = detail.rawText.trim();
+             data.push({
+                 version: version_1.Version.parse(componentlessMatch.groups.version),
+                 notes,
 diff --git a/package.json b/package.json
 index 5785aaaf94842ec5f6ba66086acf3abd7d8ebcf6..546a8afc97a636f145754b24281491828268e32e 100644
 --- a/package.json
