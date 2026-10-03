@@ -3010,9 +3010,9 @@ __metadata:
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     prettier: "npm:^3.9.9"
-    run-repo-checks: "workspace:^"
     setup-k8s-tools: "workspace:^"
     setup-oidc-token-cli: "workspace:^"
+    setup-tools: "workspace:^"
   languageName: unknown
   linkType: soft
 
@@ -3207,7 +3207,6 @@ __metadata:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     exchange-github-token: "workspace:^"
     prettier: "npm:^3.9.9"
-    run-repo-checks: "workspace:^"
     setup-gcp: "workspace:^"
     setup-tools: "workspace:^"
   languageName: unknown
@@ -4209,16 +4208,6 @@ __metadata:
     release-please: "patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch"
     semver: "npm:^7.8.5"
     typescript: "npm:^6.0.3"
-  languageName: unknown
-  linkType: soft
-
-"run-repo-checks@workspace:^, run-repo-checks@workspace:actions/run-repo-checks":
-  version: 0.0.0-use.local
-  resolution: "run-repo-checks@workspace:actions/run-repo-checks"
-  dependencies:
-    "@abinnovision/prettier-config": "npm:^2.2.0"
-    prettier: "npm:^3.9.9"
-    setup-tools: "workspace:^"
   languageName: unknown
   linkType: soft
 
