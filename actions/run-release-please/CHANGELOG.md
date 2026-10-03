@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.4...run-release-please-source-v1.2.0) (2026-10-03)
+
+
+### Features
+
+* **run-release-please:** always update release PRs on each run ([#587](https://github.com/abinnovision/actions/issues/587)) ([3a2c5ed](https://github.com/abinnovision/actions/commit/3a2c5ed952398658b3103298541f4f2a91f8f819))
+
 ## [1.1.4](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.3...run-release-please-source-v1.1.4) (2026-05-11)
 
 
