@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.7](https://github.com/abinnovision/actions/compare/release-source-v2.1.6...release-source-v2.1.7) (2026-10-03)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-release-please bumped to 1.2.0
+
 ## [2.1.6](https://github.com/abinnovision/actions/compare/release-source-v2.1.5...release-source-v2.1.6) (2026-10-01)
 
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.6.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.5.0...polyglot-monorepo-stack-source-v2.6.0) (2026-10-03)
+
+
+### Features
+
+* align stacks and move publishing into publish workflows ([#590](https://github.com/abinnovision/actions/issues/590)) ([6f689c1](https://github.com/abinnovision/actions/commit/6f689c11d6851ac54b9d092f4f7a0a2fc5e3e740))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * release bumped to 2.1.7
+
 ## [2.5.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.4.1...polyglot-monorepo-stack-source-v2.5.0) (2026-10-01)
 
 

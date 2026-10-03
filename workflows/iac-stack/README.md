@@ -43,7 +43,7 @@ This is a `workflow_call` workflow, so it can't be triggered directly. Call it f
 ```yaml
 jobs:
   iac-stack:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@iac-stack-v0
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@iac-stack-v1
 ```
 
 [//]: # "x-release-please-end"
@@ -52,8 +52,8 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@iac-stack-v0`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@iac-stack-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@iac-stack-v1`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@iac-stack-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ### Example Workflow File
 
@@ -75,7 +75,7 @@ permissions: {}
 jobs:
   ci:
     name: CI
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@iac-stack-v0
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@iac-stack-v1
     permissions:
       contents: read
       packages: read
@@ -91,7 +91,7 @@ Repositories with several roots call the workflow once per root with different `
 
 ## Migrating from opentofu-stack
 
-- Change the caller tag to `@iac-stack-v0` (previously `@opentofu-stack-v1`) <!-- x-release-please-major -->
+- Change the caller tag to `@iac-stack-v1` (previously `@opentofu-stack-v1`) <!-- x-release-please-major -->
 - The required status check becomes `CI / Status` (with the caller convention above)
 - The Node repo checks now run inside `Check`, so a separate repo checks job can be removed
 

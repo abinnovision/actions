@@ -92,7 +92,7 @@ This is a `workflow_call` workflow. Call it after the stack job that produced th
 ```yaml
 jobs:
   publish-oci:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v0
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v1
     with:
       releases: ${{ <releases> }}
 ```
@@ -103,8 +103,8 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v0`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v1`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ### Example Workflow File
 
@@ -121,7 +121,7 @@ jobs:
   publish-oci:
     name: Publish OCI
     needs: ci
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v0
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v1
     permissions:
       contents: read
       id-token: write
