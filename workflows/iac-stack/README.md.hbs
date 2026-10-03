@@ -80,7 +80,7 @@ Repositories with several roots call the workflow once per root with different `
 
 ## Migrating from opentofu-stack
 
-- Change the caller tag from `@opentofu-stack-v1` to `@{{name}}-v{{version.major}}`
+- Change the caller tag to `@{{name}}-v{{version.major}}` (previously `@opentofu-stack-v1`) <!-- x-release-please-major -->
 - The required status check becomes `CI / Status` (with the caller convention above)
 - The Node repo checks now run inside `Check`, so a separate repo checks job can be removed
 

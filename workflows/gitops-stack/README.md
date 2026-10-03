@@ -93,7 +93,7 @@ jobs:
 
 ### Migrating from gitops-deploy
 
-- Replace the `gitops-deploy-v1` tag with `gitops-stack-v0`
+- Use the `gitops-stack-v0` tag instead of `gitops-deploy-v1` <!-- x-release-please-major -->
 - Switch the caller trigger from `pull_request_target` to `pull_request`
 - Make `CI / Status` the required status check
 - Add a `.tool-versions` file with `nodejs`
