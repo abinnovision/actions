@@ -107,7 +107,7 @@ jobs:
 
 [//]: # "x-release-please-end"
 
-The resulting check contexts are `CI / Configure`, `CI / Check`, `CI / Test / <type>`,
+The resulting check contexts are `CI / Configure`, `CI / Check`, `CI / Test: <type>`,
 `CI / Release` and `CI / Status`. Require `CI / Status` and
 `Lint commits` in your rulesets.
 
