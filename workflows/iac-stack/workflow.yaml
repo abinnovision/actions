@@ -313,57 +313,52 @@ jobs:
         id: plan
         env:
           GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
-        run: tofu -chdir="$WORKING_DIR" plan -lock=false -no-color -input=false -out=tfplan 2>&1 | tee plan.log
+        run: tofu -chdir="$WORKING_DIR" plan -lock=false -no-color -input=false -out=tfplan
 
       - name: Comment plan on pull request
-        if: ${{ !cancelled() && steps.plan.outcome != 'skipped' }}
+        if: ${{ steps.plan.outcome == 'success' }}
+        uses: borchero/terraform-plan-comment@v2
+        with:
+          token: ${{ github.token }}
+          terraform-cmd: tofu
+          working-directory: ${{ inputs.working-directory }}
+          planfile: tfplan
+          header: "OpenTofu plan: `${{ inputs.working-directory }}`"
+
+      # Replaces the sticky plan comment so a stale plan is never shown as current.
+      - name: Comment plan failure on pull request
+        if: ${{ !cancelled() && steps.plan.outcome == 'failure' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          MARKER="<!-- opentofu-stack:$WORKING_DIR -->"
-          export MARKER
-
-          if [[ "$PLAN_OUTCOME" == "success" ]]; then
-            tofu -chdir="$WORKING_DIR" show -no-color tfplan > plan.txt
-            SUMMARY=$(grep -m1 -E '^(Plan:|No changes\.)' plan.txt || true)
-            # Move change markers to column 0 so the diff syntax highlights them.
-            sed -E 's/^([[:space:]]+)([-+~])/\2\1/; s/^~/!/' plan.txt > plan.diff
-            LANG_HINT="diff"
-          else
-            SUMMARY="Plan failed"
-            cp plan.log plan.diff
-            LANG_HINT=""
-          fi
+          HEADER="## OpenTofu plan: \`$WORKING_DIR\`"
+          export HEADER
 
           {
-            echo "$MARKER"
-            echo "### OpenTofu plan: \`$WORKING_DIR\`"
+            echo "$HEADER"
             echo
-            echo "**${SUMMARY:-No summary}**"
-            echo
-            echo "<details><summary>Show plan</summary>"
-            echo
-            echo "\`\`\`$LANG_HINT"
-            head -c 60000 plan.diff
-            echo
-            echo '```'
-            echo
-            echo "</details>"
+            echo "**Plan failed** at \`${HEAD_SHA:0:7}\`, see the [workflow run]($RUN_URL)."
           } > body.md
 
           cat body.md >> "$GITHUB_STEP_SUMMARY"
 
-          COMMENT_ID=$(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
-            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith(env.MARKER))) | .id' | sed -n 1p)
+          mapfile -t COMMENT_IDS < <(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith(env.HEADER))) | .id')
 
-          if [[ -n "$COMMENT_ID" ]]; then
-            gh api --method PATCH "repos/$GH_REPO/issues/comments/$COMMENT_ID" -F body=@body.md > /dev/null
-          else
+          if [[ ${#COMMENT_IDS[@]} -eq 0 ]]; then
             gh api --method POST "repos/$GH_REPO/issues/$PR_NUMBER/comments" -F body=@body.md > /dev/null
+            exit 0
           fi
+
+          gh api --method PATCH "repos/$GH_REPO/issues/comments/${COMMENT_IDS[0]}" -F body=@body.md > /dev/null
+          # Large plans span several comments; drop the remaining parts.
+          for id in "${COMMENT_IDS[@]:1}"; do
+            gh api --method DELETE "repos/$GH_REPO/issues/comments/$id" > /dev/null
+          done
 
   # Apply a fresh plan on the default branch. Runs for one root never overlap.
   apply:
