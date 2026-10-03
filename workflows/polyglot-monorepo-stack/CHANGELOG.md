@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.6.0...polyglot-monorepo-stack-source-v2.6.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* name matrix test jobs "Test: &lt;type&gt;" ([#598](https://github.com/abinnovision/actions/issues/598)) ([eda558d](https://github.com/abinnovision/actions/commit/eda558d5690e082bf3fec222bca08acd692e5036))
+
 ## [2.6.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.5.0...polyglot-monorepo-stack-source-v2.6.0) (2026-10-03)
 
 

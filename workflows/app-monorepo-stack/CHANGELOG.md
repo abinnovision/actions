@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/app-monorepo-stack-source-v1.0.0...app-monorepo-stack-source-v1.0.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* drop unsupported if from wait steps ([#602](https://github.com/abinnovision/actions/issues/602)) ([a651900](https://github.com/abinnovision/actions/commit/a65190075078184a522c65cb92b978070dd42696))
+* name matrix test jobs "Test: &lt;type&gt;" ([#598](https://github.com/abinnovision/actions/issues/598)) ([eda558d](https://github.com/abinnovision/actions/commit/eda558d5690e082bf3fec222bca08acd692e5036))
+* run network-bound steps in the background ([#601](https://github.com/abinnovision/actions/issues/601)) ([30e4555](https://github.com/abinnovision/actions/commit/30e4555e764fba8ba1e72fd1193adc60e50867f2))
+
 ## 1.0.0 (2026-10-03)
 
 
