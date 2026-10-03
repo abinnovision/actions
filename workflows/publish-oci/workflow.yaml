@@ -350,7 +350,6 @@ jobs:
           echo "Configured registries: ${#images[@]}"
 
       - name: Wait for Turbo cache and Buildx
-        if: steps.unit.outputs.skip != 'true'
         wait: [turbo-cache, buildx]
 
       # Derived build args (tool versions from .tool-versions, unit metadata) and the turbo remote-cache passthrough
