@@ -10,11 +10,11 @@
 	"actions/triage-dependabot-pr": "1.0.0",
 	"workflows/release": "2.1.7",
 	"workflows/gitops-update-tags": "2.1.0",
-	"workflows/polyglot-monorepo-stack": "2.6.0",
+	"workflows/polyglot-monorepo-stack": "2.6.1",
 	"packages/action-tool-installer": "3.0.0",
-	"workflows/app-monorepo-stack": "1.0.0",
+	"workflows/app-monorepo-stack": "1.0.1",
 	"workflows/gitops-stack": "1.0.0",
 	"workflows/iac-stack": "1.0.0",
 	"workflows/publish-npm": "1.0.0",
-	"workflows/publish-oci": "1.0.0"
+	"workflows/publish-oci": "1.0.1"
 }

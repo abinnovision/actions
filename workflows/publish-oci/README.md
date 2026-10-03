@@ -104,7 +104,7 @@ jobs:
 This workflow can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v1.0.1`: Targeting a patch version <!-- x-release-please-version -->
 
 ### Example Workflow File
 
