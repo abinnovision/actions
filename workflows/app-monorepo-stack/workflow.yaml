@@ -379,6 +379,20 @@ jobs:
           tar -rf "$RUNNER_TEMP/source.tar" -C "$RUNNER_TEMP" out
           ls -lh "$RUNNER_TEMP/source.tar"
 
+      # Uploads while the remaining steps run; joined at the end of the job.
+      - id: upload-source
+        name: Upload source payload
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
+        background: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: payload-source
+          path: ${{ runner.temp }}/source.tar
+          retention-days: 7
+          if-no-files-found: error
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
       - name: Install dependencies
         run: make install-immutable
       - name: Check dependencies
@@ -418,16 +432,9 @@ jobs:
           # Allows re-running the job within the same workflow run.
           overwrite: true
 
-      - name: Upload source payload
+      - name: Wait for source payload
         if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
-        uses: actions/upload-artifact@v7
-        with:
-          name: payload-source
-          path: ${{ runner.temp }}/source.tar
-          retention-days: 7
-          if-no-files-found: error
-          # Allows re-running the job within the same workflow run.
-          overwrite: true
+        wait: [upload-source]
 
   # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
   # Runs concurrently with check: neither job consumes build artifacts from the other.
@@ -479,12 +486,8 @@ jobs:
       id-token: write
     outputs:
       releases: ${{ steps.releases.outputs.releases }}
+    # No checkout: release-please reads the repository through the GitHub API.
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
       - id: token
         name: Exchange token for release
         uses: abinnovision/actions@exchange-github-token-dev
