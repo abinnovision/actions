@@ -382,7 +382,7 @@ jobs:
   # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
   # Runs concurrently with check: neither job consumes build artifacts from the other.
   test:
-    name: Test / ${{ matrix.test-type }}
+    name: "Test: ${{ matrix.test-type }}"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:

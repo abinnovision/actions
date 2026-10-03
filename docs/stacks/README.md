@@ -90,7 +90,7 @@ fixed. The workflow `name:` never appears in check contexts.
 
 | Job            | id                 | `name:`            | Check contexts                                                                                           |
 | :------------- | :----------------- | :----------------- | :------------------------------------------------------------------------------------------------------- |
-| Stack call     | `ci`               | `CI`               | `CI / Configure`, `CI / Check`, `CI / Status` and the lanes, for example `CI / Test / <type>`            |
+| Stack call     | `ci`               | `CI`               | `CI / Configure`, `CI / Check`, `CI / Status` and the lanes, for example `CI / Test: <type>`             |
 | Publisher call | `publish-<target>` | `Publish <Target>` | `Publish OCI / Prepare`, `Publish OCI / Build / <name>`, `Publish OCI / GitOps`, `Publish npm / Publish` |
 | Commit lint    | `lint-commits`     | `Lint commits`     | `Lint commits`                                                                                           |
 
