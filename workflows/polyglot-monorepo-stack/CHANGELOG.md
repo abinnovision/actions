@@ -1,5 +1,66 @@
 # Changelog
 
+## [3.0.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.6.1...polyglot-monorepo-stack-source-v3.0.0) (2026-10-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **gitops:** batch image tag dispatch per release (v2) ([#504](https://github.com/abinnovision/actions/issues/504))
+
+### Features
+
+* add sha field to versions output and avoid duplicate builds ([#355](https://github.com/abinnovision/actions/issues/355)) ([4839cf5](https://github.com/abinnovision/actions/commit/4839cf56b3947bc3addc2e1d9194eda8327f78ef))
+* add support for prerelease channels and enhance release outputs ([#300](https://github.com/abinnovision/actions/issues/300)) ([04450e4](https://github.com/abinnovision/actions/commit/04450e418ae28df8a606b80266d93d26f7e21f09))
+* align stacks and move publishing into publish workflows ([#590](https://github.com/abinnovision/actions/issues/590)) ([6f689c1](https://github.com/abinnovision/actions/commit/6f689c11d6851ac54b9d092f4f7a0a2fc5e3e740))
+* create polyglot-monorepo-stack workflow ([#294](https://github.com/abinnovision/actions/issues/294)) ([fbd9f43](https://github.com/abinnovision/actions/commit/fbd9f43df35b1b4dce19e318b636d06133524f9e))
+* **exchange-github-token:** add OIDC token exchange action, remove deprecated actions ([#453](https://github.com/abinnovision/actions/issues/453)) ([d7c6155](https://github.com/abinnovision/actions/commit/d7c6155a11f312d9923e6a245a167099e942f0df))
+* **gitops:** batch image tag dispatch per release (v2) ([#504](https://github.com/abinnovision/actions/issues/504)) ([f1328db](https://github.com/abinnovision/actions/commit/f1328dbfdc91febb396443ca15b50bfaca6925db))
+* implement run-release-please action ([#305](https://github.com/abinnovision/actions/issues/305)) ([5923820](https://github.com/abinnovision/actions/commit/5923820cbf91500a1d82c345dcf0251d4d1d00a5))
+* **polyglot-monorepo-stack:** add brokered multi-repo checkout token ([#552](https://github.com/abinnovision/actions/issues/552)) ([26feddf](https://github.com/abinnovision/actions/commit/26feddf31e9d6afd98a505eb2eced448abf4686f))
+* **polyglot-monorepo-stack:** add GitHub Pages deployment support ([#402](https://github.com/abinnovision/actions/issues/402)) ([0d05700](https://github.com/abinnovision/actions/commit/0d0570030111e5ecbf7a74ce3cb492c232e6cbc7))
+* **polyglot-monorepo-stack:** add image sizes and build cache info to run summary ([#585](https://github.com/abinnovision/actions/issues/585)) ([d328c2b](https://github.com/abinnovision/actions/commit/d328c2b2011c2c09294f592869a6eb3a24535f0a))
+* **polyglot-monorepo-stack:** add release class tag to app images ([#580](https://github.com/abinnovision/actions/issues/580)) ([997daf0](https://github.com/abinnovision/actions/commit/997daf071792ceb0f524471767dac50a821b5068))
+* **polyglot-monorepo-stack:** enable BuildKit SBOM generation for app images ([#515](https://github.com/abinnovision/actions/issues/515)) ([6b8508a](https://github.com/abinnovision/actions/commit/6b8508a441073372c65c6432ba352cecea5e8595))
+* **polyglot-monorepo-stack:** expose Turbo remote cache to app Docker builds ([#517](https://github.com/abinnovision/actions/issues/517)) ([e5dadfb](https://github.com/abinnovision/actions/commit/e5dadfb8a0c869b342b8289d1e01471e07bb43bf))
+* **polyglot-monorepo-stack:** publish npm packages with provenance attestations ([#404](https://github.com/abinnovision/actions/issues/404)) ([b1d0707](https://github.com/abinnovision/actions/commit/b1d0707d9fc87c1fef3d3bc7a52b4841a23fb099))
+* **polyglot-monorepo-stack:** support direct workload identity federation ([#574](https://github.com/abinnovision/actions/issues/574)) ([fa18314](https://github.com/abinnovision/actions/commit/fa1831467fad049c3421c6274407120e2e080e05))
+* use token broker ([#456](https://github.com/abinnovision/actions/issues/456)) ([a8dc1ac](https://github.com/abinnovision/actions/commit/a8dc1ace2551c90fa1b258ae0e75fc0e616bf95e))
+
+
+### Bug Fixes
+
+* add contents:read scope to GitOps dispatch token in polyglot workflow ([#484](https://github.com/abinnovision/actions/issues/484)) ([e965f4f](https://github.com/abinnovision/actions/commit/e965f4f465f2b76b132bc898352080f615975b8b))
+* change default value for enable-apps-registry-ghcr to false ([#366](https://github.com/abinnovision/actions/issues/366)) ([8253dc8](https://github.com/abinnovision/actions/commit/8253dc8e439772ec0a0fd5101cb3939033128482))
+* enhance workflow outputs to include release type and improve version handling ([#304](https://github.com/abinnovision/actions/issues/304)) ([4c0bdeb](https://github.com/abinnovision/actions/commit/4c0bdeba937b3b005ff0ef2bd85d638fa996ef9c))
+* move vars context from workflow_call defaults to job-level fallbacks ([#465](https://github.com/abinnovision/actions/issues/465)) ([9a3c4ae](https://github.com/abinnovision/actions/commit/9a3c4aebe511feda932ea3f2aca590688454e4fc))
+* name matrix test jobs "Test: &lt;type&gt;" ([#598](https://github.com/abinnovision/actions/issues/598)) ([eda558d](https://github.com/abinnovision/actions/commit/eda558d5690e082bf3fec222bca08acd692e5036))
+* **polyglot-monorepo-stack:** grant actions:write for cache writes ([#518](https://github.com/abinnovision/actions/issues/518)) ([94cbeaf](https://github.com/abinnovision/actions/commit/94cbeaf54e968955a835785c59081c585158406b))
+* **polyglot-monorepo-stack:** only deploy gh-pages on stable releases ([#407](https://github.com/abinnovision/actions/issues/407)) ([ad364d5](https://github.com/abinnovision/actions/commit/ad364d5dca773407bf690840ae74631c75e324c0))
+* **polyglot-monorepo-stack:** refresh artifact registry credentials during long builds ([#576](https://github.com/abinnovision/actions/issues/576)) ([93b072f](https://github.com/abinnovision/actions/commit/93b072f11d9f5dec60b2fdf96aadf308444da30e))
+* **polyglot-monorepo-stack:** remove dead GITOPS_PROXY_URL secret ([#461](https://github.com/abinnovision/actions/issues/461)) ([71eccce](https://github.com/abinnovision/actions/commit/71eccce56f5fdc79c46c2d880c7a429124c7a950))
+* **polyglot-monorepo-stack:** support the pull_request trigger ([#519](https://github.com/abinnovision/actions/issues/519)) ([b86e833](https://github.com/abinnovision/actions/commit/b86e833136b8e4390b9ce31621689d97c1027972))
+* **polyglot:** skip Publish / Prepare job on pull requests ([#441](https://github.com/abinnovision/actions/issues/441)) ([124a990](https://github.com/abinnovision/actions/commit/124a9902bb0aa257c18fcd33627b17e61cf355d5))
+* prefix gitops target repo with org in polyglot workflow ([#482](https://github.com/abinnovision/actions/issues/482)) ([f6e4850](https://github.com/abinnovision/actions/commit/f6e4850c3c0b46f615b3e78d8ed50c9122a97bcd))
+* refactor version evaluation ([#306](https://github.com/abinnovision/actions/issues/306)) ([9475f1c](https://github.com/abinnovision/actions/commit/9475f1c189f71e3c3302f9acb0bbba1fd8f2bdb1))
+* run npm publish with switching directories in a subshell ([#318](https://github.com/abinnovision/actions/issues/318)) ([6c747be](https://github.com/abinnovision/actions/commit/6c747be8bdf8324365aaba51cad09a9ee752226f))
+* streamline workflow and simplify ([#367](https://github.com/abinnovision/actions/issues/367)) ([68caeee](https://github.com/abinnovision/actions/commit/68caeee38083d82fb4c9d3b86f933c8c11a70819))
+* support floating semver ranges in actionDependencies ([#332](https://github.com/abinnovision/actions/issues/332)) ([a00cdcd](https://github.com/abinnovision/actions/commit/a00cdcd50a1586f39dfae8f34492ea5c3e52aaa6))
+* update versioning structure to include packageVersion and short SHA ([#320](https://github.com/abinnovision/actions/issues/320)) ([f6586bd](https://github.com/abinnovision/actions/commit/f6586bd30a741e6586b71136dcfca38e6536225c))
+* update workflow naming conventions for clarity ([#364](https://github.com/abinnovision/actions/issues/364)) ([25b2578](https://github.com/abinnovision/actions/commit/25b257854e2c97af2b99a8876d1a82b1a19ae377))
+* upgrade GitHub actions to latest versions ([#365](https://github.com/abinnovision/actions/issues/365)) ([01d818a](https://github.com/abinnovision/actions/commit/01d818a9115747dbaf4e7b54fd3a3a64f94e1305))
+* use packageVersion instead of version for npm publishing ([#322](https://github.com/abinnovision/actions/issues/322)) ([ce82d4b](https://github.com/abinnovision/actions/commit/ce82d4b3581848e9c711d7226967dcac0b8de7d2))
+* use release-please version outputs directly for Docker builds ([#324](https://github.com/abinnovision/actions/issues/324)) ([b8eabdf](https://github.com/abinnovision/actions/commit/b8eabdf3785e66d900e29c31add528d9350d7d16))
+
+
+### Performance Improvements
+
+* **polyglot-monorepo-stack:** run test job in parallel with check_build ([#520](https://github.com/abinnovision/actions/issues/520)) ([a2113dd](https://github.com/abinnovision/actions/commit/a2113ddf03868c05c51c8c3e3e8a04df00e4f99a))
+
+
+### Reverts
+
+* failed release ([#454](https://github.com/abinnovision/actions/issues/454)), fix setup-k8s-tools dependency ([#459](https://github.com/abinnovision/actions/issues/459)) ([12c7a1d](https://github.com/abinnovision/actions/commit/12c7a1d86d305e42744342af4dd4171d4aac0cc8))
+
 ## [2.6.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.6.0...polyglot-monorepo-stack-source-v2.6.1) (2026-10-03)
 
 
