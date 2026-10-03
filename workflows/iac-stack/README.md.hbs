@@ -8,7 +8,7 @@ Checks, plans and applies an OpenTofu root module with GCS state and encrypted s
 | :---------- | :------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
 | `Configure` | Always                                       | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, and validates the configuration    |
 | `Check`     | Always                                       | Node repo checks (`yarn install --immutable`, `yarn dedupe --check`, `yarn check`), `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate` |
-| `Plan`      | Trusted pull requests                        | `tofu plan` and one sticky PR comment per `working-directory` with the summary and a collapsible diff           |
+| `Plan`      | Trusted pull requests                        | `tofu plan` and one sticky PR comment per `working-directory` via [terraform-plan-comment](https://github.com/borchero/terraform-plan-comment); a failed plan replaces it with a link to the run |
 | `Apply`     | Push to `default-branch`                     | Fresh `tofu plan -out` and `tofu apply` in `apply-environment`; runs for one root never overlap                 |
 | `Status`    | Always                                       | Fails when any other job failed or was cancelled; use it as the single required status check                    |
 
