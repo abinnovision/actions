@@ -15,7 +15,7 @@ the entries whose `path` matches `include`.
 | :--------------- | :---------------------------------------------------- | :------------------------------------------------------------------------------ |
 | `Prepare`        | Once, unless `releases` is empty or `[]`              | Selects the entries matching `include`, validates them and the configuration    |
 | `<name>`         | Once per selected entry                               | Extracts the payload, builds and pushes the image, writes an image summary      |
-| `GitOps Updates` | When `gitops-config` is set and no image build failed | Dispatches one `gitops-workflow-file` run per target repository and application |
+| `GitOps Updates` | When `gitops-routes` or `gitops-config` is set and no image build failed | Dispatches one `gitops-workflow-file` run per target repository and application |
 
 - `include` holds directory patterns, one per line; `*` matches exactly one path segment
   (default `apps/*`)
@@ -28,8 +28,8 @@ the entries whose `path` matches `include`.
 - The Dockerfile is `<path>/Dockerfile`, relative to the payload root
 - The build context is the payload root
 - The turbo remote cache is enabled when the payload root contains `turbo.json`
-- A unit without a Dockerfile gets no image (notice), unless it has a `gitops-config` line, which
-  fails its build
+- A unit without a Dockerfile gets no image (notice), unless it has a `gitops-routes` or
+  `gitops-config` line, which fails its build
 
 ## Build arguments
 
@@ -68,20 +68,27 @@ Per-app BuildKit secrets come from `APP_IMAGE_SECRETS`, see [Secrets](#secrets).
 
 ## GitOps updates
 
-`gitops-config` is CSV, one line per unit:
+`gitops-routes` is CSV, one route per line:
 
 ```
-name,target-repo,dev-application,release-application[,image-name]
+name,type,target-repo,application[,image-name]
 ```
 
-- Units without a line are not dispatched; a unit with a line but without a Dockerfile fails its
-  build, so nothing is dispatched
+- `type` is `release` for a stable entry (empty `channel`) or `prerelease` for any channel
+- Every line matching the unit and type is dispatched, so one type can fan out to several
+  applications and repositories; units or types without a line are not dispatched
+- A unit with a line but without a Dockerfile fails its build, so nothing is dispatched
 - `target-repo` without an owner is resolved against the repository owner
-- Stable releases deploy to `release-application`, prereleases to `dev-application`
 - `image-name` defaults to the resolved `image`; updates are `<image-name>:<version>`, batched per
   target repository and application
-- Lines with fewer than 4 or more than 5 columns, or with empty columns, fail `Prepare`
+- Lines with fewer than 4 or more than 5 columns, empty columns or another `type` fail `Prepare`
 - The dispatch token comes from the token broker (`token-broker-url` or `vars.TOKEN_BROKER_URL`)
+
+`gitops-config` is deprecated and mutually exclusive with `gitops-routes`. Its line
+`name,target-repo,dev-application,release-application[,image-name]` is equivalent to the two routes
+`name,prerelease,target-repo,dev-application[,image-name]` and
+`name,release,target-repo,release-application[,image-name]`. `Prepare` converts it and logs the converted
+routes in a deprecation warning, ready to paste into `gitops-routes`.
 
 ## Usage
 
@@ -120,9 +127,11 @@ jobs:
       image: app-{name}
       registry: $\{{ vars.FOUNDRY_REGISTRY_DOCKER }}
       gcp-workload-identity-provider: $\{{ vars.FOUNDRY_WIF_PROVIDER }}
-      gitops-config: |
-        backend,my-gitops-repo,backend-dev,backend-prod
-        worker,my-gitops-repo,worker-dev,worker-prod,worker
+      gitops-routes: |
+        backend,prerelease,my-gitops-dev,backend-dev
+        backend,release,my-gitops-prod,backend-prod-eu
+        backend,release,my-gitops-prod,backend-prod-us
+        worker,release,my-gitops-prod,worker-prod,worker
 ```
 
 [//]: # "x-release-please-end"
