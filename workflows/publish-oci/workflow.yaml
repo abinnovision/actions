@@ -93,6 +93,7 @@ on:
         required: false
         default: ""
         description: |-
+          **Deprecated:** Use `gitops-routes`.
           Per-unit GitOps configuration in **CSV format** (one per line).
           **Format:** `name,target-repo,dev-application,release-application[,image-name]`
           **Example:**
@@ -100,7 +101,23 @@ on:
           `my-worker,my-gitops-repo,worker-dev,worker-prod,worker`
           **Image name:** Defaults to the resolved `image` of the unit
           **Deployment tags:** Dev and release deployments use the clean semver version as tag
-          **Note:** Lines with fewer than 4 or more than 5 columns, or empty columns, fail the run. A unit with a line but without a Dockerfile fails its build. Units without a line are not dispatched
+          **Note:** Mutually exclusive with `gitops-routes`. Lines with fewer than 4 or more than 5 columns, or empty columns, fail the run. A unit with a line but without a Dockerfile fails its build. Units without a line are not dispatched
+
+      gitops-routes:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          GitOps routes in **CSV format** (one per line).
+          **Format:** `name,type,target-repo,application[,image-name]`
+          **Type:** `release` for stable entries, `prerelease` for entries with a channel
+          **Example:**
+          `my-api,prerelease,gitops-dev,my-api-dev`
+          `my-api,release,gitops-prod,my-api-prod-eu`
+          `my-api,release,gitops-prod,my-api-prod-us`
+          **Image name:** Defaults to the resolved `image` of the unit
+          **Deployment tags:** Every route uses the clean semver version as tag
+          **Note:** Mutually exclusive with `gitops-config`. Every matching line is dispatched. Lines with fewer than 4 or more than 5 columns, empty columns or an unknown type fail the run. A unit with a line but without a Dockerfile fails its build. Units without a matching line are not dispatched
 
       gitops-workflow-file:
         type: string
@@ -110,7 +127,7 @@ on:
           GitOps workflow file to dispatch for deployment updates.
           **Default:** `update-tags.yaml`
           **Example:** `update-tags.yaml`, `deploy.yaml`
-          **Note:** Only used when `gitops-config` is provided
+          **Note:** Only used when `gitops-config` or `gitops-routes` is provided
 
       token-broker-url:
         type: string
@@ -119,7 +136,7 @@ on:
         description: |-
           URL of the token broker for OIDC token exchange.
           **Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.
-          **Note:** Only used when `gitops-config` is provided
+          **Note:** Only used when `gitops-config` or `gitops-routes` is provided
 
 permissions: {}
 
@@ -137,6 +154,8 @@ jobs:
     permissions: {}
     outputs:
       units: ${{ steps.select.outputs.units }}
+      # gitops-routes, or the routes converted from gitops-config.
+      gitops-routes: ${{ steps.select.outputs.gitops-routes }}
     steps:
       - name: Select and validate units
         id: select
@@ -148,6 +167,7 @@ jobs:
           INPUT_GCP_AUTH: ${{ inputs.gcp-auth }}
           INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.gcp-workload-identity-provider }}
           INPUT_GITOPS_CONFIG: ${{ inputs.gitops-config }}
+          INPUT_GITOPS_ROUTES: ${{ inputs.gitops-routes }}
           INPUT_IMAGE: ${{ inputs.image }}
           TOKEN_BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
         run: |
@@ -169,8 +189,13 @@ jobs:
             exit 1
           fi
 
-          if [[ -n "$INPUT_GITOPS_CONFIG" ]] && [[ -z "$TOKEN_BROKER_URL" ]]; then
-            echo "::error::token-broker-url is required when gitops-config is provided"
+          if [[ -n "$INPUT_GITOPS_CONFIG" ]] && [[ -n "$INPUT_GITOPS_ROUTES" ]]; then
+            echo "::error::'gitops-config' and 'gitops-routes' are mutually exclusive"
+            exit 1
+          fi
+
+          if [[ -n "$INPUT_GITOPS_CONFIG$INPUT_GITOPS_ROUTES" ]] && [[ -z "$TOKEN_BROKER_URL" ]]; then
+            echo "::error::token-broker-url is required when gitops-config or gitops-routes is provided"
             exit 1
           fi
 
@@ -179,6 +204,24 @@ jobs:
             print "::error::Invalid gitops-config line \047" $0 "\047: expected \047name,target-repo,dev-application,release-application[,image-name]\047 without empty columns"
             invalid = 1
           } END { exit invalid }' <<< "$INPUT_GITOPS_CONFIG"
+
+          # gitops-config lines become one prerelease route to the dev application and one release route to the release
+          # application. Later jobs only read the routes.
+          gitops_routes="$INPUT_GITOPS_ROUTES"
+          if [[ -n "$INPUT_GITOPS_CONFIG" ]]; then
+            gitops_routes=$(awk -F, -v OFS=, '$0 != "" {
+              image = (NF == 5) ? "," $5 : ""
+              print $1, "prerelease", $2, $3 image
+              print $1, "release", $2, $4 image
+            }' <<< "$INPUT_GITOPS_CONFIG")
+            echo "::warning title=gitops-config is deprecated::Replace gitops-config with these gitops-routes:%0A${gitops_routes//$'\n'/%0A}"
+          fi
+
+          # gitops-routes: name,type,target-repo,application[,image-name]
+          awk -F, '$0 != "" && (NF < 4 || NF > 5 || /^,|,$|,,/ || ($2 != "release" && $2 != "prerelease")) {
+            print "::error::Invalid gitops-routes line \047" $0 "\047: expected \047name,type,target-repo,application[,image-name]\047 with type \047release\047 or \047prerelease\047 and without empty columns"
+            invalid = 1
+          } END { exit invalid }' <<< "$gitops_routes"
 
           # Each include line becomes an anchored regex: metacharacters are escaped, "*" matches one path segment.
           units=$(jq -c --arg lines "$INPUT_INCLUDE" '
@@ -201,6 +244,10 @@ jobs:
           fi
 
           echo "units=$units" >> "$GITHUB_OUTPUT"
+          if [[ -n "$gitops_routes" ]]; then
+            delimiter="EOF_$(openssl rand -hex 8)"
+            printf 'gitops-routes<<%s\n%s\n%s\n' "$delimiter" "$gitops_routes" "$delimiter" >> "$GITHUB_OUTPUT"
+          fi
           echo "Units: $(jq -r 'map(.name) | join(", ")' <<< "$units")"
 
   # Build and push one image per unit that has a Dockerfile.
@@ -234,20 +281,20 @@ jobs:
           tar -xf "artifact/$FILE" -C payload
 
       # Resolves the per-unit settings. A unit without a Dockerfile ends the leg successfully without an image, unless
-      # it has a gitops-config line.
+      # it has a GitOps route.
       - name: Resolve unit
         id: unit
         env:
           APP: ${{ matrix.entry.name }}
           APP_PATH: ${{ matrix.entry.path }}
           INPUT_IMAGE: ${{ inputs.image }}
-          INPUT_GITOPS_CONFIG: ${{ inputs.gitops-config }}
+          GITOPS_ROUTES: ${{ needs.prepare.outputs.gitops-routes }}
         run: |
           set -euo pipefail
 
           if [[ ! -f "payload/$APP_PATH/Dockerfile" ]]; then
-            if awk -F, '$1 == ENVIRON["APP"] { found = 1 } END { exit !found }' <<< "$INPUT_GITOPS_CONFIG"; then
-              echo "::error::Unit '$APP' has a gitops-config line but no Dockerfile at '$APP_PATH/Dockerfile'"
+            if awk -F, '$1 == ENVIRON["APP"] { found = 1 } END { exit !found }' <<< "$GITOPS_ROUTES"; then
+              echo "::error::Unit '$APP' has a GitOps route but no Dockerfile at '$APP_PATH/Dockerfile'"
               exit 1
             fi
             echo "::notice::Unit '$APP' has no Dockerfile at '$APP_PATH/Dockerfile', no image is built for it"
@@ -524,24 +571,24 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Dispatch GitOps updates for the whole release.
-  # Apps deploying to the same (target-repo, application) pair are batched into a single dispatch.
+  # Updates for the same (target-repo, application) pair are batched into a single dispatch.
   gitops:
     name: GitOps Updates
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [prepare, build]
-    # All-or-nothing: dispatch only when no image build of this release failed. A unit with a gitops-config line fails
-    # its build without a Dockerfile, so every configured unit has an image here.
-    if: needs.build.result == 'success' && inputs.gitops-config != ''
+    # All-or-nothing: dispatch only when no image build of this release failed. A unit with a GitOps route fails its
+    # build without a Dockerfile, so every configured unit has an image here.
+    if: needs.build.result == 'success' && needs.prepare.outputs.gitops-routes != ''
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Group GitOps deployments by target
-        id: gitops-config
+        id: routes
         env:
-          # CSV format: name,target-repo,dev-application,release-application[,image-name]
-          GITOPS_APP_CONFIG: ${{ inputs.gitops-config }}
+          # CSV format: name,type,target-repo,application[,image-name]
+          GITOPS_ROUTES: ${{ needs.prepare.outputs.gitops-routes }}
           UNITS: ${{ needs.prepare.outputs.units }}
           INPUT_IMAGE: ${{ inputs.image }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -551,11 +598,16 @@ jobs:
           resolved_file=$(mktemp)
 
           while IFS=$'\t' read -r app app_path deployment_tag channel; do
-            # First line whose name column is the unit; columns were validated by the prepare job.
-            config_line=$(APP="$app" awk -F, '$1 == ENVIRON["APP"] { print; exit }' <<< "$GITOPS_APP_CONFIG")
+            type="release"
+            if [[ -n "$channel" ]]; then
+              type="prerelease"
+            fi
 
-            if [[ -z "$config_line" ]]; then
-              echo "::warning::No GitOps configuration for '$app'. Skipping GitOps deployment."
+            # Every route of the unit and type; columns were validated by the prepare job.
+            unit_routes=$(APP="$app" TYPE="$type" awk -F, '$1 == ENVIRON["APP"] && $2 == ENVIRON["TYPE"]' <<< "$GITOPS_ROUTES")
+
+            if [[ -z "$unit_routes" ]]; then
+              echo "::warning::No GitOps route for '$app' ($type). Skipping GitOps deployment."
               continue
             fi
 
@@ -564,28 +616,22 @@ jobs:
             default_image="${default_image//"{name}"/"$app"}"
             default_image="${default_image,,}"
 
-            IFS=, read -r _ target_repo dev_app release_app image_name <<< "$config_line"
-            image_name="${image_name:-$default_image}"
+            while IFS=, read -r _ _ target_repo deploy_app image_name; do
+              image_name="${image_name:-$default_image}"
 
-            if [[ "$target_repo" != *"/"* ]]; then
-              target_repo="$REPOSITORY_OWNER/$target_repo"
-            fi
+              if [[ "$target_repo" != *"/"* ]]; then
+                target_repo="$REPOSITORY_OWNER/$target_repo"
+              fi
 
-            # Stable releases deploy to the release application, prereleases to the dev application
-            if [[ -z "$channel" ]]; then
-              deploy_app="$release_app"
-            else
-              deploy_app="$dev_app"
-            fi
-
-            jq -n -c --arg repo "$target_repo" --arg application "$deploy_app" --arg update "$image_name:$deployment_tag" \
-              '{targetRepo: $repo, application: $application, update: $update}' >> "$resolved_file"
-            echo "Collected $app -> $target_repo ($deploy_app): $image_name:$deployment_tag"
+              jq -n -c --arg repo "$target_repo" --arg application "$deploy_app" --arg update "$image_name:$deployment_tag" \
+                '{targetRepo: $repo, application: $application, update: $update}' >> "$resolved_file"
+              echo "Collected $app -> $target_repo ($deploy_app): $image_name:$deployment_tag"
+            done <<< "$unit_routes"
           done < <(jq -r '.[] | [.name, .path, .version, .channel // ""] | @tsv' <<< "$UNITS")
 
           # Batch all updates targeting the same repository and application into one entry
           groups=$(jq -s -c 'group_by(.targetRepo + "|" + .application)
-            | map({targetRepo: .[0].targetRepo, application: .[0].application, updates: (map(.update) | join(","))})' "$resolved_file")
+            | map({targetRepo: .[0].targetRepo, application: .[0].application, updates: (map(.update) | unique | join(","))})' "$resolved_file")
 
           target_resources=$(echo "$groups" | jq -r '[.[].targetRepo] | unique | map("repo:" + .) | join(" ")')
 
@@ -598,18 +644,18 @@ jobs:
       # One token covering every target repository; the dispatch loop cannot call an action per group.
       - id: gitops-token
         name: Exchange token for GitOps dispatch
-        if: steps.gitops-config.outputs.has-groups == 'true'
+        if: steps.routes.outputs.has-groups == 'true'
         uses: abinnovision/actions@exchange-github-token-dev
         with:
           broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
-          resources: ${{ steps.gitops-config.outputs.target-resources }}
+          resources: ${{ steps.routes.outputs.target-resources }}
           scope: contents:read actions:write
 
       - name: Update GitOps deployments
-        if: steps.gitops-config.outputs.has-groups == 'true'
+        if: steps.routes.outputs.has-groups == 'true'
         env:
           GH_TOKEN: ${{ steps.gitops-token.outputs.token }}
-          GITOPS_GROUPS: ${{ steps.gitops-config.outputs.groups }}
+          GITOPS_GROUPS: ${{ steps.routes.outputs.groups }}
           GITOPS_WORKFLOW_FILE: ${{ inputs.gitops-workflow-file }}
         run: |
           set -euo pipefail

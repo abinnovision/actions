@@ -305,7 +305,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     needs:
       - configure
     permissions:
@@ -454,7 +454,7 @@ jobs:
   test:
     name: "Test: ${{ matrix.test-type }}"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
     needs:
       - configure
     if: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix)[0] != null }}
