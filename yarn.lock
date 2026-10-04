@@ -1878,9 +1878,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"app-monorepo-stack@workspace:workflows/app-monorepo-stack":
+"app-stack@workspace:workflows/app-stack":
   version: 0.0.0-use.local
-  resolution: "app-monorepo-stack@workspace:workflows/app-monorepo-stack"
+  resolution: "app-stack@workspace:workflows/app-stack"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     exchange-github-token: "workspace:^"

@@ -1,6 +1,7 @@
-# app-monorepo-stack
+# app-stack
 
-CI for Yarn + Turborepo monorepos that mix Node.js, Python and Go. It checks, builds and tests the
+CI for Yarn repositories: Turborepo monorepos that mix Node.js, Python and Go, and
+[single-package repositories](#single-package-repositories). It checks, builds and tests the
 repository on every pull request. On every push to the default branch it also packs the
 [units](#units) into two target-neutral payloads and creates releases. It publishes nothing itself;
 the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish-oci/README.md) and
@@ -8,13 +9,13 @@ the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish
 
 ## Behavior
 
-| Job         | Runs                                                 | Does                                                                                                                                                       |
-| :---------- | :--------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Configure` | Always                                               | Resolves the commit, mode and trust level, validates the Makefile, resolves the units, discovers test types                                                |
-| `Check`     | Always                                               | `install-immutable`, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also prunes the source units and packs the dist units |
-| `Test`      | One job per test type not already covered by `Check` | `install-immutable`, `build` and `test-<type>`                                                                                                             |
-| `Release`   | Push to `default-branch`, after `Check` and `Test`   | Runs release-please, which creates or lands release PRs and creates the releases, then writes the `releases` list                                          |
-| `Status`    | Always                                               | Single required status check, fails when any other job failed or was cancelled                                                                             |
+| Job         | Runs                                                 | Does                                                                                                                                           |
+| :---------- | :--------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure` | Always                                               | Resolves the commit and mode, validates the Makefile if present, resolves the units, discovers test types                                      |
+| `Check`     | Always                                               | Install, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also prunes the source units and packs the dist units |
+| `Test`      | One job per test type not already covered by `Check` | Install, `build` and `test-<type>`                                                                                                             |
+| `Release`   | Push to `default-branch`, after `Check` and `Test`   | Runs release-please, which creates or lands release PRs and creates the releases, then writes the `releases` list                              |
+| `Status`    | Always                                               | Single required status check, fails when any other job failed or was cancelled                                                                 |
 
 - `pull_request_target` is rejected
 - Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
@@ -32,8 +33,8 @@ This is a `workflow_call` workflow, so it can't be triggered directly. Call it f
 
 ```yaml
 jobs:
-  app-monorepo-stack:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-monorepo-stack-v1
+  app-stack:
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v0
 ```
 
 [//]: # "x-release-please-end"
@@ -42,8 +43,8 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@app-monorepo-stack-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@app-monorepo-stack-v1.0.1`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v0`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ### Example Workflow File
 
@@ -67,7 +68,7 @@ permissions: {}
 jobs:
   ci:
     name: CI
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-monorepo-stack-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v0
     permissions:
       contents: read
       packages: read
@@ -145,8 +146,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 ```
 
-Pull requests and merge groups supersede themselves; pushes to the default branch queue instead, so
-no release or publish is ever cut short.
+Pull requests and merge groups supersede themselves; a running push to the default branch is never
+cancelled. GitHub keeps only one pending run per group, though: when several pushes land while a run
+is in progress, only the newest one runs afterwards and the ones in between are cancelled before they
+start. Their commits are still released by the next run, with payloads built from its commit.
 
 ### Permissions
 
@@ -167,15 +170,15 @@ permissions, see [`publish-npm`](../publish-npm/README.md) and [`publish-oci`](.
 
 Pull requests from forks get a read-only token and no OIDC token: cache saves are skipped, private
 submodules and private GitHub Package Registry dependencies do not resolve, and the checkout token
-exchange is skipped. Dependabot pull requests keep cache writes. `Configure` reports both cases as
-`trusted: false`; `Check` and `Test` run regardless.
+exchange is skipped. Dependabot pull requests keep cache writes. `Check` and `Test` run regardless.
 
 ## Repository layout
 
 ### Makefile
 
-Dependency installation goes through `make`, so each repository can define its own strategy across
-languages. Two targets are required; `Configure` fails the run if `install-immutable` is missing.
+With a Makefile, dependency installation goes through `make`, so each repository can define its own
+strategy across languages. Two targets are required; `Configure` fails the run if `install-immutable`
+is missing. Without a Makefile the workflow runs `yarn install --immutable`.
 
 | Target              | Purpose                          | Used by           |
 | ------------------- | -------------------------------- | ----------------- |
@@ -200,7 +203,7 @@ install-immutable:
 
 ```
 your-repo/
-├── Makefile              # install and install-immutable targets
+├── Makefile              # optional: install and install-immutable targets
 ├── .tool-versions        # asdf versions: nodejs (required), python, golang, uv
 ├── packages/             # dist units by default
 │   └── <name>/package.json
@@ -247,7 +250,24 @@ with:
 
 Every source unit needs a `name` in its `package.json`, and Turbo must be a dependency in the root
 `package.json`. Basenames must be unique within the source units and within the dist units;
-`Configure` fails otherwise. Packing is not filtered by `private`.
+`Configure` fails otherwise. Packing is not filtered by `private`. `turbo boundaries` runs in `Check`
+when Turbo is a dependency.
+
+### Single-package repositories
+
+The pattern `.` selects the repository root as a unit. Its `name` is the repository name, since the
+root has no directory basename, and its dist tarball is `<repository>.tgz`. A root source unit is not
+pruned; the source payload already holds the whole tree. Turbo and a Makefile are not needed.
+
+```yaml
+with:
+  source-units: ""
+  dist-units: .
+```
+
+Use `source-units: .` instead when the root has a `Dockerfile` for `publish-oci`. The publish
+workflows select the root entry with `include: .`; in `publish-oci` use `{name}`, not `{path}`, in `image`. release-please must release the root package,
+keyed `.` in `release-please-config.json`.
 
 ## Publishing
 
@@ -260,7 +280,8 @@ The payloads, the `releases` list and the rules of the publish workflows are des
 
 `publish-oci` builds each image from the source payload with `<path>/Dockerfile`, using the tar
 root as build context. A Dockerfile copies from the pruned `out/<name>/` tree: `json/` and the
-lockfile for the dependency layer, `full/` for the sources. The build arguments, such as
+lockfile for the dependency layer, `full/` for the sources. A root source unit (`.`) is not pruned,
+so its `Dockerfile` copies from the tracked source tree at the tar root. The build arguments, such as
 `app_name`, `node_version` and `build_version`, are provided by `publish-oci`, see its
 [README](../publish-oci/README.md).
 
@@ -291,9 +312,28 @@ Prefer `repo:` over `org:` or `enterprise:`: the token is persisted as a git cre
 whole job, so every later step, including test code, can read everything it grants. Private GitHub
 Package Registry dependencies use the job `GITHUB_TOKEN` and are unaffected.
 
+## Migrating from app-monorepo-stack
+
+`app-monorepo-stack` was renamed to `app-stack`. Inputs and outputs are unchanged.
+
+- Change the caller tag to `@app-stack-v0` (previously `@app-monorepo-stack-v1`) <!-- x-release-please-major -->
+
+## Migrating from a hand-written workflow
+
+- Replace the build, release and publish jobs with the [example](#example-workflow-file) in
+  `.github/workflows/ci.yaml`, triggered on `pull_request` and `push`. `pull_request_target` fails in
+  `Configure`.
+- The required status check becomes `CI / Status` (plus `Lint commits`).
+- Publishing to npmjs moves from an `NPM_AUTH_TOKEN` secret to
+  [trusted publishing](https://docs.npmjs.com/trusted-publishers): register `ci.yaml` as trusted
+  publisher of the package and add `"publishConfig": { "npm": true }` to `package.json`, see
+  [`publish-npm`](../publish-npm/README.md).
+- The workflow installs only the tools in `.tool-versions` and the dependencies. Test scripts that
+  need browsers install them themselves, for example `playwright install --with-deps && vitest run`.
+
 ## Migrating from polyglot-monorepo-stack
 
-- Call `app-monorepo-stack` instead of `polyglot-monorepo-stack`.
+- Call `app-stack` instead of `polyglot-monorepo-stack`.
 - Rename the caller to `.github/workflows/ci.yaml` with `name: CI`, trigger it on `pull_request`
   and `push`, and follow the [example](#example-workflow-file). `pull_request_target` now fails in
   `Configure`.
@@ -330,11 +370,11 @@ Package Registry dependencies use the job `GITHUB_TOKEN` and are unaffected.
 | `checkout-submodules`      | Whether to checkout submodules.<br>**Default:** `false`<br>**Example:** `true`, `false`, `recursive`<br>**Note:** Use `recursive` to recursively checkout submodules                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | No       | `false`      |
 | `checkout-token-resources` | Additional resources the checkout token must be able to read, whitespace-separated.<br>When set, the workflow exchanges its OIDC token at the token broker for an installation token with `contents:read` on this repository plus these resources, and uses it for every checkout.<br>**Default:** _empty_ (no exchange; `GITHUB_TOKEN` is used)<br>**Format:** `repo:owner/name`, `org:name` or `enterprise:slug`<br>**Example:** `repo:my-org/private-submodule repo:my-org/go-lib`<br>**Requires:** `token-broker-url` (or the `TOKEN_BROKER_URL` repository variable), and the token broker's GitHub App installed on this repository and every listed resource<br>**Note:** Unavailable on pull requests from forks, which have no OIDC token; those runs use `GITHUB_TOKEN` | No       | _empty_      |
 | `prerelease-channel`       | Prerelease channel name (e.g., "beta", "canary", "rc").<br>When set, computes prerelease versions and sets the channel of prerelease entries in the release list.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | No       | _empty_      |
-| `source-units`             | Units pruned into the source payload, one directory pattern per line.<br>`*` matches exactly one path segment. Only directories with a `package.json` count.<br>**Default:** `apps/*`<br>**Example:** `apps/*` and `services/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | No       | `apps/*`     |
-| `dist-units`               | Units packed into the dist payload, one directory pattern per line.<br>`*` matches exactly one path segment. Only directories with a `package.json` count.<br>**Default:** `packages/*`<br>**Example:** `packages/*` and `libs/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | No       | `packages/*` |
+| `source-units`             | Units pruned into the source payload, one directory pattern per line.<br>`*` matches exactly one path segment. Only directories with a `package.json` count.<br>`.` selects the repository root, which is not pruned: the source payload already holds the whole tree.<br>**Default:** `apps/*`<br>**Example:** `apps/*` and `services/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                                                       | No       | `apps/*`     |
+| `dist-units`               | Units packed into the dist payload, one directory pattern per line.<br>`*` matches exactly one path segment. Only directories with a `package.json` count.<br>`.` selects the repository root.<br>**Default:** `packages/*`<br>**Example:** `packages/*` and `libs/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | No       | `packages/*` |
 
 ## Outputs
 
-| Output     | Description                                                                                                                                                                                                                                                                                                                              |
-| :--------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `releases` | Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.<br>Each entry: {schema: 1, name, path, version, channel, sha, payloads}.<br>`payloads.source` is set for source units, `payloads.dist` for dist units.<br>`[]` when nothing was released. |
+| Output     | Description                                                                                                                                                                                                                                                                                                                                                                                                           |
+| :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `releases` | Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.<br>Each entry: {schema: 1, name, path, version, channel, sha, payloads}. `name` is the directory basename, the repository name for the root unit `.`.<br>`payloads.source` is set for source units, `payloads.dist` for dist units.<br>`[]` when nothing was released. |

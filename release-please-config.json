@@ -35,7 +35,7 @@
 		"workflows/release": {
 			"extra-files": ["README.md"]
 		},
-		"workflows/app-monorepo-stack": {
+		"workflows/app-stack": {
 			"extra-files": ["README.md"]
 		},
 		"workflows/gitops-stack": {
