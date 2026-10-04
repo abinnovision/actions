@@ -301,53 +301,6 @@ Prefer `repo:` over `org:` or `enterprise:`: the token is persisted as a git cre
 whole job, so every later step, including test code, can read everything it grants. Private GitHub
 Package Registry dependencies use the job `GITHUB_TOKEN` and are unaffected.
 
-## Migrating from app-monorepo-stack
-
-`app-monorepo-stack` was renamed to `app-stack`. Inputs and outputs are unchanged.
-
-- Change the caller tag to `@{{name}}-v{{version.major}}` (previously `@app-monorepo-stack-v1`) <!-- x-release-please-major -->
-
-## Migrating from a hand-written workflow
-
-- Replace the build, release and publish jobs with the [example](#example-workflow-file) in
-  `.github/workflows/ci.yaml`, triggered on `pull_request` and `push`. `pull_request_target` fails in
-  `Configure`.
-- The required status check becomes `CI / Status` (plus `Lint commits`).
-- Publishing to npmjs moves from an `NPM_AUTH_TOKEN` secret to
-  [trusted publishing](https://docs.npmjs.com/trusted-publishers): register `ci.yaml` as trusted
-  publisher of the package and add `"publishConfig": { "npm": true }` to `package.json`, see
-  [`publish-npm`](../publish-npm/README.md).
-- The workflow installs only the tools in `.tool-versions` and the dependencies. Test scripts that
-  need browsers install them themselves, for example `playwright install --with-deps && vitest run`.
-
-## Migrating from polyglot-monorepo-stack
-
-- Call `app-stack` instead of `polyglot-monorepo-stack`.
-- Rename the caller to `.github/workflows/ci.yaml` with `name: CI`, trigger it on `pull_request`
-  and `push`, and follow the [example](#example-workflow-file). `pull_request_target` now fails in
-  `Configure`.
-- The required status check becomes `CI / Status` (plus `Lint commits`).
-- Publishing moved to separate workflows that the caller wires to this workflow's `releases` output.
-  Images keep the name `app-<name>` when `publish-oci` is called with `image: app-{name}`.
-
-| Removed input or secret                                  | Replacement                                                                        |
-| :------------------------------------------------------- | :--------------------------------------------------------------------------------- |
-| `enable-package-publishing`                              | Add a `publish-npm` job with `releases: needs.ci.outputs.releases`                 |
-| `enable-packages-registry-npm`                           | `publish-npm` input `npm`                                                          |
-| `enable-packages-registry-npm-provenance`                | `publish-npm` input `provenance`                                                   |
-| `enable-packages-registry-ghpr`                          | `publish-npm` input `ghpr`                                                         |
-| `enable-app-image-builds`                                | Add a `publish-oci` job with `releases: needs.ci.outputs.releases`                 |
-| `enable-apps-registry-ghcr`                              | `publish-oci` input `ghcr`                                                         |
-| `enable-apps-registry-gcpar`, `registry-gcpar-url`       | `publish-oci` input `registry`                                                     |
-| `gcp-workload-identity-provider`, `gcp-auth`             | `publish-oci` inputs of the same name                                              |
-| `gitops-app-config`                                      | `publish-oci` input `gitops-config` (registry column removed, image name optional) |
-| `gitops-workflow-file`                                   | `publish-oci` input `gitops-workflow-file`                                         |
-| `APP_IMAGE_SECRETS`                                      | `publish-oci` secret `APP_IMAGE_SECRETS`                                           |
-| `CHECKOUT_TOKEN`                                         | Input `checkout-token-resources`                                                   |
-| `enable-apps-registry-dockerhub`, `registry-dockerhub-*` | Not available; stay on `polyglot-monorepo-stack` if needed                         |
-| `REGISTRY_DOCKERHUB_TOKEN`                               | Not available; stay on `polyglot-monorepo-stack` if needed                         |
-| `enable-gh-pages`, `gh-pages-build-output`               | Not available; stay on `polyglot-monorepo-stack` if needed                         |
-
 ## Inputs
 
 {{> inputs-table inputs}}
