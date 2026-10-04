@@ -42,7 +42,8 @@ on:
         required: false
         default: "{name}"
         description: |-
-          Image repository name, used for every registry. `{path}` and `{name}` are replaced per unit.
+          Image repository name, used for every registry. `{path}` and `{name}` are replaced per unit, and the result is lowercased.
+          A value without placeholders is used as is for every unit.
           **Default:** `{name}`
           **Example:** `app-{name}`
 
@@ -254,9 +255,10 @@ jobs:
             exit 0
           fi
 
-          # Plain string replacement; values are never evaluated.
+          # Plain string replacement; values are never evaluated. Lowercased, as OCI repository names must be.
           image="${INPUT_IMAGE//"{path}"/"$APP_PATH"}"
           image="${image//"{name}"/"$APP"}"
+          image="${image,,}"
 
           turbo_cache="false"
           if [[ -f payload/turbo.json ]]; then
@@ -560,6 +562,7 @@ jobs:
             # Same plain string replacement as the build job.
             default_image="${INPUT_IMAGE//"{path}"/"$app_path"}"
             default_image="${default_image//"{name}"/"$app"}"
+            default_image="${default_image,,}"
 
             IFS=, read -r _ target_repo dev_app release_app image_name <<< "$config_line"
             image_name="${image_name:-$default_image}"
