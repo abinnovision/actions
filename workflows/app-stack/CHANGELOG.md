@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0 (2026-10-04)
+
+
+### Features
+
+* rename app-monorepo-stack to app-stack and support single-package repos ([#608](https://github.com/abinnovision/actions/issues/608)) ([e1c7fe7](https://github.com/abinnovision/actions/commit/e1c7fe7ba688b01c7fa6cac97a6cbc6264915d5a))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/app-monorepo-stack-source-v1.0.0...app-monorepo-stack-source-v1.0.1) (2026-10-03)
 
 
