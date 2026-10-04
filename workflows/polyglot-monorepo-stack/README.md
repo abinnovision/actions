@@ -1,6 +1,6 @@
 # polyglot-monorepo-stack
 
-> **Deprecated:** use [app-monorepo-stack](../app-monorepo-stack/README.md). This workflow only receives fixes.
+> **Deprecated:** use [app-stack](../app-stack/README.md). This workflow only receives fixes.
 
 CI/CD for Yarn + Turborepo monorepos that mix Node.js, Python and Go. It checks and builds the
 repository on every pull request, and on the default branch it also creates releases and publishes

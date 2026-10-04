@@ -5,14 +5,13 @@ skeleton, one trigger model and one required status check, so repository ruleset
 
 ## Kinds
 
-| Kind   | Stack                                                              | Repository contains                                    |
-| :----- | :----------------------------------------------------------------- | :----------------------------------------------------- |
-| app    | [app-monorepo-stack](../../workflows/app-monorepo-stack/README.md) | Yarn and Turbo monorepo with `apps/*` and `packages/*` |
-| gitops | [gitops-stack](../../workflows/gitops-stack/README.md)             | Kubernetes manifests synced by ArgoCD                  |
-| iac    | [iac-stack](../../workflows/iac-stack/README.md)                   | OpenTofu root modules with remote state                |
+| Kind   | Stack                                                  | Repository contains                                                                     |
+| :----- | :----------------------------------------------------- | :-------------------------------------------------------------------------------------- |
+| app    | [app-stack](../../workflows/app-stack/README.md)       | Yarn and Turbo monorepo with `apps/*` and `packages/*`, or a single package at the root |
+| gitops | [gitops-stack](../../workflows/gitops-stack/README.md) | Kubernetes manifests synced by ArgoCD                                                   |
+| iac    | [iac-stack](../../workflows/iac-stack/README.md)       | OpenTofu root modules with remote state                                                 |
 
-Planned kinds: single-package repositories (`app-standalone-stack`) and Go repositories released with goreleaser. They
-follow the same contract.
+Planned kind: Go repositories released with goreleaser. It follows the same contract.
 
 ## Calling a stack
 
@@ -64,11 +63,11 @@ uses: abinnovision/actions/.github/workflows/workflow.yaml@<name>-v<major>
 
 The name tells the family of the workflow:
 
-| Family    | Pattern                  | Examples                                          | Rule                                                                                              |
-| :-------- | :----------------------- | :------------------------------------------------ | :------------------------------------------------------------------------------------------------ |
-| Stack     | `<kind>[-<shape>]-stack` | `app-monorepo-stack`, `gitops-stack`, `iac-stack` | One per repository kind. `<shape>` only when a kind has more than one repository layout           |
-| Publisher | `publish-<target>`       | `publish-oci`, `publish-npm`                      | `<target>` is the artifact or registry type, not a vendor product name when a generic term exists |
-| Helper    | `<kind>-<verb>-<object>` | `gitops-update-tags`                              | Dispatched by other workflows, never called from `ci.yaml`                                        |
+| Family    | Pattern                  | Examples                                 | Rule                                                                                              |
+| :-------- | :----------------------- | :--------------------------------------- | :------------------------------------------------------------------------------------------------ |
+| Stack     | `<kind>[-<shape>]-stack` | `app-stack`, `gitops-stack`, `iac-stack` | One per repository kind. `<shape>` only when a kind has more than one repository layout           |
+| Publisher | `publish-<target>`       | `publish-oci`, `publish-npm`             | `<target>` is the artifact or registry type, not a vendor product name when a generic term exists |
+| Helper    | `<kind>-<verb>-<object>` | `gitops-update-tags`                     | Dispatched by other workflows, never called from `ci.yaml`                                        |
 
 Composite actions follow `actions/<verb>-<object>` (`run-commitlint`, `exchange-github-token`, `setup-tools`) with the
 same tag scheme.
@@ -106,12 +105,12 @@ fixed. The workflow `name:` never appears in check contexts.
 
 ## Jobs
 
-| Job         | Runs                              | Does                                                                  |
-| :---------- | :-------------------------------- | :-------------------------------------------------------------------- |
-| `Configure` | Always                            | Resolves the event into `mode` and `trusted`, validates the inputs    |
-| `Check`     | Always                            | Repository checks and static checks of the stack, without credentials |
-| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, preview, deploy, plan, apply     |
-| `Status`    | Always                            | Fails when any other job failed or was cancelled                      |
+| Job         | Runs                              | Does                                                                                                    |
+| :---------- | :-------------------------------- | :------------------------------------------------------------------------------------------------------ |
+| `Configure` | Always                            | Resolves the event into `mode` and, for stacks with credentialed lanes, `trusted`; validates the inputs |
+| `Check`     | Always                            | Repository checks and static checks of the stack, without credentials                                   |
+| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, preview, deploy, plan, apply                                       |
+| `Status`    | Always                            | Fails when any other job failed or was cancelled                                                        |
 
 - `mode` is `pr` for pull requests, `main` for pushes to the default branch and `none` otherwise.
 - `trusted` is `false` for pull requests from forks and from Dependabot. Lanes that need credentials are skipped for
@@ -127,9 +126,9 @@ Rulesets require exactly two contexts, independent of the kind:
 ### Repository checks
 
 `Check` runs the same baseline in every stack: tool setup from `.tool-versions`, `yarn install --immutable`,
-`yarn dedupe --check` and `yarn check`. `app-monorepo-stack` installs through `make install-immutable`, also runs
-`turbo boundaries` and builds before `check`. Every repository therefore needs a `.tool-versions` with `nodejs` and a
-`check` script in its `package.json`.
+`yarn dedupe --check` and `yarn check`. `app-stack` installs through `make install-immutable` when a Makefile exists, runs
+`turbo boundaries` when Turbo is a dependency and builds before `check`. Every repository therefore needs a `.tool-versions` with `nodejs` and a
+`check` script in its `package.json`; app repositories also need a `build` script.
 
 ## Conventions inside the workflows
 
@@ -152,15 +151,17 @@ lines ignored), where `*` matches exactly one path segment and never `/`: `apps/
 `apps/web/admin`. Stacks and publish workflows use the same semantics.
 
 - Stack inputs: `source-units` (default `apps/*`) and `dist-units` (default `packages/*`).
+- The pattern `.` selects the repository root. Its `name` is the repository name; publish workflows select it with
+  `include: .`.
 - Publish workflow input: `include`, matched against the entry `path` (default `apps/*` for publish-oci, `packages/*`
   for publish-npm).
 
 ### Payloads
 
-| Kind   | Artifact         | File         | Contents                                                                                                     |
-| :----- | :--------------- | :----------- | :----------------------------------------------------------------------------------------------------------- |
-| source | `payload-source` | `source.tar` | Tracked source tree (including submodules) plus `out/<name>/` (`turbo prune --docker`) for every source unit |
-| dist   | `payload-dist`   | `<name>.tgz` | One `yarn pack` tarball per dist unit; yarn has replaced `workspace:` ranges                                 |
+| Kind   | Artifact         | File         | Contents                                                                                                                         |
+| :----- | :--------------- | :----------- | :------------------------------------------------------------------------------------------------------------------------------- |
+| source | `payload-source` | `source.tar` | Tracked source tree (including submodules) plus `out/<name>/` (`turbo prune --docker`) for every source unit except the root `.` |
+| dist   | `payload-dist`   | `<name>.tgz` | One `yarn pack` tarball per dist unit; yarn has replaced `workspace:` ranges                                                     |
 
 `<name>` is the directory basename; the stack rejects duplicate basenames within the source units or within the dist
 units. Payloads are version-free and kept for 7 days. Artifacts are only shared within one workflow run, so the stack
@@ -188,7 +189,7 @@ and the publish jobs must run in the same caller workflow.
 | Field      | Description                                                                                         |
 | :--------- | :-------------------------------------------------------------------------------------------------- |
 | `schema`   | Protocol version, currently `1`                                                                     |
-| `name`     | Directory basename                                                                                  |
+| `name`     | Directory basename, the repository name for the root unit `.`                                       |
 | `path`     | Unit path in the repository, the unique key                                                         |
 | `version`  | Released version without build metadata                                                             |
 | `channel`  | Prerelease channel, `""` for a stable release                                                       |

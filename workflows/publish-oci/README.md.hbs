@@ -21,7 +21,9 @@ the entries whose `path` matches `include`.
   (default `apps/*`)
 - `Prepare` fails when a selected entry has a `schema` other than `1` or no `payloads.source`
 - `image` is resolved per unit by plain string replacement: `{path}` becomes the entry's `path`,
-  `{name}` its `name` (e.g. `app-{name}` -> `app-backend`)
+  `{name}` its `name` (e.g. `app-{name}` -> `app-backend`). The result is lowercased, as OCI
+  repository names must be. A value without placeholders, such as `image: recaptcha-v3` for a
+  single-package repository, names the image directly
 
 ## Conventions
 
