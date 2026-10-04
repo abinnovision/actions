@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.0.1...publish-oci-source-v1.1.0) (2026-10-04)
+
+
+### Features
+
+* **publish-oci:** add gitops-routes for per-type GitOps routing ([#607](https://github.com/abinnovision/actions/issues/607)) ([112bf66](https://github.com/abinnovision/actions/commit/112bf66c1a448ab4ec827c65658b8d36438d2bde))
+* rename app-monorepo-stack to app-stack and support single-package repos ([#608](https://github.com/abinnovision/actions/issues/608)) ([e1c7fe7](https://github.com/abinnovision/actions/commit/e1c7fe7ba688b01c7fa6cac97a6cbc6264915d5a))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.0.0...publish-oci-source-v1.0.1) (2026-10-03)
 
 
