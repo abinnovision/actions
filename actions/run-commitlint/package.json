@@ -40,7 +40,7 @@
 		"@commitlint/execute-rule": "21.0.1",
 		"@commitlint/format": "21.2.3",
 		"@commitlint/lint": "21.2.3",
-		"chalk": "^6.0.0",
+		"chalk": "^6.0.1",
 		"conventional-changelog-conventionalcommits": "10.4.0"
 	},
 	"devDependencies": {
