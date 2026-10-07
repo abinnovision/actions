@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.5](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.3.4...run-commitlint-source-v1.3.5) (2026-10-07)
+
+
+### Bug Fixes
+
+* **deps:** bump chalk from 6.0.0 to 6.0.1 ([#609](https://github.com/abinnovision/actions/issues/609)) ([3498138](https://github.com/abinnovision/actions/commit/3498138b90cc575e466e2df7c7e334ccf9d51834))
+
 ## [1.3.4](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.3.3...run-commitlint-source-v1.3.4) (2026-09-30)
 
 

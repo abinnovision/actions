@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.0...app-stack-source-v1.0.1) (2026-10-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.4.1
+
 ## 1.0.0 (2026-10-04)
 
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/gitops-stack-source-v1.0.0...gitops-stack-source-v1.0.1) (2026-10-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-k8s-tools bumped to 2.0.4
+    * setup-oidc-token-cli bumped to 1.1.4
+
 ## 1.0.0 (2026-10-03)
 
 
