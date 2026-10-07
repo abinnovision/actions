@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/abinnovision/actions/compare/action-tool-installer-source-v3.0.0...action-tool-installer-source-v3.0.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* **deps:** bump @actions/cache from 6.2.0 to 6.3.0 ([#612](https://github.com/abinnovision/actions/issues/612)) ([2d7a4fb](https://github.com/abinnovision/actions/commit/2d7a4fb6077d810347170c0b54e7a16c26e43836))
+
 ## [3.0.0](https://github.com/abinnovision/actions/compare/action-tool-installer-source-v2.0.0...action-tool-installer-source-v3.0.0) (2026-07-19)
 
 

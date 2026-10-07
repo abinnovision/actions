@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.1](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.1.0...publish-oci-source-v1.1.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* **publish-oci:** run buildx setup in the foreground ([#614](https://github.com/abinnovision/actions/issues/614)) ([a07b691](https://github.com/abinnovision/actions/commit/a07b691e42c10168f16977e54a0af52f34df0160))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.4.1
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.0.1...publish-oci-source-v1.1.0) (2026-10-04)
 
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.1](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.4.0...exchange-github-token-source-v1.4.1) (2026-10-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @internal/action-tool-installer bumped to 3.0.1
+
 ## [1.4.0](https://github.com/abinnovision/actions/compare/exchange-github-token-source-v1.3.0...exchange-github-token-source-v1.4.0) (2026-10-01)
 
 

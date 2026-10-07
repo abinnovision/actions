@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.7.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.7.0...polyglot-monorepo-stack-source-v2.7.1) (2026-10-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.4.1
+    * release bumped to 2.1.8
+
 ## [2.7.0](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.6.1...polyglot-monorepo-stack-source-v2.7.0) (2026-10-04)
 
 
