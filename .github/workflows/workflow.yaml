@@ -1,0 +1,567 @@
+# CI for Yarn repositories: Turborepo monorepos that mix Node.js, Python and Go, and single-package repositories.
+# Checks, builds and tests every change. On push to the default branch it packs the dist units into the
+# dist payload, prunes the source units into the source payload and creates releases. Both payloads are
+# target-neutral artifacts. The released units are exposed as one release list through the `releases`
+# output. Publishing is wired by the caller.
+
+name: App Stack
+
+on:
+  workflow_call:
+    inputs:
+      token-broker-url:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          URL of the token broker for OIDC token exchange.
+          **Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.
+      default-branch:
+        type: string
+        required: false
+        default: "main"
+        description: |-
+          Default branch name for the repository.
+          **Default:** `main`
+          **Example:** `main`, `master`, `develop`
+      test-types:
+        type: string
+        required: false
+        default: "unit"
+        description: |-
+          Comma-separated list of test types to run.
+          **Valid values:** `unit`, `integration`, `e2e`
+          **Default:** `unit`
+          **Example:** `unit,integration,e2e`
+      run-unit-tests-in-build:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Run unit tests as part of the check job instead of a separate job.
+          Recommended for smaller monorepos to reduce overall execution time.
+          **Default:** `true`
+          **Note:** You must include `unit` in the `test-types` input for this to have any effect.
+      checkout-submodules:
+        type: string
+        required: false
+        default: "false"
+        description: |-
+          Whether to checkout submodules.
+          **Default:** `false`
+          **Example:** `true`, `false`, `recursive`
+          **Note:** Use `recursive` to recursively checkout submodules
+      checkout-token-resources:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Additional resources the checkout token must be able to read, whitespace-separated.
+          When set, the workflow exchanges its OIDC token at the token broker for an installation token with `contents:read` on this repository plus these resources, and uses it for every checkout.
+          **Default:** _empty_ (no exchange; `GITHUB_TOKEN` is used)
+          **Format:** `repo:owner/name`, `org:name` or `enterprise:slug`
+          **Example:** `repo:my-org/private-submodule repo:my-org/go-lib`
+          **Requires:** `token-broker-url` (or the `TOKEN_BROKER_URL` repository variable), and the token broker's GitHub App installed on this repository and every listed resource
+          **Note:** Unavailable on pull requests from forks, which have no OIDC token; those runs use `GITHUB_TOKEN`
+      prerelease-channel:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Prerelease channel name (e.g., "beta", "canary", "rc").
+          When set, computes prerelease versions and sets the channel of prerelease entries in the release list.
+      source-units:
+        type: string
+        required: false
+        default: "apps/*"
+        description: |-
+          Units pruned into the source payload, one directory pattern per line.
+          `*` matches exactly one path segment. Only directories with a `package.json` count.
+          `.` selects the repository root, which is not pruned: the source payload already holds the whole tree.
+          **Default:** `apps/*`
+          **Example:** `apps/*` and `services/*` on separate lines
+      dist-units:
+        type: string
+        required: false
+        default: "packages/*"
+        description: |-
+          Units packed into the dist payload, one directory pattern per line.
+          `*` matches exactly one path segment. Only directories with a `package.json` count.
+          `.` selects the repository root.
+          **Default:** `packages/*`
+          **Example:** `packages/*` and `libs/*` on separate lines
+
+    outputs:
+      releases:
+        value: ${{ jobs.release.outputs.releases || '[]' }}
+        description: |-
+          Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.
+          Each entry: {schema: 1, name, path, version, channel, sha, payloads}. `name` is the directory basename, the repository name for the root unit `.`.
+          `payloads.source` is set for source units, `payloads.dist` for dist units.
+          `[]` when nothing was released.
+
+permissions: {}
+
+env:
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Resolve the event, validate the repository, resolve the units and discover test types.
+  configure:
+    name: Configure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      # Commit SHA to check out.
+      commit-sha: ${{ steps.event.outputs.commit_sha }}
+
+      # Pipeline mode (pr, main or none).
+      mode: ${{ steps.event.outputs.mode }}
+
+      # Unit paths as compact JSON arrays, `.` for the repository root.
+      source-units: ${{ steps.units.outputs.source-units }}
+      dist-units: ${{ steps.units.outputs.dist-units }}
+
+      # Test types to run.
+      test-types: ${{ steps.evaluate.outputs.test_types }}
+      test-types-for-matrix: ${{ steps.evaluate.outputs.test_types_for_matrix }}
+    steps:
+      # Resolve the commit SHA and mode for this event.
+      - name: Evaluate event
+        id: event
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ inputs.default-branch }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
+            echo "::error::'pull_request_target' is not supported by app-stack. Switch the caller to 'pull_request'."
+            exit 1
+          fi
+
+          mode="none"
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            mode="pr"
+          elif [[ "$EVENT_NAME" == "push" && "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
+            mode="main"
+          fi
+
+          echo "commit_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+          echo "Event: $EVENT_NAME"
+          echo "Commit SHA: $HEAD_SHA"
+          echo "Mode: $mode"
+
+      # Check out the root files of the resolved commit only; blobs are fetched on demand.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.event.outputs.commit_sha }}
+          submodules: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/*/
+
+      # Add the package.json of every directory matching a unit pattern to the sparse checkout.
+      - name: Checkout unit manifests
+        env:
+          INPUT_SOURCE_UNITS: ${{ inputs.source-units }}
+          INPUT_DIST_UNITS: ${{ inputs.dist-units }}
+        run: |
+          set -euo pipefail
+
+          manifests() {
+            local output="$1" patterns="$2" pattern
+            while read -r pattern; do
+              [[ -n "$pattern" ]] || continue
+              if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ ]]; then
+                echo "::error::Invalid pattern '$pattern' in $output: only path segments and '*' are supported" >&2
+                exit 1
+              fi
+              # The root package.json is already checked out.
+              [[ "${pattern%/}" != "." ]] || continue
+              echo "/${pattern%/}/package.json"
+            done <<< "$patterns"
+          }
+
+          paths=$(manifests source-units "$INPUT_SOURCE_UNITS"; manifests dist-units "$INPUT_DIST_UNITS")
+          echo "$paths"
+          if [[ -n "$paths" ]]; then
+            git sparse-checkout add --stdin <<< "$paths"
+          fi
+
+      # Optional: without a Makefile, dependencies are installed with `yarn install --immutable`.
+      - name: Validate Makefile
+        run: |
+          if [ ! -f "Makefile" ]; then
+            echo "No Makefile, installing with 'yarn install --immutable'"
+            exit 0
+          fi
+          if ! grep -qE '^install-immutable:' Makefile; then
+            echo "::error::Makefile missing required 'install-immutable' target"
+            exit 1
+          fi
+
+      # Every directory matching a pattern line that contains a package.json is a unit. The unquoted
+      # pattern, validated by the previous step, is expanded by bash, so `*` matches one path segment.
+      - name: Resolve units
+        id: units
+        env:
+          INPUT_SOURCE_UNITS: ${{ inputs.source-units }}
+          INPUT_DIST_UNITS: ${{ inputs.dist-units }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          resolve() {
+            local output="$1" patterns="$2" pattern dir units duplicates
+            units=$(
+              while read -r pattern; do
+                [[ -n "$pattern" ]] || continue
+                for dir in $pattern; do
+                  if [[ -f "$dir/package.json" ]]; then
+                    echo "${dir%/}"
+                  fi
+                done
+              done <<< "$patterns" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique'
+            )
+
+            duplicates=$(jq -r --arg root "$REPOSITORY_NAME" '
+              group_by(if . == "." then $root else split("/") | last end)
+              | map(select(length > 1) | join(", ")) | join("; ")
+            ' <<< "$units")
+            if [[ -n "$duplicates" ]]; then
+              echo "::error::Duplicate basenames in $output: $duplicates"
+              exit 1
+            fi
+
+            echo "$output=$units" >> "$GITHUB_OUTPUT"
+            echo "$output: $units"
+          }
+
+          resolve source-units "$INPUT_SOURCE_UNITS"
+          resolve dist-units "$INPUT_DIST_UNITS"
+
+      # Parse test types.
+      - name: Evaluate
+        id: evaluate
+        env:
+          INPUT_TEST_TYPES: ${{ inputs.test-types }}
+          INPUT_RUN_UNIT_TESTS_IN_BUILD: ${{ inputs.run-unit-tests-in-build }}
+        run: |
+          # Parse and validate test types
+          test_types=()
+          test_types_for_matrix=()
+          valid_types=("unit" "integration" "e2e")
+
+          if [ -n "$INPUT_TEST_TYPES" ]; then
+            IFS=',' read -ra types <<< "$INPUT_TEST_TYPES"
+            for type in "${types[@]}"; do
+              # Trim whitespace
+              type=$(echo "$type" | xargs)
+
+              # Validate type
+              if [[ " ${valid_types[@]} " =~ " ${type} " ]]; then
+                test_types+=("$type")
+
+                # Exclude unit tests from matrix if they run in the check job
+                if [[ "$type" == "unit" && "$INPUT_RUN_UNIT_TESTS_IN_BUILD" == "true" ]]; then
+                  echo "Unit tests will run in the check job, excluding from test matrix"
+                else
+                  test_types_for_matrix+=("$type")
+                fi
+              else
+                echo "::warning::Invalid test type '$type' - skipping. Valid types: unit, integration, e2e"
+              fi
+            done
+          fi
+
+          # Convert to JSON using jq
+          test_types_json=$(printf '%s\n' "${test_types[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          test_types_matrix_json=$(printf '%s\n' "${test_types_for_matrix[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "test_types=$test_types_json" >> $GITHUB_OUTPUT
+          echo "test_types_for_matrix=$test_types_matrix_json" >> $GITHUB_OUTPUT
+
+          # Debug output
+          echo "All test types: $test_types_json"
+          echo "Test types for matrix: $test_types_matrix_json"
+
+  # Install, build and check. Builds first so linter config in compiled workspace packages is available.
+  # On push to the default branch it also prunes the source units into the source payload and packs the
+  # dist units into the dist payload.
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - configure
+    permissions:
+      contents: read
+      packages: read
+      actions: write
+      id-token: write
+    steps:
+      - &checkout-token
+        id: checkout-token
+        name: Exchange token for checkout
+        if: >-
+          inputs.checkout-token-resources != ''
+          && (github.event.pull_request == null
+          || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: abinnovision/actions@exchange-github-token-v1.4.1
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          resources: "repo:${{ github.repository }} ${{ inputs.checkout-token-resources }}"
+          scope: contents:read
+
+      - &checkout
+        name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: ${{ inputs.checkout-submodules }}
+          token: ${{ steps.checkout-token.outputs.token || github.token }}
+      - name: Setup Tools
+        uses: abinnovision/actions@setup-tools-v1.1.0
+
+      # Runs before install and build so the pruned trees only contain tracked sources.
+      - name: Prune source units
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
+        env:
+          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
+        run: |
+          set -euo pipefail
+
+          # The root unit is not pruned, the payload already holds the whole tree.
+          mapfile -t units < <(jq -r '.[] | select(. != ".")' <<< "$SOURCE_UNITS")
+
+          if [[ ${#units[@]} -gt 0 ]]; then
+            # Get turbo version from package.json (required to prune)
+            TURBO_VERSION=$(jq -r '.devDependencies.turbo // .dependencies.turbo // empty' package.json)
+
+            if [ -z "$TURBO_VERSION" ]; then
+              echo "::error::Turbo not found in package.json devDependencies or dependencies"
+              exit 1
+            fi
+
+            echo "Turbo version: $TURBO_VERSION"
+          fi
+
+          for unit in "${units[@]}"; do
+            # Package name of the unit, used as the prune scope
+            scope=$(jq -r '.name // empty' "$unit/package.json")
+            if [[ -z "$scope" ]]; then
+              echo "::error::Package name not found in $unit/package.json"
+              exit 1
+            fi
+
+            # Outside the workspace so later check steps don't pick up the pruned trees.
+            echo "Running turbo prune for scope: $scope"
+            yarn dlx turbo@"$TURBO_VERSION" prune --scope="$scope" --docker --out-dir="$RUNNER_TEMP/out/${unit##*/}"
+          done
+
+          # Tracked source tree (including submodules) plus the pruned unit trees under out/.
+          git ls-files --recurse-submodules -z | tar --null -T - -cf "$RUNNER_TEMP/source.tar"
+          if [[ -d "$RUNNER_TEMP/out" ]]; then
+            tar -rf "$RUNNER_TEMP/source.tar" -C "$RUNNER_TEMP" out
+          fi
+          ls -lh "$RUNNER_TEMP/source.tar"
+
+      # Uploads while the remaining steps run; joined at the end of the job.
+      - id: upload-source
+        name: Upload source payload
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
+        background: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: payload-source
+          path: ${{ runner.temp }}/source.tar
+          retention-days: 7
+          if-no-files-found: error
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+      - &install
+        name: Install dependencies
+        run: |
+          if [[ -f Makefile ]]; then
+            make install-immutable
+          else
+            yarn install --immutable
+          fi
+      - name: Check dependencies
+        run: |
+          yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
+          if jq -e '.devDependencies.turbo // .dependencies.turbo' package.json > /dev/null; then
+            yarn turbo boundaries || (echo "turbo boundaries failed" && exit 1)
+          fi
+      - name: Build
+        run: yarn run build
+      - name: Check
+        run: yarn run check
+      - name: Unit Tests
+        if: ${{ inputs.run-unit-tests-in-build && contains(fromJSON(needs.configure.outputs.test-types), 'unit') }}
+        run: yarn run test-unit
+
+      # One version-free tarball per dist unit, named after the directory basename or, for the root, the repository.
+      - name: Pack dist units
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
+        env:
+          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$RUNNER_TEMP/dist"
+          mapfile -t units < <(jq -r '.[]' <<< "$DIST_UNITS")
+          for unit in "${units[@]}"; do
+            name="${unit##*/}"
+            if [[ "$unit" == "." ]]; then
+              name="$REPOSITORY_NAME"
+            fi
+            (cd "$unit" && yarn pack --out "$RUNNER_TEMP/dist/$name.tgz")
+          done
+
+      - name: Upload dist payload
+        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
+        uses: actions/upload-artifact@v7
+        with:
+          name: payload-dist
+          path: ${{ runner.temp }}/dist
+          retention-days: 7
+          if-no-files-found: error
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+      - name: Wait for source payload
+        wait: [upload-source]
+
+  # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
+  # Runs concurrently with check: neither job consumes build artifacts from the other.
+  test:
+    name: "Test: ${{ matrix.test-type }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs:
+      - configure
+    if: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix)[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix) }}
+    permissions:
+      contents: read
+      packages: read
+      actions: write
+      id-token: write
+    steps:
+      - *checkout-token
+      - *checkout
+      - name: Setup Tools
+        uses: abinnovision/actions@setup-tools-v1.1.0
+      - *install
+      - name: Build
+        run: yarn run build
+
+      # Requires test-* scripts in root package.json.
+      - name: Run ${{ matrix.test-type }} tests
+        env:
+          TEST_TYPE: ${{ matrix.test-type }}
+        run: yarn run "test-$TEST_TYPE"
+
+  # Create releases with release-please and emit the release list (schema 1) with one entry per released unit.
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - configure
+      - check
+      - test
+    # Only on push to the default branch, after a successful check and a successful or skipped test job.
+    # always() prevents skipping when the test job is skipped.
+    if: >-
+      always()
+      && needs.configure.outputs.mode == 'main'
+      && needs.check.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.test.result)
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      releases: ${{ steps.releases.outputs.releases }}
+    # No checkout: release-please reads the repository through the GitHub API.
+    steps:
+      - id: token
+        name: Exchange token for release
+        uses: abinnovision/actions@exchange-github-token-v1.4.1
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          scope: contents:write pull_requests:write
+
+      - id: release
+        name: Run release-please
+        uses: abinnovision/actions@run-release-please-v1.2.0
+        with:
+          token: ${{ steps.token.outputs.token }}
+          target-branch: ${{ inputs.default-branch }}
+          prerelease-channel: ${{ inputs.prerelease-channel }}
+
+      # `[]` when release-please released nothing.
+      - id: releases
+        name: Write release list
+        env:
+          VERSIONS: ${{ steps.release.outputs.versions }}
+          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
+          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+          INPUT_PRERELEASE_CHANNEL: ${{ inputs.prerelease-channel }}
+        run: |
+          set -euo pipefail
+
+          releases=$(jq -c \
+            --argjson source "$SOURCE_UNITS" \
+            --argjson dist "$DIST_UNITS" \
+            --arg root "$REPOSITORY_NAME" \
+            --arg channel "$INPUT_PRERELEASE_CHANNEL" \
+            '[to_entries[] | .key as $path | (if $path == "." then $root else $path | split("/") | last end) as $name | {
+              schema: 1,
+              name: $name,
+              path: $path,
+              version: .value.packageVersion,
+              channel: (if .value.type == "prerelease" then $channel else "" end),
+              sha: .value.sha,
+              payloads: (
+                (if $path | IN($source[]) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
+                + (if $path | IN($dist[]) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
+              )
+            }]' <<< "$VERSIONS")
+
+          echo "releases=$releases" >> "$GITHUB_OUTPUT"
+          echo "Releases: $releases"
+
+  # Single required status check for rulesets.
+  status:
+    name: Status
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [configure, check, test, release]
+    if: always()
+    permissions: {}
+    steps:
+      - name: Evaluate status
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
