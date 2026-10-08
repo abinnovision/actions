@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.1...app-stack-source-v1.0.2) (2026-10-08)
+
+
+### Bug Fixes
+
+* **app-stack:** run source payload upload in the foreground ([#616](https://github.com/abinnovision/actions/issues/616)) ([dedd326](https://github.com/abinnovision/actions/commit/dedd32617bf2e5126cf913c35d61d058468e30f3))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.0...app-stack-source-v1.0.1) (2026-10-07)
 
 
