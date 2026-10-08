@@ -380,11 +380,8 @@ jobs:
           fi
           ls -lh "$RUNNER_TEMP/source.tar"
 
-      # Uploads while the remaining steps run; joined at the end of the job.
-      - id: upload-source
-        name: Upload source payload
+      - name: Upload source payload
         if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
-        background: true
         uses: actions/upload-artifact@v7
         with:
           name: payload-source
@@ -445,9 +442,6 @@ jobs:
           if-no-files-found: error
           # Allows re-running the job within the same workflow run.
           overwrite: true
-
-      - name: Wait for source payload
-        wait: [upload-source]
 
   # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
   # Runs concurrently with check: neither job consumes build artifacts from the other.
