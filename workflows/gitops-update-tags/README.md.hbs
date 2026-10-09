@@ -12,6 +12,11 @@ Runs in repositories that use [gitops-stack](../gitops-stack/README.md#repositor
 - Optional automerge when all specified images are updated
 - Writes a job summary with the applied `image -> tag` updates, the pull request link, and automerge status
 
+## Requirements
+
+- The repository has a `.tool-versions` file with `nodejs` and `kustomize`, installed through
+  [setup-tools](../../actions/setup-tools/README.md)
+
 ## Usage
 
 This is a `workflow_call` workflow, so it can't be triggered directly. It must be called

@@ -26,8 +26,7 @@
 	"dependencies": {
 		"exchange-github-token": "workspace:^",
 		"setup-gcp": "workspace:^",
-		"setup-k8s-tools": "workspace:^",
-		"setup-node": "workspace:^"
+		"setup-tools": "workspace:^"
 	},
 	"devDependencies": {
 		"@abinnovision/prettier-config": "^2.2.0",
