@@ -87,12 +87,26 @@ jobs:
     needs:
       - configure
       - check_build
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-dev
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     # Only run on push to "main" branch.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      versions: ${{ steps.release.outputs.versions }}
+    steps:
+      - id: token
+        name: Exchange token for release
+        uses: abinnovision/actions@exchange-github-token-dev
+        with:
+          broker-url: ${{ vars.TOKEN_BROKER_URL }}
+          scope: contents:write pull_requests:write
+      - id: release
+        name: Run release-please
+        uses: abinnovision/actions@run-release-please-dev
+        with:
+          token: ${{ steps.token.outputs.token }}
 
   publish:
     name: Publish
