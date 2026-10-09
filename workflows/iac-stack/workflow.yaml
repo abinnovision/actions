@@ -8,9 +8,10 @@ on:
         required: false
         default: "tofu"
         description: |-
-          Root module directory, passed to `tofu -chdir`.
+          Root module directories, one pattern per line.
+          `*` matches exactly one path segment. Only directories with a `*.tf` or `*.tofu` file count.
           **Default:** `tofu`
-          **Example:** `infra`, `tofu/production`
+          **Example:** `infra`, `tofu/*`
 
       gcp-workload-identity-provider:
         type: string
@@ -44,7 +45,8 @@ on:
         default: ""
         description: |-
           Prefix of the GCS state object, so several roots can share one bucket.
-          **Default:** Falls back to `working-directory` if not provided.
+          Only allowed when `working-directory` matches exactly one root.
+          **Default:** Falls back to the root directory if not provided.
 
       default-branch:
         type: string
@@ -102,8 +104,6 @@ on:
 permissions: {}
 
 env:
-  WORKING_DIR: ${{ inputs.working-directory }}
-  STATE_PREFIX: ${{ inputs.state-prefix || inputs.working-directory }}
   WIF_PROVIDER: ${{ inputs.gcp-workload-identity-provider || vars.FOUNDRY_WIF_PROVIDER }}
   STATE_BUCKET: ${{ inputs.state-bucket || vars.FOUNDRY_STATE_BUCKET }}
   STATE_KEY: ${{ inputs.state-key || vars.FOUNDRY_STATE_KEY }}
@@ -122,72 +122,152 @@ jobs:
       contents: read
     outputs:
       # Commit under test: PR head, merge group head or the pushed commit.
-      commit-sha: ${{ steps.evaluate.outputs.commit_sha }}
+      commit-sha: ${{ steps.event.outputs.commit_sha }}
 
       # Operation against the backend: pr, main or none.
-      mode: ${{ steps.evaluate.outputs.mode }}
+      mode: ${{ steps.event.outputs.mode }}
 
       # Whether credentialed jobs may run: false for fork and Dependabot pull requests.
-      trusted: ${{ steps.evaluate.outputs.trusted }}
+      trusted: ${{ steps.trust.outputs.trusted }}
 
       # Token broker scopes for the GitHub provider token of this mode.
       github-token-scope: ${{ steps.evaluate.outputs.github_token_scope }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
 
-      - name: Validate working directory
+      # Root module directories as a compact JSON array.
+      roots: ${{ steps.roots.outputs.roots }}
+    steps:
+      # Resolve the commit SHA and mode for this event.
+      - name: Evaluate event
+        id: event
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ inputs.default-branch }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
         run: |
-          if [[ ! -d "$WORKING_DIR" ]]; then
-            echo "::error::Working directory '$WORKING_DIR' not found"
+          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
+            echo "::error::'pull_request_target' is not supported by iac-stack. Switch the caller to 'pull_request'."
             exit 1
           fi
+
+          mode="none"
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            mode="pr"
+          elif [[ "$EVENT_NAME" == "push" && "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
+            mode="main"
+          fi
+
+          echo "commit_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+          echo "Event: $EVENT_NAME"
+          echo "Commit SHA: $HEAD_SHA"
+          echo "Mode: $mode"
+
+      # Pull requests from forks and Dependabot cannot use credentials.
+      - name: Evaluate trust
+        id: trust
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          trusted="true"
+
+          if [[ "$EVENT_NAME" == "pull_request" && ( "$HEAD_REPOSITORY" != "$REPOSITORY" || "$ACTOR" == "dependabot[bot]" ) ]]; then
+            trusted="false"
+            echo "::notice::Pull requests from forks and Dependabot cannot use credentials, skipping credentialed jobs"
+          fi
+
+          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
+          echo "Trusted: $trusted"
+
+      # Check out the root files of the resolved commit only; blobs are fetched on demand, so the
+      # credentials stay for `git sparse-checkout add`.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.event.outputs.commit_sha }}
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/*/
+
+      # Every directory matching a pattern line that contains a `*.tf` or `*.tofu` file is a root. The
+      # unquoted pattern, validated first, is expanded by bash, so `*` matches one path segment.
+      - name: Resolve roots
+        id: roots
+        env:
+          INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          paths=""
+          while read -r pattern; do
+            [[ -n "$pattern" ]] || continue
+            if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ || "$pattern" == /* || "$pattern" =~ (^|/)\.\.(/|$) ]]; then
+              echo "::error::Invalid pattern '$pattern' in working-directory: only path segments and '*' are supported"
+              exit 1
+            fi
+            # The root module files are already checked out.
+            [[ "${pattern%/}" != "." ]] || continue
+            paths+="/${pattern%/}/*.tf"$'\n'"/${pattern%/}/*.tofu"$'\n'
+          done <<< "$INPUT_WORKING_DIRECTORY"
+
+          if [[ -n "$paths" ]]; then
+            git sparse-checkout add --stdin <<< "$paths"
+          fi
+
+          roots=$(
+            while read -r pattern; do
+              [[ -n "$pattern" ]] || continue
+              for dir in $pattern; do
+                files=("$dir"/*.tf "$dir"/*.tofu)
+                if [[ -d "$dir" && ${#files[@]} -gt 0 ]]; then
+                  dir="${dir%/}"
+                  echo "${dir#./}"
+                fi
+              done
+            done <<< "$INPUT_WORKING_DIRECTORY" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique'
+          )
+
+          if [[ "$roots" == "[]" ]]; then
+            echo "::error::No root module matches working-directory"
+            exit 1
+          fi
+
+          echo "roots=$roots" >> "$GITHUB_OUTPUT"
+          echo "Roots: $roots"
 
       - name: Evaluate
         id: evaluate
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-          SHA: ${{ github.sha }}
-          ACTOR: ${{ github.actor }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
-          DEFAULT_BRANCH: ${{ inputs.default-branch }}
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          REPOSITORY: ${{ github.repository }}
+          MODE: ${{ steps.event.outputs.mode }}
+          TRUSTED: ${{ steps.trust.outputs.trusted }}
+          ROOTS: ${{ steps.roots.outputs.roots }}
+          INPUT_STATE_PREFIX: ${{ inputs.state-prefix }}
           PLAN_SCOPE: ${{ inputs.github-token-plan-scope }}
           APPLY_SCOPE: ${{ inputs.github-token-apply-scope }}
           BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
         run: |
-          mode="none"
-          trusted="false"
-          commit_sha="$SHA"
           github_token_scope=""
 
-          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
-            echo "::error::'pull_request_target' is not supported by iac-stack. Switch the caller to 'pull_request'."
-            exit 1
-          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
-            mode="pr"
-            commit_sha="$PR_HEAD_SHA"
-            if [[ "$HEAD_REPOSITORY" == "$REPOSITORY" && "$ACTOR" != "dependabot[bot]" ]]; then
-              trusted="true"
-              github_token_scope="$PLAN_SCOPE"
-            else
-              echo "::notice::Pull requests from forks and Dependabot cannot authenticate to GCP, skipping plan"
-            fi
-          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
-            trusted="true"
-            commit_sha="$MERGE_GROUP_HEAD_SHA"
-          elif [[ "$EVENT_NAME" == "push" ]]; then
-            trusted="true"
-            if [[ "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
-              mode="main"
-              github_token_scope="$APPLY_SCOPE"
-            fi
+          if [[ "$MODE" == "pr" && "$TRUSTED" == "true" ]]; then
+            github_token_scope="$PLAN_SCOPE"
+          elif [[ "$MODE" == "main" ]]; then
+            github_token_scope="$APPLY_SCOPE"
           fi
 
-          if [[ "$mode" == "main" || ( "$mode" == "pr" && "$trusted" == "true" ) ]]; then
+          if [[ -n "$INPUT_STATE_PREFIX" && "$(jq length <<< "$ROOTS")" -ne 1 ]]; then
+            echo "::error::state-prefix requires working-directory to match exactly one root"
+            exit 1
+          fi
+
+          if [[ "$MODE" == "main" || ( "$MODE" == "pr" && "$TRUSTED" == "true" ) ]]; then
             if [[ -z "$WIF_PROVIDER" || -z "$STATE_BUCKET" || -z "$STATE_KEY" ]]; then
               echo "::error::A workload identity provider, state bucket and state key are required. Enable the foundry-state-backend custom property or set the inputs."
               exit 1
@@ -199,20 +279,16 @@ jobs:
             fi
           fi
 
-          echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
           # Scopes may be newline-separated; outputs must be single-line.
           echo "github_token_scope=$(echo "$github_token_scope" | xargs)" >> "$GITHUB_OUTPUT"
-
-          echo "Mode: $mode"
-          echo "State: gs://$STATE_BUCKET/$STATE_PREFIX"
 
   # Repo checks and static OpenTofu checks without backend or credentials.
   check:
     name: Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs:
+      - configure
     permissions:
       contents: read
       # Private GitHub Package Registry dependencies during install.
@@ -220,7 +296,10 @@ jobs:
     steps:
       - &checkout
         name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          persist-credentials: false
 
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
@@ -232,26 +311,45 @@ jobs:
         run: yarn run check
 
       - name: Check formatting
-        run: tofu -chdir="$WORKING_DIR" fmt -check -recursive
+        env:
+          ROOTS: ${{ needs.configure.outputs.roots }}
+        run: |
+          for root in $(jq -r '.[]' <<< "$ROOTS"); do
+            tofu -chdir="$root" fmt -check -recursive
+          done
 
       - name: Initialize OpenTofu (without backend)
-        run: tofu -chdir="$WORKING_DIR" init -backend=false -input=false
+        env:
+          ROOTS: ${{ needs.configure.outputs.roots }}
+        run: |
+          for root in $(jq -r '.[]' <<< "$ROOTS"); do
+            tofu -chdir="$root" init -backend=false -input=false
+          done
 
       - name: Validate
-        run: tofu -chdir="$WORKING_DIR" validate
+        env:
+          ROOTS: ${{ needs.configure.outputs.roots }}
+        run: |
+          for root in $(jq -r '.[]' <<< "$ROOTS"); do
+            tofu -chdir="$root" validate
+          done
 
-  # Plan against the real state and report it on the pull request.
+  # Plan each root against the real state and report it on the pull request.
   plan:
-    name: Plan
+    name: "Plan: ${{ matrix.root }}"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
       - configure
       - check
     if: needs.configure.outputs.mode == 'pr' && needs.configure.outputs.trusted == 'true'
-    concurrency:
-      group: opentofu-plan-${{ github.repository }}-${{ github.ref }}-${{ inputs.working-directory }}
-      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        root: ${{ fromJSON(needs.configure.outputs.roots) }}
+    env:
+      WORKING_DIR: ${{ matrix.root }}
+      STATE_PREFIX: ${{ inputs.state-prefix || matrix.root }}
     permissions:
       contents: read
       id-token: write
@@ -322,13 +420,13 @@ jobs:
 
       - name: Comment plan on pull request
         if: ${{ steps.plan.outcome == 'success' }}
-        uses: borchero/terraform-plan-comment@v2
+        uses: borchero/terraform-plan-comment@v3
         with:
           token: ${{ github.token }}
           terraform-cmd: tofu
-          working-directory: ${{ inputs.working-directory }}
+          working-directory: ${{ matrix.root }}
           planfile: tfplan
-          header: "OpenTofu plan: `${{ inputs.working-directory }}`"
+          header: "OpenTofu plan: `${{ matrix.root }}`"
 
       # Replaces the sticky plan comment so a stale plan is never shown as current.
       - name: Comment plan failure on pull request
@@ -365,9 +463,9 @@ jobs:
             gh api --method DELETE "repos/$GH_REPO/issues/comments/$id" > /dev/null
           done
 
-  # Apply a fresh plan on the default branch. Runs for one root never overlap.
+  # Apply a fresh plan per root on the default branch.
   apply:
-    name: Apply
+    name: "Apply: ${{ matrix.root }}"
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs:
@@ -375,9 +473,13 @@ jobs:
       - check
     if: needs.configure.outputs.mode == 'main'
     environment: ${{ inputs.apply-environment || null }}
-    concurrency:
-      group: opentofu-apply-${{ github.repository }}-${{ inputs.working-directory }}
-      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        root: ${{ fromJSON(needs.configure.outputs.roots) }}
+    env:
+      WORKING_DIR: ${{ matrix.root }}
+      STATE_PREFIX: ${{ inputs.state-prefix || matrix.root }}
     permissions:
       contents: read
       id-token: write
