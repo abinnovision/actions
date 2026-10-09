@@ -2,7 +2,8 @@
 
 Setup development tools from .tool-versions using native GitHub Actions.
 Automatically installs all tools defined in the file.
-Supports Node.js (with corepack), Python (with uv), Go, and OpenTofu.
+Supports Node.js (with corepack), Python (with uv), Go, OpenTofu, and Kubernetes tools
+(kustomize, kubeconform, kube-score, argocd).
 
 ## Usage
 
