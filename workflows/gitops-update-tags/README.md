@@ -2,7 +2,7 @@
 
 Updates image tags in kustomization files and creates pull requests.
 
-> For repository setup, see [GitOps Stack documentation](../../docs/gitops-stack/README.md).
+Runs in repositories that use [gitops-stack](../gitops-stack/README.md#repository-layout).
 
 ## Behavior
 

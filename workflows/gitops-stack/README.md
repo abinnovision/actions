@@ -2,22 +2,20 @@
 
 Validates manifests and deploys ArgoCD applications.
 
-> For repository setup, see [GitOps Stack documentation](../../docs/gitops-stack/README.md).
+It follows the shared [stack contract](../../docs/stacks/README.md) for calling, naming, jobs and required checks.
 
 ## Behavior
 
-| Job         | Runs on                                                         | Does                                                                                                                     |
+| Job         | Runs                                                            | Does                                                                                                                     |
 | :---------- | :-------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------- |
 | `Configure` | Always                                                          | Resolves the mode (`pr`, `main` or none) and discovers applications in `applications-directory`                          |
 | `Check`     | Always                                                          | Repository baseline checks (install, dedupe, `check`), without credentials                                               |
 | `Preview`   | Pull requests from the same repository, one job per application | Validates manifests and posts the ArgoCD diff as a PR comment                                                            |
 | `Deploy`    | Push to `default-branch`, one job per application               | Validates manifests, triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health) |
-| `Status`    | Always                                                          | Single required status check, fails if any other job failed or was cancelled                                             |
+| `Status`    | Always                                                          | Single required status check, fails when any other job failed or was cancelled                                           |
 
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to ArgoCD
-- `pull_request_target` is rejected
 - Application directory names must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
-- Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 
 ## Requirements
 
@@ -65,8 +63,8 @@ on:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number || github.event.merge_group.id || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 permissions: {}
 
@@ -99,6 +97,99 @@ jobs:
 - Add a `.tool-versions` file with `nodejs`
 - Pull request runs now authenticate with the OIDC identity of a `pull_request` event (subject
   `repo:<owner>/<repo>:pull_request`). ArgoCD and DEX RBAC rules must accept it
+
+## Repository layout
+
+### Directory structure
+
+```
+gitops-repo/
+├── .github/workflows/
+│   ├── ci.yaml
+│   └── update-tags.yaml   # see gitops-update-tags
+├── .tool-versions
+├── package.json
+├── yarn.lock
+└── k8s/
+    ├── applications/      # applications-directory, one directory per application
+    │   ├── staging/
+    │   │   ├── .argocd-app
+    │   │   ├── kustomization.yaml
+    │   │   └── *.yaml
+    │   └── production/
+    │       └── ...
+    └── base/
+        └── <shared-resources>/
+```
+
+### Applications
+
+Each application directory holds a `.argocd-app` file with the name of its ArgoCD Application on a single line:
+
+```
+my-app-staging
+```
+
+and a `kustomization.yaml`. Image entries are the targets of
+[gitops-update-tags](../gitops-update-tags/README.md):
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: app-my-app-staging
+
+resources:
+  - ../../base/backend
+  - ../../base/frontend
+  - ./ingress.yaml
+
+images:
+  - name: app-backend
+    newName: ghcr.io/org/app-backend
+    newTag: sha-abc1234
+  - name: app-frontend
+    newName: ghcr.io/org/app-frontend
+    newTag: sha-abc1234
+```
+
+### Root files
+
+`.tool-versions` pins the Node.js version used by `Check`:
+
+```
+nodejs 24.18.0
+```
+
+The root `package.json` provides the `check` script, here formatting only:
+
+```json
+{
+  "private": true,
+  "packageManager": "yarn@4.9.2",
+  "scripts": {
+    "check": "yarn format:check",
+    "format:check": "prettier --check '{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}'",
+    "format:fix": "prettier --write '{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}'",
+    "postinstall": "husky"
+  },
+  "commitlint": {
+    "extends": ["@abinnovision/commitlint-config"]
+  },
+  "lint-staged": {
+    "{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}": ["prettier --write"]
+  },
+  "prettier": "@abinnovision/prettier-config",
+  "devDependencies": {
+    "@abinnovision/commitlint-config": "^2.2.1",
+    "@abinnovision/prettier-config": "^2.1.3",
+    "@commitlint/cli": "^20.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
+    "prettier": "^3.6.2"
+  }
+}
+```
 
 ## Validation Tools
 
