@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.2](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.7.1...polyglot-monorepo-stack-source-v2.7.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* **polyglot-monorepo-stack:** run release-please directly ([#619](https://github.com/abinnovision/actions/issues/619)) ([0fe7f6c](https://github.com/abinnovision/actions/commit/0fe7f6c637194ed932bc16561aa4c14ae5720be5))
+
 ## [2.7.1](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.7.0...polyglot-monorepo-stack-source-v2.7.1) (2026-10-07)
 
 

@@ -9,7 +9,7 @@
 	"actions/setup-tools": "1.1.0",
 	"actions/triage-dependabot-pr": "1.0.0",
 	"workflows/gitops-update-tags": "2.1.1",
-	"workflows/polyglot-monorepo-stack": "2.7.1",
+	"workflows/polyglot-monorepo-stack": "2.7.2",
 	"packages/action-tool-installer": "3.0.1",
 	"workflows/gitops-stack": "1.0.1",
 	"workflows/iac-stack": "1.0.1",
