@@ -161,7 +161,8 @@ jobs:
           echo "Commit SHA: $HEAD_SHA"
           echo "Mode: $mode"
 
-      # Check out the root files of the resolved commit only; blobs are fetched on demand.
+      # Check out the root files of the resolved commit only; blobs are fetched on demand, so the
+      # credentials stay for `git sparse-checkout add`.
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -334,6 +335,7 @@ jobs:
           ref: ${{ needs.configure.outputs.commit-sha }}
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ steps.checkout-token.outputs.token || github.token }}
+          persist-credentials: false
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
 
