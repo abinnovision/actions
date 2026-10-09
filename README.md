@@ -37,7 +37,7 @@ Reusable workflows can be used in other repositories like this:
 jobs:
   <job>:
     uses: abinnovision/actions/.github/workflows/workflow.yaml@<workflow-name>-v<version>
-    # E.g., abinnovision/actions/.github/workflows/workflow.yaml@release-v1
+    # E.g., abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1
     # See readme of each workflow for configuration.
 ```
 
@@ -99,7 +99,7 @@ Actions and workflows in this monorepo can reference each other. In source code,
 ```yaml
 steps:
   - uses: abinnovision/actions@setup-tools-dev
-  - uses: abinnovision/actions/.github/workflows/workflow.yaml@release-dev
+  - uses: abinnovision/actions@run-release-please-dev
 ```
 
 Published packages declare their internal dependencies in `package.json` via the `actionDependencies` field:
@@ -107,7 +107,7 @@ Published packages declare their internal dependencies in `package.json` via the
 ```json
 {
   "actionDependencies": {
-    "release": "*",
+    "run-release-please": "*",
     "setup-gcp": "*",
     "setup-tools": "*"
   }

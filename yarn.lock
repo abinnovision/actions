@@ -4104,18 +4104,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"release@workspace:workflows/release":
-  version: 0.0.0-use.local
-  resolution: "release@workspace:workflows/release"
-  dependencies:
-    "@abinnovision/prettier-config": "npm:^2.2.0"
-    exchange-github-token: "workspace:^"
-    prettier: "npm:^3.9.9"
-    run-release-please: "workspace:^"
-    setup-gcp: "workspace:^"
-  languageName: unknown
-  linkType: soft
-
 "require-directory@npm:^2.1.1":
   version: 2.1.1
   resolution: "require-directory@npm:2.1.1"
