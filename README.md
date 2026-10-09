@@ -26,8 +26,19 @@ jobs:
 
 ## Workflows
 
-Browse all available reusable workflows in the [workflows](./workflows) directory. Each workflow has its own README with
-detailed usage instructions.
+Workflows are organized as stacks. A repository calls exactly one stack for its kind and wires publish workflows to its
+release list. The shared contract (calling, naming, jobs, releases and the publish protocol) is described in
+[docs/stacks](./docs/stacks/README.md). Each workflow has its own README with detailed usage instructions.
+
+| Family    | Workflow                                                                 | Purpose                                                  |
+| :-------- | :----------------------------------------------------------------------- | :------------------------------------------------------- |
+| Stack     | [app-stack](./workflows/app-stack/README.md)                             | Yarn repositories, Turborepo monorepos or single package |
+| Stack     | [gitops-stack](./workflows/gitops-stack/README.md)                       | Kubernetes manifests deployed by ArgoCD                  |
+| Stack     | [iac-stack](./workflows/iac-stack/README.md)                             | OpenTofu root modules                                    |
+| Publisher | [publish-oci](./workflows/publish-oci/README.md)                         | Container images and GitOps tag updates                  |
+| Publisher | [publish-npm](./workflows/publish-npm/README.md)                         | npm packages                                             |
+| Helper    | [gitops-update-tags](./workflows/gitops-update-tags/README.md)           | Image tag updates in gitops repositories                 |
+| Stack     | [polyglot-monorepo-stack](./workflows/polyglot-monorepo-stack/README.md) | Deprecated, use app-stack                                |
 
 ### Usage
 
