@@ -11,7 +11,7 @@
 	"workflows/gitops-update-tags": "3.0.0",
 	"workflows/polyglot-monorepo-stack": "2.7.3",
 	"packages/action-tool-installer": "3.0.1",
-	"workflows/gitops-stack": "2.0.0",
+	"workflows/gitops-stack": "2.0.1",
 	"workflows/iac-stack": "1.1.0",
 	"workflows/publish-npm": "1.0.0",
 	"workflows/publish-oci": "1.1.2",

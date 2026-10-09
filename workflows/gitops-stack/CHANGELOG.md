@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.0.0...gitops-stack-source-v2.0.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **gitops-stack:** authenticate confidential DEX clients with their secret ([#636](https://github.com/abinnovision/actions/issues/636)) ([a7a716c](https://github.com/abinnovision/actions/commit/a7a716c0827c7fe445793579cb42d8d0a9bb445e))
+
 ## [2.0.0](https://github.com/abinnovision/actions/compare/gitops-stack-source-v1.0.1...gitops-stack-source-v2.0.0) (2026-10-09)
 
 
