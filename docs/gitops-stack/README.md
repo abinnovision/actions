@@ -63,10 +63,15 @@ images:
 
 ### .tool-versions
 
-Node.js version used by the `Check` job (see [setup-tools](../../actions/setup-tools/README.md)):
+Tool versions for all jobs (see [setup-tools](../../actions/setup-tools/README.md)). `Check` uses Node.js and the
+validation tools, `Preview` and `Deploy` use `argocd`:
 
 ```
 nodejs 24.18.0
+kustomize 5.7.1
+kubeconform 0.7.0
+kube-score 1.20.0
+argocd 3.1.8
 ```
 
 ### package.json
@@ -106,13 +111,24 @@ nodejs 24.18.0
 Checks the repository, validates manifests and deploys to ArgoCD. Runs the jobs `Configure`, `Check`, `Preview`,
 `Deploy` and `Status`.
 
-- Pull requests: Validates manifests, posts ArgoCD diff as PR comment
-- Main branch: Validates manifests, triggers an ArgoCD sync without waiting for health
+- Every change: Validates the manifests of every application directory in `Check`
+- Pull requests: Posts the ArgoCD diff of every application with `.argocd-app` as a PR comment
+- Main branch: Triggers an ArgoCD sync of every application with `.argocd-app` without waiting for health, in a GitHub
+  environment named after the application
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`
 - Triggered by `pull_request` and `push`; `pull_request_target` is rejected
 - The required status check is `CI / Status`
 
-Repositories using `gitops-deploy` follow the migration steps in the reference.
+ArgoCD and DEX are configured through repository variables:
+
+| Variable                       | Description                                       |
+| :----------------------------- | :------------------------------------------------ |
+| `ARGOCD_SERVER`                | ArgoCD server hostname, without `https://`        |
+| `DEX_ENDPOINT`                 | DEX issuer URL                                    |
+| `DEX_GITHUB_ACTIONS_CLIENT_ID` | ID of the public DEX client for GitHub Actions    |
+| `DEX_GITHUB_ACTIONS_CONNECTOR` | ID of the DEX connector for GitHub Actions tokens |
+
+Repositories using `gitops-deploy` or an older major follow the migration steps in the reference.
 
 **Reference:** [`workflows/gitops-stack`](../../workflows/gitops-stack/README.md)
 
@@ -148,20 +164,12 @@ permissions: {}
 jobs:
   ci:
     name: CI
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-stack-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-stack-v2
     permissions:
       contents: read
       packages: read
       id-token: write
       pull-requests: write
-      deployments: write
-    with:
-      argocd-server: ${{ vars.ARGOCD_SERVER }}
-      auth-method: dex
-    secrets:
-      DEX_ENDPOINT: ${{ vars.DEX_ENDPOINT }}
-      DEX_GITHUB_ACTIONS_CLIENT: ${{ vars.DEX_GITHUB_ACTIONS_CLIENT }}
-      DEX_GITHUB_ACTIONS_CONNECTOR: ${{ vars.DEX_GITHUB_ACTIONS_CONNECTOR }}
 ```
 
 ### update-tags.yaml

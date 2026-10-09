@@ -3025,7 +3025,6 @@ __metadata:
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     prettier: "npm:^3.9.9"
-    setup-k8s-tools: "workspace:^"
     setup-oidc-token-cli: "workspace:^"
     setup-tools: "workspace:^"
   languageName: unknown

@@ -6,24 +6,43 @@ Validates manifests and deploys ArgoCD applications.
 
 ## Behavior
 
-| Job         | Runs on                                                         | Does                                                                                                                     |
-| :---------- | :-------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------- |
-| `Configure` | Always                                                          | Resolves the mode (`pr`, `main` or none) and discovers applications in `applications-directory`                          |
-| `Check`     | Always                                                          | Repository baseline checks (install, dedupe, `check`), without credentials                                               |
-| `Preview`   | Pull requests from the same repository, one job per application | Validates manifests and posts the ArgoCD diff as a PR comment                                                            |
-| `Deploy`    | Push to `default-branch`, one job per application               | Validates manifests, triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health) |
-| `Status`    | Always                                                          | Single required status check, fails if any other job failed or was cancelled                                             |
+| Job               | Runs on                                                              | Does                                                                                                                                |
+| :---------------- | :------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure`       | Always                                                               | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, validates the configuration and discovers applications |
+| `Check`           | Always                                                               | Repository baseline checks (install, dedupe, `check`), then validates the manifests of every application, without credentials       |
+| `Preview: <name>` | Trusted pull requests, one job per application with `.argocd-app`    | Posts the ArgoCD diff as a PR comment                                                                                               |
+| `Deploy: <name>`  | Push to `default-branch`, one job per application with `.argocd-app` | Triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health)                                 |
+| `Status`          | Always                                                               | Single required status check, fails if any other job failed or was cancelled                                                        |
 
+- Every directory in `applications-directory` is an application and is validated in `Check`: `kustomize build`
+  (with Helm), `kubeconform` (fails the job) and `kube-score` (warnings only). The logs are uploaded as the
+  `validation-logs` artifact. Directories without a `kustomization.yaml`, `kustomization.yml` or `Kustomization` file
+  are skipped
+- Directories with an `.argocd-app` file also get a `Preview` and a `Deploy` job. ArgoCD renders the manifests
+  server-side, so these jobs only check out the root files
+- The preview comment is updated on every run: it shows the diff, notes that there are no changes or that the preview
+  failed
+- With `enable-github-deployments`, each `Deploy` job runs in a GitHub environment named after the application, linked
+  to the application in the ArgoCD UI. Every `Deploy` job records a GitHub deployment, also when the application was
+  already in sync
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to ArgoCD
 - `pull_request_target` is rejected
 - Application directory names must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
+- Concurrency is owned by the caller
 - Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 
 ## Requirements
 
-- The repository has a `.tool-versions` file with `nodejs` and a `package.json` with a `check` script
-- The caller grants `contents: read`, `packages: read`, `id-token: write`, `pull-requests: write` and `deployments: write`
-- ArgoCD (or DEX) accepts the GitHub Actions OIDC token of `pull_request` and `push` runs, or an ArgoCD token is provided
+- The repository has a `.tool-versions` file with `nodejs`, `kustomize` and `argocd`, plus `kubeconform` and
+  `kube-score` unless disabled, and a `package.json` with a `check` script. `kustomize build --enable-helm` needs
+  `helm` when an application uses Helm charts
+- The caller grants `contents: read`, `packages: read`, `id-token: write` and `pull-requests: write`
+- The repository variables `ARGOCD_SERVER`, `DEX_ENDPOINT`, `DEX_GITHUB_ACTIONS_CLIENT_ID` and
+  `DEX_GITHUB_ACTIONS_CONNECTOR` are set, or the matching inputs are passed. `Configure` fails when one is missing and
+  a `Preview` or `Deploy` job would run
+- The DEX client is a public client. DEX and ArgoCD accept the GitHub Actions OIDC token with the subject
+  `repo:<owner>/<repo>:pull_request` for previews and, for deploys, `repo:<owner>/<repo>:environment:<name>` with
+  `enable-github-deployments` or `repo:<owner>/<repo>:ref:refs/heads/<default-branch>` without it
 
 ## Usage
 
@@ -36,8 +55,6 @@ This is a `workflow_call` workflow, so it can't be triggered directly. Call it f
 jobs:
   gitops-stack:
     uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-stack-v1
-    with:
-      argocd-server: ${{ <argocd-server> }}
 ```
 
 [//]: # "x-release-please-end"
@@ -79,34 +96,47 @@ jobs:
       packages: read
       id-token: write
       pull-requests: write
-      deployments: write
-    with:
-      argocd-server: ${{ vars.ARGOCD_SERVER }}
-      auth-method: dex
-    secrets:
-      DEX_ENDPOINT: ${{ vars.DEX_ENDPOINT }}
-      DEX_GITHUB_ACTIONS_CLIENT: ${{ vars.DEX_GITHUB_ACTIONS_CLIENT }}
-      DEX_GITHUB_ACTIONS_CONNECTOR: ${{ vars.DEX_GITHUB_ACTIONS_CONNECTOR }}
 ```
 
 [//]: # "x-release-please-end"
+
+The ArgoCD and DEX settings are read from the repository variables. Pass `argocd-server`, `dex-endpoint`,
+`dex-client-id` or `dex-connector` to override them.
+
+### Migrating from gitops-stack v1
+
+- Remove the `secrets:` block. `DEX_ENDPOINT`, `DEX_GITHUB_ACTIONS_CLIENT` and `DEX_GITHUB_ACTIONS_CONNECTOR` become
+  the variables `DEX_ENDPOINT`, `DEX_GITHUB_ACTIONS_CLIENT_ID` (client ID only) and `DEX_GITHUB_ACTIONS_CONNECTOR`, or
+  the inputs `dex-endpoint`, `dex-client-id` and `dex-connector`
+- Configure the DEX client as a public client; no client secret is sent
+- Remove `auth-method` and `health-timeout`. Token authentication (`ARGOCD_TOKEN`) is no longer supported
+- `argocd-server` is optional and falls back to `vars.ARGOCD_SERVER`
+- Add `kustomize`, `kubeconform`, `kube-score` and `argocd` to `.tool-versions`
+- Job names change to `Preview: <name>` and `Deploy: <name>`; `CI / Status` stays the required check
+- With `enable-github-deployments`, deploy jobs authenticate with the subject
+  `repo:<owner>/<repo>:environment:<name>`. Update the DEX and ArgoCD mappings to allow it
+- The caller no longer needs `deployments: write`
+- Deploy jobs no longer set `concurrency`; the caller's `concurrency` applies
+- `Preview` and `Deploy` wait for `Check`, so invalid manifests are never deployed
+- Directories without a kustomization file are skipped by validation
+- With `enable-github-deployments`, every `Deploy` job records a GitHub deployment, also when the application was already in sync
 
 ### Migrating from gitops-deploy
 
 - Use the `gitops-stack-v1` tag instead of `gitops-deploy-v1` <!-- x-release-please-major -->
 - Switch the caller trigger from `pull_request_target` to `pull_request`
 - Make `CI / Status` the required status check
-- Add a `.tool-versions` file with `nodejs`
+- Add a `.tool-versions` file with `nodejs` and the Kubernetes tools
 - Pull request runs now authenticate with the OIDC identity of a `pull_request` event (subject
   `repo:<owner>/<repo>:pull_request`). ArgoCD and DEX RBAC rules must accept it
 
 ## Validation Tools
 
-| Tool          | Purpose           | Impact            |
-| ------------- | ----------------- | ----------------- |
-| `kustomize`   | Build manifests   | Required          |
-| `kubeconform` | Schema validation | Blocks deployment |
-| `kube-score`  | Best practices    | Warning only      |
+| Tool          | Purpose           | Impact        |
+| ------------- | ----------------- | ------------- |
+| `kustomize`   | Build manifests   | Required      |
+| `kubeconform` | Schema validation | Fails `Check` |
+| `kube-score`  | Best practices    | Warning only  |
 
 ## Advanced Configuration
 
@@ -148,27 +178,19 @@ with:
 
 | Input                          | Description                                                                                                                                                                                                                                                                                                                                                                          | Required | Default                                                                                                                                 |
 | :----------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
-| `argocd-server`                | ArgoCD server hostname (without https://).<br>**Required:** Always<br>**Example:** `argocd.example.com`                                                                                                                                                                                                                                                                              | Yes      |                                                                                                                                         |
+| `argocd-server`                | ArgoCD server hostname (without https://).<br>**Default:** Falls back to `vars.ARGOCD_SERVER` if not provided.<br>**Example:** `argocd.example.com`                                                                                                                                                                                                                                  | No       | _empty_                                                                                                                                 |
+| `dex-endpoint`                 | DEX OIDC issuer URL used to exchange the GitHub Actions OIDC token for an ArgoCD token.<br>This is public configuration, not a secret.<br>**Default:** Falls back to `vars.DEX_ENDPOINT` if not provided.<br>**Example:** `https://dex.example.com`                                                                                                                                  | No       | _empty_                                                                                                                                 |
+| `dex-client-id`                | ID of the public DEX client for GitHub Actions.<br>**Default:** Falls back to `vars.DEX_GITHUB_ACTIONS_CLIENT_ID` if not provided.<br>**Example:** `github-actions`                                                                                                                                                                                                                  | No       | _empty_                                                                                                                                 |
+| `dex-connector`                | ID of the DEX connector that accepts GitHub Actions OIDC tokens.<br>**Default:** Falls back to `vars.DEX_GITHUB_ACTIONS_CONNECTOR` if not provided.<br>**Example:** `github-actions`                                                                                                                                                                                                 | No       | _empty_                                                                                                                                 |
 | `default-branch`               | Default branch name for the repository.<br>**Example:** `main`, `master`, `develop`                                                                                                                                                                                                                                                                                                  | No       | `main`                                                                                                                                  |
 | `applications-directory`       | Root directory containing application subdirectories.<br>**Example:** `k8s/applications`, `manifests/apps`                                                                                                                                                                                                                                                                           | No       | `k8s/applications`                                                                                                                      |
-| `auth-method`                  | Authentication method for ArgoCD.<br>**Options:** `dex`, `token`<br>**Note:** DEX uses OIDC token exchange, token uses direct API token                                                                                                                                                                                                                                              | No       | `dex`                                                                                                                                   |
 | `enable-kube-score`            | Enable kube-score validation (best practices).<br>**Note:** kube-score failures are warnings only, won't block deployment                                                                                                                                                                                                                                                            | No       | `true`                                                                                                                                  |
 | `enable-kubeconform`           | Enable kubeconform validation (schema validation).<br>**Note:** kubeconform failures are critical and will block deployment                                                                                                                                                                                                                                                          | No       | `true`                                                                                                                                  |
 | `kubeconform-schema-locations` | Newline-separated list of kubeconform schema locations.<br>**Default:** Default Kubernetes schemas + Datree CRDs catalog<br>**Example:**<br>`<br>default<br>https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>https://storage.googleapis.com/custom-crds/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>` | No       | `default<br>https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>` |
 | `sync-timeout`                 | Timeout in seconds for the post-trigger check that the sync operation started without immediate errors.<br>**Note:** The sync itself runs asynchronously; this only bounds a short check, not the full sync duration.<br>**Default:** `120` (2 minutes)                                                                                                                              | No       | `120`                                                                                                                                   |
-| `health-timeout`               | **Deprecated:** No longer used. The workflow no longer waits for application health after sync.<br>Kept for backward compatibility; has no effect.                                                                                                                                                                                                                                   | No       | `600`                                                                                                                                   |
 | `skip-if-synced`               | Skip deployment if application is already in sync.                                                                                                                                                                                                                                                                                                                                   | No       | `true`                                                                                                                                  |
 | `sync-prune`                   | Enable pruning of resources that are no longer defined in the source.<br>**Note:** When enabled, resources removed from manifests will be deleted during sync                                                                                                                                                                                                                        | No       | _empty_                                                                                                                                 |
 | `enable-pr-comments`           | Enable posting diff comments on pull requests.                                                                                                                                                                                                                                                                                                                                       | No       | `true`                                                                                                                                  |
-| `enable-github-deployments`    | Enable GitHub deployments API integration.<br>**Note:** Creates deployment records with links to ArgoCD UI                                                                                                                                                                                                                                                                           | No       | `true`                                                                                                                                  |
-
-## Secrets
-
-| Secret                         | Description                                                                                                                                                              | Required |
-| :----------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
-| `DEX_ENDPOINT`                 | DEX OIDC server endpoint URL for ArgoCD authentication.<br>**Required:** When using DEX authentication method<br>**Example:** `https://dex.example.com`                  | No       |
-| `DEX_GITHUB_ACTIONS_CLIENT`    | DEX client credentials (client_id:client_secret) for GitHub Actions.<br>**Required:** When using DEX authentication method<br>**Example:** `github-actions:secret_value` | No       |
-| `DEX_GITHUB_ACTIONS_CONNECTOR` | DEX connector ID for GitHub authentication.<br>**Required:** When using DEX authentication method<br>**Example:** `github`                                               | No       |
-| `ARGOCD_TOKEN`                 | ArgoCD API token for direct authentication.<br>**Required:** When using token authentication method<br>**Example:** `argocd.token=eyJhbGc...`                            | No       |
+| `enable-github-deployments`    | Run each deploy job in a GitHub environment named after the application, with a link to the ArgoCD UI.<br>**Note:** Changes the OIDC subject of deploy jobs to `repo:<owner>/<repo>:environment:<application>`                                                                                                                                                                       | No       | `true`                                                                                                                                  |
 
 ## Outputs
