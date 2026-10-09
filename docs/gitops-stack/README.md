@@ -64,7 +64,7 @@ images:
 ### .tool-versions
 
 Tool versions for all jobs (see [setup-tools](../../actions/setup-tools/README.md)). `Check` uses Node.js and the
-validation tools, `Preview` and `Deploy` use `argocd`:
+validation tools, `Preview` and `Deploy` use `argocd`, and `gitops-update-tags` uses Node.js and `kustomize`:
 
 ```
 nodejs 24.18.0
@@ -190,7 +190,7 @@ on:
 jobs:
   update:
     name: Update Tags
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@gitops-update-tags-v2
     permissions:
       contents: read
       id-token: write

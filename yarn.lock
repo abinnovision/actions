@@ -3038,8 +3038,7 @@ __metadata:
     exchange-github-token: "workspace:^"
     prettier: "npm:^3.9.9"
     setup-gcp: "workspace:^"
-    setup-k8s-tools: "workspace:^"
-    setup-node: "workspace:^"
+    setup-tools: "workspace:^"
   languageName: unknown
   linkType: soft
 
