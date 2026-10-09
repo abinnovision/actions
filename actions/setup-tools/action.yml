@@ -3,7 +3,8 @@ author: "abi group GmbH"
 description: |
   Setup development tools from .tool-versions using native GitHub Actions.
   Automatically installs all tools defined in the file.
-  Supports Node.js (with corepack), Python (with uv), Go, and OpenTofu.
+  Supports Node.js (with corepack), Python (with uv), Go, OpenTofu, and Kubernetes tools
+  (kustomize, kubeconform, kube-score, argocd).
 
 inputs:
   tool-versions-file:
@@ -47,6 +48,18 @@ outputs:
   opentofu-version:
     description: "Installed OpenTofu version (if opentofu in .tool-versions)"
     value: ${{ steps.parse.outputs.opentofu-version }}
+  kustomize-version:
+    description: "Installed kustomize version (if kustomize in .tool-versions)"
+    value: ${{ steps.parse.outputs.kustomize-version }}
+  kubeconform-version:
+    description: "Installed kubeconform version (if kubeconform in .tool-versions)"
+    value: ${{ steps.parse.outputs.kubeconform-version }}
+  kube-score-version:
+    description: "Installed kube-score version (if kube-score in .tool-versions)"
+    value: ${{ steps.parse.outputs.kube-score-version }}
+  argocd-version:
+    description: "Installed Argo CD version (if argocd in .tool-versions)"
+    value: ${{ steps.parse.outputs.argocd-version }}
 
 runs:
   using: composite
@@ -87,6 +100,13 @@ runs:
           echo "has-opentofu=true" >> $GITHUB_OUTPUT
           echo "opentofu-version=$(grep -E '^opentofu ' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
         fi
+
+        for tool in kustomize kubeconform kube-score argocd; do
+          if grep -qE "^${tool} " "$TOOL_VERSIONS_FILE"; then
+            echo "has-k8s-tools=true" >> $GITHUB_OUTPUT
+            echo "${tool}-version=$(grep -E "^${tool} " "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+          fi
+        done
 
     # Node.js setup via internal setup-node action
     - name: Setup Node.js
@@ -129,3 +149,13 @@ runs:
       with:
         tofu_version: ${{ steps.parse.outputs.opentofu-version }}
         tofu_wrapper: ${{ inputs.opentofu-wrapper }}
+
+    # Kubernetes tools via internal setup-k8s-tools action (empty version skips a tool)
+    - name: Setup Kubernetes tools
+      if: steps.parse.outputs.has-k8s-tools == 'true'
+      uses: abinnovision/actions@setup-k8s-tools-dev
+      with:
+        kustomize: ${{ steps.parse.outputs.kustomize-version }}
+        kubeconform: ${{ steps.parse.outputs.kubeconform-version }}
+        kube-score: ${{ steps.parse.outputs.kube-score-version }}
+        argocd: ${{ steps.parse.outputs.argocd-version }}
