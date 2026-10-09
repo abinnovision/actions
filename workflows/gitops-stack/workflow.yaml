@@ -28,8 +28,8 @@ on:
         required: false
         default: ""
         description: |-
-          ID of the public DEX client for GitHub Actions.
-          A `client_id:client_secret` value is accepted; only the ID is used.
+          DEX client for GitHub Actions: `client_id` for a public client, or `client_id:client_secret` for a
+          confidential client, which authenticates with `client_secret_basic`.
           **Default:** Falls back to `vars.DEX_CORE_GITHUB_ACTIONS_CLIENT` if not provided.
           **Example:** `github-actions`
 
@@ -454,13 +454,13 @@ jobs:
         name: Setup oidc-token-cli
         uses: abinnovision/actions@setup-oidc-token-cli-dev
 
-      # Exchange the GitHub Actions OIDC token for a DEX token (RFC 8693) with the public DEX client.
+      # Exchange the GitHub Actions OIDC token for a DEX token (RFC 8693).
       - &auth
         name: Authenticate with ArgoCD
         env:
           ARGOCD_SERVER: ${{ inputs.argocd-server || vars.ARGOCD_CORE_SERVER }}
           DEX_ENDPOINT: ${{ inputs.dex-endpoint || vars.DEX_CORE_ENDPOINT }}
-          DEX_CLIENT_ID: ${{ inputs.dex-client-id || vars.DEX_CORE_GITHUB_ACTIONS_CLIENT }}
+          DEX_CLIENT: ${{ inputs.dex-client-id || vars.DEX_CORE_GITHUB_ACTIONS_CLIENT }}
           DEX_CONNECTOR: ${{ inputs.dex-connector || vars.DEX_CORE_GITHUB_ACTIONS_CONNECTOR }}
         run: |
           set -euo pipefail
@@ -470,9 +470,15 @@ jobs:
             exit 1
           fi
 
+          client_args=(--client-id "${DEX_CLIENT%%:*}")
+          if [[ "$DEX_CLIENT" == *:* ]]; then
+            export OIDC_TOKEN_CLIENT_SECRET="${DEX_CLIENT#*:}"
+            client_args+=(--client-auth-method client_secret_basic)
+          fi
+
           dex_token=$(oidc-token \
             --issuer "$DEX_ENDPOINT" \
-            --client-id "${DEX_CLIENT_ID%%:*}" \
+            "${client_args[@]}" \
             --grant-type token-exchange \
             --subject-token-source github-actions \
             --subject-token-type urn:ietf:params:oauth:token-type:id_token \
