@@ -2,8 +2,6 @@
 
 Validates manifests and deploys ArgoCD applications.
 
-> For repository setup, see [GitOps Stack documentation](../../docs/gitops-stack/README.md).
-
 ## Behavior
 
 | Job         | Runs on                                                           | Does                                                                                                                  |
@@ -52,8 +50,8 @@ on:
     branches: [main]
 
 concurrency:
-  group: $\{{ github.workflow }}-$\{{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: $\{{ github.event_name == 'pull_request' }}
+  group: $\{{ github.workflow }}-$\{{ github.ref }}-$\{{ github.event.pull_request.number || github.event.merge_group.id || 'main' }}
+  cancel-in-progress: $\{{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 permissions: {}
 
@@ -86,6 +84,99 @@ jobs:
 - Add a `.tool-versions` file with `nodejs`
 - Pull request runs now authenticate with the OIDC identity of a `pull_request` event (subject
   `repo:<owner>/<repo>:pull_request`). ArgoCD and DEX RBAC rules must accept it
+
+## Repository layout
+
+### Directory structure
+
+```
+gitops-repo/
+├── .github/workflows/
+│   ├── ci.yaml
+│   └── update-tags.yaml   # see gitops-update-tags
+├── .tool-versions
+├── package.json
+├── yarn.lock
+└── k8s/
+    ├── applications/      # applications-directory, one directory per application
+    │   ├── staging/
+    │   │   ├── .argocd-app
+    │   │   ├── kustomization.yaml
+    │   │   └── *.yaml
+    │   └── production/
+    │       └── ...
+    └── base/
+        └── <shared-resources>/
+```
+
+### Applications
+
+Each application directory holds a `.argocd-app` file with the name of its ArgoCD Application on a single line:
+
+```
+my-app-staging
+```
+
+and a `kustomization.yaml`. Image entries are the targets of
+[gitops-update-tags](../gitops-update-tags/README.md):
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: app-my-app-staging
+
+resources:
+  - ../../base/backend
+  - ../../base/frontend
+  - ./ingress.yaml
+
+images:
+  - name: app-backend
+    newName: ghcr.io/org/app-backend
+    newTag: sha-abc1234
+  - name: app-frontend
+    newName: ghcr.io/org/app-frontend
+    newTag: sha-abc1234
+```
+
+### Root files
+
+`.tool-versions` pins the Node.js version used by `Check`:
+
+```
+nodejs 24.18.0
+```
+
+The root `package.json` provides the `check` script, here formatting only:
+
+```json
+{
+  "private": true,
+  "packageManager": "yarn@4.9.2",
+  "scripts": {
+    "check": "yarn format:check",
+    "format:check": "prettier --check '{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}'",
+    "format:fix": "prettier --write '{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}'",
+    "postinstall": "husky"
+  },
+  "commitlint": {
+    "extends": ["@abinnovision/commitlint-config"]
+  },
+  "lint-staged": {
+    "{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}": ["prettier --write"]
+  },
+  "prettier": "@abinnovision/prettier-config",
+  "devDependencies": {
+    "@abinnovision/commitlint-config": "^2.2.1",
+    "@abinnovision/prettier-config": "^2.1.3",
+    "@commitlint/cli": "^20.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
+    "prettier": "^3.6.2"
+  }
+}
+```
 
 ## Validation Tools
 

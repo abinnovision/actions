@@ -65,6 +65,6 @@ This action can be used with different version ranges. The following ranges are 
 
 ## Outputs
 
-| Output     | Description                                                                                                                                                                                                                      |
-| :--------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `versions` | JSON object mapping released package paths to version info.<br>Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"\|"prerelease"}.<br>Empty object {} when nothing was released or computed.<br> |
+| Output     | Description                                                                                                                                                                                                                                        |
+| :--------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `versions` | JSON object mapping released package paths to version info.<br>Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"\|"prerelease", sha: "short sha"}.<br>Empty object {} when nothing was released or computed.<br> |
