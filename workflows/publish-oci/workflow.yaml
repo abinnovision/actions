@@ -252,7 +252,7 @@ jobs:
 
   # Build and push one image per unit that has a Dockerfile.
   build:
-    name: ${{ matrix.entry.name }}
+    name: "Build: ${{ matrix.entry.name }}"
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: prepare

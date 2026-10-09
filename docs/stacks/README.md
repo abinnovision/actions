@@ -89,11 +89,11 @@ File names are lowercase kebab with `.yaml`; the workflow `name:` is the title-c
 The job `name:` of a reusable-workflow call is the prefix of every check context it produces, so job ids and names are
 fixed. The workflow `name:` never appears in check contexts.
 
-| Job            | id                 | `name:`            | Check contexts                                                                                           |
-| :------------- | :----------------- | :----------------- | :------------------------------------------------------------------------------------------------------- |
-| Stack call     | `ci`               | `CI`               | `CI / Configure`, `CI / Check`, `CI / Status` and the lanes, for example `CI / Test: <type>`             |
-| Publisher call | `publish-<target>` | `Publish <Target>` | `Publish OCI / Prepare`, `Publish OCI / Build / <name>`, `Publish OCI / GitOps`, `Publish npm / Publish` |
-| Commit lint    | `lint-commits`     | `Lint commits`     | `Lint commits`                                                                                           |
+| Job            | id                 | `name:`            | Check contexts                                                                                                                                                                       |
+| :------------- | :----------------- | :----------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stack call     | `ci`               | `CI`               | `CI / Configure`, `CI / Check`, `CI / Status` and the lanes, for example `CI / Test: <type>`, `CI / Preview: <app>`, `CI / Deploy: <app>`, `CI / Plan: <root>`, `CI / Apply: <root>` |
+| Publisher call | `publish-<target>` | `Publish <Target>` | `Publish OCI / Prepare`, `Publish OCI / Build: <name>`, `Publish OCI / GitOps`, `Publish npm / Publish`                                                                              |
+| Commit lint    | `lint-commits`     | `Lint commits`     | `Lint commits`                                                                                                                                                                       |
 
 - The job id is the kebab form of the job name. For publishers it equals the name of the called workflow: job
   `publish-oci` calls `publish-oci`.
@@ -101,18 +101,20 @@ fixed. The workflow `name:` never appears in check contexts.
 - Job names describe what is verified, not the tool that verifies it: `Check`, `Test`, `Lint commits`. Tool names
   belong in action names (`run-commitlint`, `run-release-please`). A publish target is the subject itself, so
   `Publish OCI` and `Publish npm` are fine.
+- Lane names that fan out over a matrix use `<Lane>: <value>` rather than `<Lane> / <value>`, because
+  GitHub renders the separator `/` as a check group. Values such as iac root paths may still contain `/`.
 - Utility jobs in `pr-utils.yaml` are named verb plus subject in sentence case.
 - Inputs and outputs are kebab-case (`token-broker-url`, `releases`), secrets are upper snake case
   (`APP_IMAGE_SECRETS`), placeholders use braces (`{name}`, `{path}`).
 
 ## Jobs
 
-| Job         | Runs                              | Does                                                                                                    |
-| :---------- | :-------------------------------- | :------------------------------------------------------------------------------------------------------ |
-| `Configure` | Always                            | Resolves the event into `mode` and, for stacks with credentialed lanes, `trusted`; validates the inputs |
-| `Check`     | Always                            | Repository checks and static checks of the stack, without credentials                                   |
-| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, preview, deploy, plan, apply                                       |
-| `Status`    | Always                            | Fails when any other job failed or was cancelled                                                        |
+| Job         | Runs                              | Does                                                                                                                                                                                                                                       |
+| :---------- | :-------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure` | Always                            | Resolves the event into `mode` and, for stacks with credentialed lanes, `trusted`; validates the inputs                                                                                                                                    |
+| `Check`     | Always                            | Repository checks plus the static checks of the kind that need no credentials: `tofu fmt` and `validate` per root (iac), `kustomize build` with kubeconform and kube-score per application (gitops), `build`, `check` and unit tests (app) |
+| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, preview, deploy, plan, apply                                                                                                                                                                          |
+| `Status`    | Always                            | Fails when any other job failed or was cancelled                                                                                                                                                                                           |
 
 - `mode` is `pr` for pull requests, `main` for pushes to the default branch and `none` otherwise.
 - `trusted` is `false` for pull requests from forks and from Dependabot. Lanes that need credentials are skipped for
@@ -137,6 +139,12 @@ Rulesets require exactly two contexts, independent of the kind:
 - Top-level `permissions: {}` and `defaults.run.shell: bash`; every job declares its own permissions and a timeout.
 - No expressions inside `run:` blocks. Values are passed through `env:`. `scripts/check-run-interpolation.ts` enforces
   this in CI.
+- Every checkout uses the commit resolved by `Configure` (`ref: needs.configure.outputs.commit-sha`) with
+  `persist-credentials: false`. `Configure` uses a sparse, blob-less checkout of only what it needs and keeps the
+  credentials, since `git sparse-checkout add` fetches the missing blobs on demand.
+- Lanes that need credentials depend on `Check`.
+- Stacks set no `concurrency`. Callers own it through the workflow-level group shown above: it cancels superseded pull
+  request runs and serialises runs on the default branch; a newer pending run replaces an older pending one.
 - Step names are shared: `Checkout`, `Setup Tools`, `Install dependencies`, `Check dependencies`, `Check`, `Build`.
 
 ## Releases
