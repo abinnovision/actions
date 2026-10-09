@@ -238,20 +238,22 @@ The root `package.json` provides the `check` script, here formatting only:
 
 ### Custom Validation Schema Locations
 
+Setting this input replaces the built-in Kubernetes schemas unless `default` is listed.
+
 ```yaml
 with:
-kubeconform-schema-locations: |
-	default
-	https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/\{{.Group}}/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
-	https://storage.googleapis.com/my-company-crds/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
+  kubeconform-schema-locations: |
+    default
+    https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/\{{.Group}}/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
+    https://storage.googleapis.com/my-company-crds/\{{.ResourceKind}}_\{{.ResourceAPIVersion}}.json
 ```
 
 ### Disable Specific Validations
 
 ```yaml
 with:
-	enable-kubeconform: false
-	enable-kube-score: false
+  enable-kubeconform: false
+  enable-kube-score: false
 ```
 
 ### Adjust Timeouts

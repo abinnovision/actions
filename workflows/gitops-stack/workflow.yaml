@@ -357,6 +357,8 @@ jobs:
 
           schema_args=()
           while IFS= read -r location; do
+            location="${location#"${location%%[![:space:]]*}"}"
+            location="${location%"${location##*[![:space:]]}"}"
             [[ -n "$location" ]] && schema_args+=(-schema-location "$location")
           done <<< "$INPUT_KUBECONFORM_SCHEMA_LOCATIONS"
 
