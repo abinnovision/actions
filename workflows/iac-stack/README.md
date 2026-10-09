@@ -4,14 +4,15 @@ Checks, plans and applies an OpenTofu root module with GCS state and encrypted s
 
 ## Behavior
 
-| Job         | Runs on                  | Does                                                                                                                                                                                             |
-| :---------- | :----------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Configure` | Always                   | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, and validates the configuration                                                                                     |
-| `Check`     | Always                   | Node repo checks (`yarn install --immutable`, `yarn dedupe --check`, `yarn check`), `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate`                                    |
-| `Plan`      | Trusted pull requests    | `tofu plan` and one sticky PR comment per `working-directory` via [terraform-plan-comment](https://github.com/borchero/terraform-plan-comment); a failed plan replaces it with a link to the run |
-| `Apply`     | Push to `default-branch` | Fresh `tofu plan -out` and `tofu apply` in `apply-environment`; runs for one root never overlap                                                                                                  |
-| `Status`    | Always                   | Fails when any other job failed or was cancelled; use it as the single required status check                                                                                                     |
+| Job             | Runs on                  | Does                                                                                                                                                                                       |
+| :-------------- | :----------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure`     | Always                   | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, and validates the configuration                                                                               |
+| `Check`         | Always                   | Node repo checks (`yarn install --immutable`, `yarn dedupe --check`, `yarn check`), then `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate` for every root          |
+| `Plan: <root>`  | Trusted pull requests    | `tofu plan` per root and one sticky PR comment per root via [terraform-plan-comment](https://github.com/borchero/terraform-plan-comment); a failed plan replaces it with a link to the run |
+| `Apply: <root>` | Push to `default-branch` | Fresh `tofu plan -out` and `tofu apply` per root in `apply-environment`                                                                                                                    |
+| `Status`        | Always                   | Fails when any other job failed or was cancelled; use it as the single required status check                                                                                               |
 
+- `working-directory` takes patterns, one per line, where `*` matches one path segment. Every matching directory with a `*.tf` or `*.tofu` file is a root and gets its own `Plan` and `Apply` job
 - State and plan files are always encrypted with OpenTofu's `gcp_kms` key provider
 - Optional GitHub token exchange via the token broker, passed as `GITHUB_TOKEN` to the GitHub provider
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to GCP
@@ -87,7 +88,7 @@ jobs:
 
 [//]: # "x-release-please-end"
 
-Repositories with several roots call the workflow once per root with different `working-directory` values.
+Repositories with several roots list one pattern per line in `working-directory`, for example `tofu/*`. Concurrency is owned by the caller. `state-prefix` is only allowed when a single root matches.
 
 ## Migrating from opentofu-stack
 
@@ -117,11 +118,11 @@ with:
 
 | Input                            | Description                                                                                                                                                                                                                                                            | Required | Default      |
 | :------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :----------- |
-| `working-directory`              | Root module directory, passed to `tofu -chdir`.<br>**Default:** `tofu`<br>**Example:** `infra`, `tofu/production`                                                                                                                                                      | No       | `tofu`       |
+| `working-directory`              | Root module directories, one pattern per line.<br>`*` matches exactly one path segment. Only directories with a `*.tf` or `*.tofu` file count.<br>**Default:** `tofu`<br>**Example:** `infra`, `tofu/*`                                                                | No       | `tofu`       |
 | `gcp-workload-identity-provider` | Full Workload Identity Federation provider resource name.<br>Authenticates directly as the repository without a service account.<br>This is public configuration, not a secret.<br>**Default:** Falls back to `vars.FOUNDRY_WIF_PROVIDER` if not provided.             | No       | _empty_      |
 | `state-bucket`                   | GCS bucket holding the state.<br>**Default:** Falls back to `vars.FOUNDRY_STATE_BUCKET` if not provided.                                                                                                                                                               | No       | _empty_      |
 | `state-key`                      | Full KMS crypto key resource name used to encrypt the state and plan files.<br>**Default:** Falls back to `vars.FOUNDRY_STATE_KEY` if not provided.                                                                                                                    | No       | _empty_      |
-| `state-prefix`                   | Prefix of the GCS state object, so several roots can share one bucket.<br>**Default:** Falls back to `working-directory` if not provided.                                                                                                                              | No       | _empty_      |
+| `state-prefix`                   | Prefix of the GCS state object, so several roots can share one bucket.<br>Only allowed when `working-directory` matches exactly one root.<br>**Default:** Falls back to the root directory if not provided.                                                            | No       | _empty_      |
 | `default-branch`                 | Branch that triggers the apply job on push.<br>**Default:** `main`                                                                                                                                                                                                     | No       | `main`       |
 | `apply-environment`              | GitHub environment used by the apply job. Set to an empty string to disable.<br>**Default:** `production`                                                                                                                                                              | No       | `production` |
 | `token-broker-url`               | URL of the token broker for OIDC token exchange.<br>**Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.                                                                                                                                                | No       | _empty_      |
