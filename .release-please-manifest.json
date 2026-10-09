@@ -8,7 +8,6 @@
 	"actions/setup-oidc-token-cli": "1.1.4",
 	"actions/setup-tools": "1.1.0",
 	"actions/triage-dependabot-pr": "1.0.0",
-	"workflows/release": "2.1.8",
 	"workflows/gitops-update-tags": "2.1.1",
 	"workflows/polyglot-monorepo-stack": "2.7.1",
 	"packages/action-tool-installer": "3.0.1",

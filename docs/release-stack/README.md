@@ -7,13 +7,14 @@ channels, and structured version output for downstream jobs.
 
 - `release-please-config.json` — release-please configuration (release types, package paths, changelog settings)
 - `.release-please-manifest.json` — tracks current versions for each package path
+- `TOKEN_BROKER_URL` repository variable, with the token broker's GitHub App installed on the repository
 - [Conventional Commits](https://www.conventionalcommits.org/) — commit messages drive version bumps (`feat:` → minor,
   `fix:` → patch, `feat!:` / `BREAKING CHANGE` → major)
 
 ## Release Lifecycle
 
 1. Developers merge pull requests with conventional commit messages.
-2. The release workflow calls `run-release-please`, which creates or updates release PRs grouping pending changes per
+2. The release job runs `run-release-please`, which creates or updates release PRs grouping pending changes per
    package.
 3. When a release PR is merged, `run-release-please` publishes GitHub Releases and tags, then outputs the `versions`
    JSON.
@@ -58,7 +59,7 @@ Consumers install with `npm install <package>@beta`.
 
 ## Version Output
 
-The release workflow outputs a `versions` JSON object mapping package paths to version info.
+The `run-release-please` action outputs a `versions` JSON object mapping package paths to version info.
 
 ### Structure
 
@@ -129,10 +130,22 @@ on:
 jobs:
   release:
     name: Release
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v2
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    outputs:
+      versions: ${{ steps.release.outputs.versions }}
+    steps:
+      - id: token
+        uses: abinnovision/actions@exchange-github-token-v1
+        with:
+          broker-url: ${{ vars.TOKEN_BROKER_URL }}
+          scope: contents:write pull_requests:write
+      - id: release
+        uses: abinnovision/actions@run-release-please-v1
+        with:
+          token: ${{ steps.token.outputs.token }}
 ```
 
 ### release.yaml with prerelease channel
@@ -149,12 +162,23 @@ on:
 jobs:
   release:
     name: Release
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@release-v2
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    with:
-      prerelease-channel: ${{ github.ref_name != 'main' && github.ref_name || '' }}
+    outputs:
+      versions: ${{ steps.release.outputs.versions }}
+    steps:
+      - id: token
+        uses: abinnovision/actions@exchange-github-token-v1
+        with:
+          broker-url: ${{ vars.TOKEN_BROKER_URL }}
+          scope: contents:write pull_requests:write
+      - id: release
+        uses: abinnovision/actions@run-release-please-v1
+        with:
+          token: ${{ steps.token.outputs.token }}
+          prerelease-channel: ${{ github.ref_name != 'main' && github.ref_name || '' }}
 ```
 
 ### Consuming version output
@@ -192,9 +216,8 @@ jobs:
 
 ## References
 
-- [`workflows/release`](../../workflows/release/README.md) — Reusable release workflow
 - [`actions/run-release-please`](../../actions/run-release-please/README.md) — Release-please action with prerelease
   support
-- [`workflows/polyglot-monorepo-stack`](../../workflows/polyglot-monorepo-stack/README.md) — Full CI/CD stack using the
-  release workflow
+- [`workflows/polyglot-monorepo-stack`](../../workflows/polyglot-monorepo-stack/README.md) — Full CI/CD stack using
+  `run-release-please`
 - [`workflows/node-monorepo-stack`](../../workflows/node-monorepo-stack/README.md) — Node-specific CI/CD stack

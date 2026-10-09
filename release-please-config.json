@@ -32,9 +32,6 @@
 		"actions/triage-dependabot-pr": {
 			"extra-files": ["README.md"]
 		},
-		"workflows/release": {
-			"extra-files": ["README.md"]
-		},
 		"workflows/app-stack": {
 			"extra-files": ["README.md"]
 		},
