@@ -2,20 +2,20 @@
 
 Validates manifests and deploys ArgoCD applications.
 
+It follows the shared [stack contract](../../docs/stacks/README.md) for calling, naming, jobs and required checks.
+
 ## Behavior
 
-| Job         | Runs on                                                           | Does                                                                                                                  |
+| Job         | Runs                                                              | Does                                                                                                                  |
 | :---------- | :---------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
 | `Configure` | Always                                                            | Resolves the mode (`pr`, `main` or none) and discovers applications in `applications-directory`                      |
 | `Check`     | Always                                                            | Repository baseline checks (install, dedupe, `check`), without credentials       |
 | `Preview`   | Pull requests from the same repository, one job per application  | Validates manifests and posts the ArgoCD diff as a PR comment                                                        |
 | `Deploy`    | Push to `default-branch`, one job per application                 | Validates manifests, triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health) |
-| `Status`    | Always                                                            | Single required status check, fails if any other job failed or was cancelled                                         |
+| `Status`    | Always | Single required status check, fails when any other job failed or was cancelled |
 
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to ArgoCD
-- `pull_request_target` is rejected
 - Application directory names must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
-- Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 
 ## Requirements
 
