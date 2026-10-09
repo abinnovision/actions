@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.1.1...publish-oci-source-v1.1.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* align checkout credentials and lane names across stacks ([#631](https://github.com/abinnovision/actions/issues/631)) ([44d7f70](https://github.com/abinnovision/actions/commit/44d7f700ff8177b0f90188cc13524a8f281a1318))
+
 ## [1.1.1](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.1.0...publish-oci-source-v1.1.1) (2026-10-07)
 
 

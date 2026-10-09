@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v2.1.1...gitops-update-tags-source-v3.0.0) (2026-10-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **gitops-stack:** validate manifests in Check and use the public DEX client ([#630](https://github.com/abinnovision/actions/issues/630))
+
+### Features
+
+* **gitops-stack:** validate manifests in Check and use the public DEX client ([#630](https://github.com/abinnovision/actions/issues/630)) ([9d5a6fc](https://github.com/abinnovision/actions/commit/9d5a6fce3bdb7f83b7b14839c90d22d9ce135fbc))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 1.2.0
+
 ## [2.1.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v2.1.0...gitops-update-tags-source-v2.1.1) (2026-10-07)
 
 
