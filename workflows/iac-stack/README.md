@@ -2,22 +2,22 @@
 
 Checks, plans and applies an OpenTofu root module with GCS state and encrypted state files, next to the Node repo checks.
 
+It follows the shared [stack contract](../../docs/stacks/README.md) for calling, naming, jobs and required checks.
+
 ## Behavior
 
-| Job             | Runs on                  | Does                                                                                                                                                                                       |
+| Job             | Runs                     | Does                                                                                                                                                                                       |
 | :-------------- | :----------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Configure`     | Always                   | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, and validates the configuration                                                                               |
 | `Check`         | Always                   | Node repo checks (`yarn install --immutable`, `yarn dedupe --check`, `yarn check`), then `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate` for every root          |
 | `Plan: <root>`  | Trusted pull requests    | `tofu plan` per root and one sticky PR comment per root via [terraform-plan-comment](https://github.com/borchero/terraform-plan-comment); a failed plan replaces it with a link to the run |
 | `Apply: <root>` | Push to `default-branch` | Fresh `tofu plan -out` and `tofu apply` per root in `apply-environment`                                                                                                                    |
-| `Status`        | Always                   | Fails when any other job failed or was cancelled; use it as the single required status check                                                                                               |
+| `Status`        | Always                   | Single required status check, fails when any other job failed or was cancelled                                                                                                             |
 
 - `working-directory` takes patterns, one per line, where `*` matches one path segment. Every matching directory with a `*.tf` or `*.tofu` file is a root and gets its own `Plan` and `Apply` job
 - State and plan files are always encrypted with OpenTofu's `gcp_kms` key provider
 - Optional GitHub token exchange via the token broker, passed as `GITHUB_TOKEN` to the GitHub provider
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to GCP
-- `pull_request_target` is rejected
-- Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 
 ## Requirements
 

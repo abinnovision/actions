@@ -2,7 +2,7 @@
 
 Updates image tags in kustomization files and creates pull requests.
 
-> For repository setup, see [GitOps Stack documentation](../../docs/gitops-stack/README.md).
+Runs in repositories that use [gitops-stack](../gitops-stack/README.md#repository-layout).
 
 ## Behavior
 
@@ -11,6 +11,11 @@ Updates image tags in kustomization files and creates pull requests.
 - Formats files with prettier before committing
 - Optional automerge when all specified images are updated
 - Writes a job summary with the applied `image -> tag` updates, the pull request link, and automerge status
+
+## Requirements
+
+- The repository has a `.tool-versions` file with `nodejs` and `kustomize`, installed through
+  [setup-tools](../../actions/setup-tools/README.md)
 
 ## Usage
 
