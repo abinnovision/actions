@@ -27,8 +27,8 @@ on:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number || github.event.merge_group.id || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 permissions: {}
 
@@ -45,6 +45,8 @@ jobs:
   `pr-utils.yaml`, which never checks out pull request code.
 - Callers must not use `paths:` filters. A workflow that does not start never reports the required check.
 - Repositories with a merge queue also trigger on `merge_group`.
+- Concurrency is declared in the caller only. A called workflow sees the caller's `github.workflow`, so a group on both
+  sides deadlocks. Pull requests and merge groups supersede themselves; pushes to `main` are never cancelled.
 
 ## Naming
 
@@ -144,6 +146,38 @@ Rulesets require exactly two contexts, independent of the kind:
 - Stacks set no `concurrency`. Callers own it through the workflow-level group shown above: it cancels superseded pull
   request runs and serialises runs on the default branch; a newer pending run replaces an older pending one.
 - Step names are shared: `Checkout`, `Setup Tools`, `Install dependencies`, `Check dependencies`, `Check`, `Build`.
+
+## Releases
+
+Stacks with a `Release` lane ([app-stack](../../workflows/app-stack/README.md)) release with
+[release-please](https://github.com/googleapis/release-please) through
+[run-release-please](../../actions/run-release-please/README.md). The repository needs:
+
+- `release-please-config.json` with one package per released unit, keyed by its path (`.` for the root unit)
+- `.release-please-manifest.json` with the current version of each package
+- The `TOKEN_BROKER_URL` repository variable (or the `token-broker-url` input), with the token broker's GitHub App
+  installed on the repository
+- [Conventional Commits](https://www.conventionalcommits.org/): `fix:` bumps the patch, `feat:` the minor, `feat!:` or
+  `BREAKING CHANGE` the major version
+
+On every push to the default branch, `Release` opens or updates one release PR per package with pending changes. The push
+that merges a release PR creates the GitHub releases and tags, and the released units appear in the
+[release list](#release-list). Release PRs are rebuilt on every run, so manual commits on their branches are
+overwritten.
+
+### Prerelease channels
+
+With `prerelease-channel` set (for example `beta`), every unit with pending changes is listed as a prerelease, without
+merging its release PR:
+
+| Field     | Value                                     | Example        |
+| :-------- | :---------------------------------------- | :------------- |
+| `version` | `{next-version}-{channel}.{commit-count}` | `1.4.0-beta.5` |
+| `channel` | The channel name                          | `beta`         |
+| `sha`     | Short commit SHA                          | `a3f2c1d`      |
+
+`{commit-count}` counts the commits since the last release of the unit. Stable releases have `channel: ""`. `publish-npm`
+uses the channel as the dist-tag.
 
 ## Publishing
 

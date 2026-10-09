@@ -2,17 +2,17 @@
 
 Validates manifests and deploys ArgoCD applications.
 
-> For repository setup, see [GitOps Stack documentation](../../docs/gitops-stack/README.md).
+It follows the shared [stack contract](../../docs/stacks/README.md) for calling, naming, jobs and required checks.
 
 ## Behavior
 
-| Job               | Runs on                                                              | Does                                                                                                                                |
+| Job               | Runs                                                                 | Does                                                                                                                                |
 | :---------------- | :------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
 | `Configure`       | Always                                                               | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, validates the configuration and discovers applications |
 | `Check`           | Always                                                               | Repository baseline checks (install, dedupe, `check`), then validates the manifests of every application, without credentials       |
 | `Preview: <name>` | Trusted pull requests, one job per application with `.argocd-app`    | Posts the ArgoCD diff as a PR comment                                                                                               |
 | `Deploy: <name>`  | Push to `default-branch`, one job per application with `.argocd-app` | Triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health)                                 |
-| `Status`          | Always                                                               | Single required status check, fails if any other job failed or was cancelled                                                        |
+| `Status`          | Always                                                               | Single required status check, fails when any other job failed or was cancelled                                                      |
 
 - Every directory in `applications-directory` is an application and is validated in `Check`: `kustomize build`
   (with Helm), `kubeconform` (fails the job) and `kube-score` (warnings only). The logs are uploaded as the
@@ -82,8 +82,8 @@ on:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number || github.event.merge_group.id || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 permissions: {}
 
@@ -102,6 +102,13 @@ jobs:
 
 The ArgoCD and DEX settings are read from the repository variables. Pass `argocd-server`, `dex-endpoint`,
 `dex-client-id` or `dex-connector` to override them.
+
+| Variable                       | Description                                       |
+| :----------------------------- | :------------------------------------------------ |
+| `ARGOCD_SERVER`                | ArgoCD server hostname, without `https://`        |
+| `DEX_ENDPOINT`                 | DEX issuer URL                                    |
+| `DEX_GITHUB_ACTIONS_CLIENT_ID` | ID of the public DEX client for GitHub Actions    |
+| `DEX_GITHUB_ACTIONS_CONNECTOR` | ID of the DEX connector for GitHub Actions tokens |
 
 ### Migrating from gitops-stack v1
 
@@ -129,6 +136,105 @@ The ArgoCD and DEX settings are read from the repository variables. Pass `argocd
 - Add a `.tool-versions` file with `nodejs` and the Kubernetes tools
 - Pull request runs now authenticate with the OIDC identity of a `pull_request` event (subject
   `repo:<owner>/<repo>:pull_request`). ArgoCD and DEX RBAC rules must accept it
+
+## Repository layout
+
+### Directory structure
+
+```
+gitops-repo/
+├── .github/workflows/
+│   ├── ci.yaml
+│   └── update-tags.yaml   # see gitops-update-tags
+├── .tool-versions
+├── package.json
+├── yarn.lock
+└── k8s/
+    ├── applications/      # applications-directory, one directory per application
+    │   ├── staging/
+    │   │   ├── .argocd-app
+    │   │   ├── kustomization.yaml
+    │   │   └── *.yaml
+    │   └── production/
+    │       └── ...
+    └── base/
+        └── <shared-resources>/
+```
+
+### Applications
+
+Each application directory holds a `.argocd-app` file with the name of its ArgoCD Application on a single line:
+
+```
+my-app-staging
+```
+
+and a `kustomization.yaml`. Image entries are the targets of
+[gitops-update-tags](../gitops-update-tags/README.md):
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: app-my-app-staging
+
+resources:
+  - ../../base/backend
+  - ../../base/frontend
+  - ./ingress.yaml
+
+images:
+  - name: app-backend
+    newName: ghcr.io/org/app-backend
+    newTag: sha-abc1234
+  - name: app-frontend
+    newName: ghcr.io/org/app-frontend
+    newTag: sha-abc1234
+```
+
+### Root files
+
+`.tool-versions` pins the tools of every job (see [setup-tools](../../actions/setup-tools/README.md)). `Check` uses
+Node.js and the validation tools, `Preview` and `Deploy` use `argocd`, and
+[gitops-update-tags](../gitops-update-tags/README.md) uses Node.js and `kustomize`:
+
+```
+nodejs 24.18.0
+kustomize 5.7.1
+kubeconform 0.7.0
+kube-score 1.20.0
+argocd 3.1.8
+```
+
+The root `package.json` provides the `check` script, here formatting only:
+
+```json
+{
+  "private": true,
+  "packageManager": "yarn@4.9.2",
+  "scripts": {
+    "check": "yarn format:check",
+    "format:check": "prettier --check '{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}'",
+    "format:fix": "prettier --write '{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}'",
+    "postinstall": "husky"
+  },
+  "commitlint": {
+    "extends": ["@abinnovision/commitlint-config"]
+  },
+  "lint-staged": {
+    "{.github/**/*,k8s/**/*,*}.{json,json5,yaml,yml,md}": ["prettier --write"]
+  },
+  "prettier": "@abinnovision/prettier-config",
+  "devDependencies": {
+    "@abinnovision/commitlint-config": "^2.2.1",
+    "@abinnovision/prettier-config": "^2.1.3",
+    "@commitlint/cli": "^20.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
+    "prettier": "^3.6.2"
+  }
+}
+```
 
 ## Validation Tools
 
