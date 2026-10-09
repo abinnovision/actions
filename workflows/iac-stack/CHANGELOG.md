@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.0.1...iac-stack-source-v1.1.0) (2026-10-09)
+
+
+### Features
+
+* **iac-stack:** plan and apply multiple root modules ([#629](https://github.com/abinnovision/actions/issues/629)) ([17e607a](https://github.com/abinnovision/actions/commit/17e607a2d8cacfdbae73b217d89cc5c622296530))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 1.2.0
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.0.0...iac-stack-source-v1.0.1) (2026-10-07)
 
 

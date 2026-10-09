@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.1.0...setup-tools-source-v1.2.0) (2026-10-09)
+
+
+### Features
+
+* **setup-tools:** install Kubernetes tools from .tool-versions ([#628](https://github.com/abinnovision/actions/issues/628)) ([1d9e6f8](https://github.com/abinnovision/actions/commit/1d9e6f8c20e3090ab10074d061ceabc80d6d8e6f))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.0.2...setup-tools-source-v1.1.0) (2026-09-30)
 
 
