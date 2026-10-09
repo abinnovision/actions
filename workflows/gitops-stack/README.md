@@ -37,8 +37,8 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
   `kube-score` unless disabled, and a `package.json` with a `check` script. `kustomize build --enable-helm` needs
   `helm` when an application uses Helm charts
 - The caller grants `contents: read`, `packages: read`, `id-token: write` and `pull-requests: write`
-- The repository variables `ARGOCD_SERVER`, `DEX_ENDPOINT`, `DEX_GITHUB_ACTIONS_CLIENT_ID` and
-  `DEX_GITHUB_ACTIONS_CONNECTOR` are set, or the matching inputs are passed. `Configure` fails when one is missing and
+- The variables `ARGOCD_CORE_SERVER`, `DEX_CORE_ENDPOINT`, `DEX_CORE_GITHUB_ACTIONS_CLIENT` and
+  `DEX_CORE_GITHUB_ACTIONS_CONNECTOR` are set, or the matching inputs are passed. `Configure` fails when one is missing and
   a `Preview` or `Deploy` job would run
 - The DEX client is a public client. DEX and ArgoCD accept the GitHub Actions OIDC token with the subject
   `repo:<owner>/<repo>:pull_request` for previews and, for deploys, `repo:<owner>/<repo>:environment:<name>` with
@@ -103,21 +103,20 @@ jobs:
 The ArgoCD and DEX settings are read from the repository variables. Pass `argocd-server`, `dex-endpoint`,
 `dex-client-id` or `dex-connector` to override them.
 
-| Variable                       | Description                                       |
-| :----------------------------- | :------------------------------------------------ |
-| `ARGOCD_SERVER`                | ArgoCD server hostname, without `https://`        |
-| `DEX_ENDPOINT`                 | DEX issuer URL                                    |
-| `DEX_GITHUB_ACTIONS_CLIENT_ID` | ID of the public DEX client for GitHub Actions    |
-| `DEX_GITHUB_ACTIONS_CONNECTOR` | ID of the DEX connector for GitHub Actions tokens |
+| Variable                            | Description                                                        |
+| :---------------------------------- | :----------------------------------------------------------------- |
+| `ARGOCD_CORE_SERVER`                | ArgoCD server hostname, without `https://`                         |
+| `DEX_CORE_ENDPOINT`                 | DEX issuer URL                                                     |
+| `DEX_CORE_GITHUB_ACTIONS_CLIENT`    | ID of the public DEX client, `client_id:client_secret` is accepted |
+| `DEX_CORE_GITHUB_ACTIONS_CONNECTOR` | ID of the DEX connector for GitHub Actions tokens                  |
 
 ### Migrating from gitops-stack v1
 
-- Remove the `secrets:` block. `DEX_ENDPOINT`, `DEX_GITHUB_ACTIONS_CLIENT` and `DEX_GITHUB_ACTIONS_CONNECTOR` become
-  the variables `DEX_ENDPOINT`, `DEX_GITHUB_ACTIONS_CLIENT_ID` (client ID only) and `DEX_GITHUB_ACTIONS_CONNECTOR`, or
-  the inputs `dex-endpoint`, `dex-client-id` and `dex-connector`
+- Remove the `secrets:` block and the `argocd-server` input. The workflow reads `ARGOCD_CORE_SERVER`,
+  `DEX_CORE_ENDPOINT`, `DEX_CORE_GITHUB_ACTIONS_CLIENT` and `DEX_CORE_GITHUB_ACTIONS_CONNECTOR` itself; the inputs
+  `argocd-server`, `dex-endpoint`, `dex-client-id` and `dex-connector` override them
 - Configure the DEX client as a public client; no client secret is sent
 - Remove `auth-method` and `health-timeout`. Token authentication (`ARGOCD_TOKEN`) is no longer supported
-- `argocd-server` is optional and falls back to `vars.ARGOCD_SERVER`
 - Add `kustomize`, `kubeconform`, `kube-score` and `argocd` to `.tool-versions`
 - Job names change to `Preview: <name>` and `Deploy: <name>`; `CI / Status` stays the required check
 - With `enable-github-deployments`, deploy jobs authenticate with the subject
@@ -286,10 +285,10 @@ with:
 
 | Input                          | Description                                                                                                                                                                                                                                                                                                                                                                          | Required | Default                                                                                                                                 |
 | :----------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
-| `argocd-server`                | ArgoCD server hostname (without https://).<br>**Default:** Falls back to `vars.ARGOCD_SERVER` if not provided.<br>**Example:** `argocd.example.com`                                                                                                                                                                                                                                  | No       | _empty_                                                                                                                                 |
-| `dex-endpoint`                 | DEX OIDC issuer URL used to exchange the GitHub Actions OIDC token for an ArgoCD token.<br>This is public configuration, not a secret.<br>**Default:** Falls back to `vars.DEX_ENDPOINT` if not provided.<br>**Example:** `https://dex.example.com`                                                                                                                                  | No       | _empty_                                                                                                                                 |
-| `dex-client-id`                | ID of the public DEX client for GitHub Actions.<br>**Default:** Falls back to `vars.DEX_GITHUB_ACTIONS_CLIENT_ID` if not provided.<br>**Example:** `github-actions`                                                                                                                                                                                                                  | No       | _empty_                                                                                                                                 |
-| `dex-connector`                | ID of the DEX connector that accepts GitHub Actions OIDC tokens.<br>**Default:** Falls back to `vars.DEX_GITHUB_ACTIONS_CONNECTOR` if not provided.<br>**Example:** `github-actions`                                                                                                                                                                                                 | No       | _empty_                                                                                                                                 |
+| `argocd-server`                | ArgoCD server hostname (without https://).<br>**Default:** Falls back to `vars.ARGOCD_CORE_SERVER` if not provided.<br>**Example:** `argocd.example.com`                                                                                                                                                                                                                             | No       | _empty_                                                                                                                                 |
+| `dex-endpoint`                 | DEX OIDC issuer URL used to exchange the GitHub Actions OIDC token for an ArgoCD token.<br>This is public configuration, not a secret.<br>**Default:** Falls back to `vars.DEX_CORE_ENDPOINT` if not provided.<br>**Example:** `https://dex.example.com`                                                                                                                             | No       | _empty_                                                                                                                                 |
+| `dex-client-id`                | ID of the public DEX client for GitHub Actions.<br>A `client_id:client_secret` value is accepted; only the ID is used.<br>**Default:** Falls back to `vars.DEX_CORE_GITHUB_ACTIONS_CLIENT` if not provided.<br>**Example:** `github-actions`                                                                                                                                         | No       | _empty_                                                                                                                                 |
+| `dex-connector`                | ID of the DEX connector that accepts GitHub Actions OIDC tokens.<br>**Default:** Falls back to `vars.DEX_CORE_GITHUB_ACTIONS_CONNECTOR` if not provided.<br>**Example:** `github-actions`                                                                                                                                                                                            | No       | _empty_                                                                                                                                 |
 | `default-branch`               | Default branch name for the repository.<br>**Example:** `main`, `master`, `develop`                                                                                                                                                                                                                                                                                                  | No       | `main`                                                                                                                                  |
 | `applications-directory`       | Root directory containing application subdirectories.<br>**Example:** `k8s/applications`, `manifests/apps`                                                                                                                                                                                                                                                                           | No       | `k8s/applications`                                                                                                                      |
 | `enable-kube-score`            | Enable kube-score validation (best practices).<br>**Note:** kube-score failures are warnings only, won't block deployment                                                                                                                                                                                                                                                            | No       | `true`                                                                                                                                  |
