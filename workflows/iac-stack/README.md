@@ -6,13 +6,13 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 ## Behavior
 
-| Job             | Runs                     | Does                                                                                                                                                                                       |
-| :-------------- | :----------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Configure`     | Always                   | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, and validates the configuration                                                                               |
-| `Check`         | Always                   | Node repo checks (`yarn install --immutable`, `yarn dedupe --check`, `yarn check`), then `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate` for every root          |
-| `Plan: <root>`  | Trusted pull requests    | `tofu plan` per root and one sticky PR comment per root via [terraform-plan-comment](https://github.com/borchero/terraform-plan-comment); a failed plan replaces it with a link to the run |
-| `Apply: <root>` | Push to `default-branch` | Fresh `tofu plan -out` and `tofu apply` per root in `apply-environment`                                                                                                                    |
-| `Status`        | Always                   | Single required status check, fails when any other job failed or was cancelled                                                                                                             |
+| Job             | Runs                     | Does                                                                                                                                                                                                                   |
+| :-------------- | :----------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure`     | Always                   | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, and validates the configuration                                                                                                           |
+| `Check`         | Always                   | Node repo checks (`yarn install --immutable`, `yarn dedupe --check`, `yarn check`), then `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate` for every root, and `tofu test` with `enable-tests` |
+| `Plan: <root>`  | Trusted pull requests    | `tofu plan` per root and one sticky PR comment per root via [terraform-plan-comment](https://github.com/borchero/terraform-plan-comment); a failed plan replaces it with a link to the run                             |
+| `Apply: <root>` | Push to `default-branch` | Fresh `tofu plan -out` and `tofu apply` per root in `apply-environment`                                                                                                                                                |
+| `Status`        | Always                   | Single required status check, fails when any other job failed or was cancelled                                                                                                                                         |
 
 - `working-directory` takes patterns, one per line, where `*` matches one path segment. Every matching directory with a `*.tf` or `*.tofu` file is a root and gets its own `Plan` and `Apply` job
 - State and plan files are always encrypted with OpenTofu's `gcp_kms` key provider
@@ -103,6 +103,28 @@ Repositories with several roots list one pattern per line in `working-directory`
 The encryption config allows reading an existing unencrypted state as a fallback. The first apply rewrites
 the state encrypted. Plans on pull requests run with `-lock=false` and never write state.
 
+### Tests
+
+Set `enable-tests: true` to run `tofu test` for every root inside `Check`. Test files (`*.tftest.hcl` or
+`*.tofutest.hcl`) live in the root or its `tests/` directory; roots without test files are skipped.
+
+`Check` has no credentials, so tests must not reach real APIs. Use `mock_provider` (OpenTofu 1.8 or later),
+`override_resource` or `override_data`; `command = plan` alone still configures the provider. Tests keep their state in memory and never touch the GCS backend.
+
+```hcl
+# tofu/tests/bucket.tftest.hcl
+mock_provider "google" {}
+
+run "bucket_name" {
+  command = plan
+
+  assert {
+    condition     = google_storage_bucket.this.name == "example"
+    error_message = "unexpected bucket name"
+  }
+}
+```
+
 ### GitHub provider token
 
 Set `github-token-plan-scope` and/or `github-token-apply-scope` to exchange a GitHub App token through the
@@ -119,6 +141,7 @@ with:
 | Input                            | Description                                                                                                                                                                                                                                                            | Required | Default      |
 | :------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :----------- |
 | `working-directory`              | Root module directories, one pattern per line.<br>`*` matches exactly one path segment. Only directories with a `*.tf` or `*.tofu` file count.<br>**Default:** `tofu`<br>**Example:** `infra`, `tofu/*`                                                                | No       | `tofu`       |
+| `enable-tests`                   | Run `tofu test` for every root in the Check job, without credentials.<br>Providers must be mocked, since `command = plan` still configures them.<br>**Default:** `false`                                                                                               | No       | _empty_      |
 | `gcp-workload-identity-provider` | Full Workload Identity Federation provider resource name.<br>Authenticates directly as the repository without a service account.<br>This is public configuration, not a secret.<br>**Default:** Falls back to `vars.FOUNDRY_WIF_PROVIDER` if not provided.             | No       | _empty_      |
 | `state-bucket`                   | GCS bucket holding the state.<br>**Default:** Falls back to `vars.FOUNDRY_STATE_BUCKET` if not provided.                                                                                                                                                               | No       | _empty_      |
 | `state-key`                      | Full KMS crypto key resource name used to encrypt the state and plan files.<br>**Default:** Falls back to `vars.FOUNDRY_STATE_KEY` if not provided.                                                                                                                    | No       | _empty_      |
