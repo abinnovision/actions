@@ -110,7 +110,8 @@ jobs:
               continue
             fi
 
-            if [[ "$pair" != *:* ]]; then
+            # The tag is everything after the last ':', which must not be part of a registry port.
+            if [[ "$pair" != *:* || "${pair##*:}" == */* ]]; then
               echo "::error::Invalid update entry '$pair'. Expected format: image-name:tag"
               exit 1
             fi
@@ -165,10 +166,12 @@ jobs:
 
           MISSING_IMAGES=""
 
-          while IFS=':' read -r image tag; do
+          while IFS= read -r entry; do
+            image="${entry%:*}"
+            tag="${entry##*:}"
             [[ -z "$image" ]] && continue
 
-            if yq eval ".images[] | select(.name == \"$image\")" "$kustomization" | grep -q .; then
+            if IMAGE="$image" yq eval '.images[] | select(.name == strenv(IMAGE))' "$kustomization" | grep -q .; then
               echo "Image name validated: $image"
             else
               echo "::error::Image '$image' not found in ${kustomization##*/}"
@@ -186,7 +189,9 @@ jobs:
       - name: Set image tag
         working-directory: ${{ inputs.applications-directory }}/${{ inputs.application }}
         run: |
-          while IFS=':' read -r image tag; do
+          while IFS= read -r entry; do
+            image="${entry%:*}"
+            tag="${entry##*:}"
             [[ -z "$image" ]] && continue
 
             echo "Setting image tag: $image -> $tag"
@@ -208,7 +213,9 @@ jobs:
         run: |
           COMMIT_BODY=""
 
-          while IFS=':' read -r image tag; do
+          while IFS= read -r entry; do
+            image="${entry%:*}"
+            tag="${entry##*:}"
             [[ -z "$image" ]] && continue
             COMMIT_BODY="${COMMIT_BODY}- ${image} -> ${tag}"$'\n'
           done <<< "$PARSED_UPDATES"
@@ -223,7 +230,9 @@ jobs:
         run: |
           CHANGES_LIST=""
 
-          while IFS=':' read -r image tag; do
+          while IFS= read -r entry; do
+            image="${entry%:*}"
+            tag="${entry##*:}"
             if [[ -z "$image" ]]; then
               continue
             fi
@@ -250,7 +259,7 @@ jobs:
           fi
 
           # Extract updated image names from PARSED_UPDATES (format: image:tag)
-          UPDATED_IMAGES=$(echo "$PARSED_UPDATES" | cut -d: -f1 | sort -u | grep -v '^$')
+          UPDATED_IMAGES=$(echo "$PARSED_UPDATES" | sed 's/:[^:]*$//' | sort -u | grep -v '^$')
 
           echo "::group::Automerge check"
           echo "Required images: $INPUT_AUTOMERGE_IMAGES"
@@ -331,7 +340,9 @@ jobs:
             echo ""
             echo "| Image | New Tag |"
             echo "| :---- | :------ |"
-            while IFS=':' read -r image tag; do
+            while IFS= read -r entry; do
+              image="${entry%:*}"
+              tag="${entry##*:}"
               [[ -z "$image" ]] && continue
               echo "| \`${image}\` | \`${tag}\` |"
             done <<< "$PARSED_UPDATES"
