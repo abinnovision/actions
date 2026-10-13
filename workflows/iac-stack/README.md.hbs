@@ -14,7 +14,7 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 | `Apply: <root>` | Push to `default-branch`                 | Fresh `tofu plan -out` and `tofu apply` per root in `apply-environment`                                         |
 | `Status`    | Always | Single required status check, fails when any other job failed or was cancelled |
 
-- `working-directory` takes patterns, one per line, where `*` matches one path segment. Every matching directory with a `*.tf` or `*.tofu` file is a root and gets its own `Plan` and `Apply` job
+- `working-directory` takes patterns, one per line, where `*` matches one path segment and skips dot directories. Every pattern must match a root. Every matching directory with a `*.tf` or `*.tofu` file is a root and gets its own `Plan` and `Apply` job
 - State and plan files are always encrypted with OpenTofu's `gcp_kms` key provider
 - Optional GitHub token exchange via the token broker, passed as `GITHUB_TOKEN` to the GitHub provider
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to GCP
@@ -128,7 +128,7 @@ with:
 ### Several roots
 
 One call covers every root. `state-prefix` takes the placeholders `{path}` (root directory) and `{name}` (its last
-segment), so existing state objects keep their prefix. `github-token-roots` limits the exchanged GitHub token to the
+segment, the repository name for the root `.`), so existing state objects keep their prefix. `github-token-roots` limits the exchanged GitHub token to the
 roots that need it; the other roots run without `GITHUB_TOKEN`.
 
 ```yaml

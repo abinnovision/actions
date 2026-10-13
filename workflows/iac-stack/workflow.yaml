@@ -9,7 +9,8 @@ on:
         default: "tofu"
         description: |-
           Root module directories, one pattern per line.
-          `*` matches exactly one path segment. Only directories with a `*.tf` or `*.tofu` file count.
+          `*` matches exactly one path segment and skips dot directories. Only directories with a `*.tf` or `*.tofu` file count.
+          Every pattern must match a root.
           **Default:** `tofu`
           **Example:** `infra`, `tofu/*`
 
@@ -54,7 +55,7 @@ on:
         default: ""
         description: |-
           Prefix of the GCS state object, so several roots can share one bucket.
-          `{path}` expands to the root directory and `{name}` to its last segment. Expanded prefixes must be unique.
+          `{path}` expands to the root directory and `{name}` to its last segment, the repository name for the root `.`. Expanded prefixes must be unique.
           A prefix without placeholders is only allowed when `working-directory` matches exactly one root.
           **Default:** Falls back to the root directory if not provided.
           **Example:** `{name}`, `infra/{path}`
@@ -143,170 +144,75 @@ jobs:
       contents: read
     outputs:
       # Commit under test: PR head, merge group head or the pushed commit.
-      commit-sha: ${{ steps.event.outputs.commit_sha }}
+      commit-sha: ${{ steps.event.outputs.commit-sha }}
 
       # Operation against the backend: pr, main or none.
       mode: ${{ steps.event.outputs.mode }}
 
       # Whether credentialed jobs may run: false for fork and Dependabot pull requests.
-      trusted: ${{ steps.trust.outputs.trusted }}
+      trusted: ${{ steps.event.outputs.trusted }}
 
       # Token broker scopes for the GitHub provider token of this mode.
       github-token-scope: ${{ steps.evaluate.outputs.github_token_scope }}
 
       # Root module directories as a compact JSON array.
-      roots: ${{ steps.roots.outputs.roots }}
+      roots: ${{ steps.roots.outputs.paths }}
 
       # Roots that receive the GitHub provider token, as a compact JSON array.
-      github-token-roots: ${{ steps.roots.outputs.github_token_roots }}
+      github-token-roots: ${{ steps.token-roots.outputs.paths || steps.roots.outputs.paths }}
 
       # State prefix per root as a compact JSON object.
-      state-prefixes: ${{ steps.evaluate.outputs.state_prefixes }}
+      state-prefixes: ${{ steps.roots.outputs.values }}
     steps:
-      # Resolve the commit SHA and mode for this event.
+      # Resolve the commit SHA, mode and trust for this event. Pull requests from forks and Dependabot cannot use
+      # credentials.
       - name: Evaluate event
         id: event
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-          DEFAULT_BRANCH: ${{ inputs.default-branch }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
-        run: |
-          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
-            echo "::error::'pull_request_target' is not supported by iac-stack. Switch the caller to 'pull_request'."
-            exit 1
-          fi
+        uses: abinnovision/actions@evaluate-event-dev
+        with:
+          default-branch: ${{ inputs.default-branch }}
 
-          mode="none"
-
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            mode="pr"
-          elif [[ "$EVENT_NAME" == "push" && "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
-            mode="main"
-          fi
-
-          echo "commit_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-
-          echo "Event: $EVENT_NAME"
-          echo "Commit SHA: $HEAD_SHA"
-          echo "Mode: $mode"
-
-      # Pull requests from forks and Dependabot cannot use credentials.
-      - name: Evaluate trust
-        id: trust
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          ACTOR: ${{ github.actor }}
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          trusted="true"
-
-          if [[ "$EVENT_NAME" == "pull_request" && ( "$HEAD_REPOSITORY" != "$REPOSITORY" || "$ACTOR" == "dependabot[bot]" ) ]]; then
-            trusted="false"
-            echo "::notice::Pull requests from forks and Dependabot cannot use credentials, skipping credentialed jobs"
-          fi
-
-          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
-          echo "Trusted: $trusted"
-
-      # Check out the root files of the resolved commit only; blobs are fetched on demand, so the
-      # credentials stay for `git sparse-checkout add`.
+      # Check out the root files of the resolved commit only; root discovery reads the git tree.
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ steps.event.outputs.commit_sha }}
+          ref: ${{ steps.event.outputs.commit-sha }}
           filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /*
             !/*/
 
-      # Every directory matching a pattern line that contains a `*.tf` or `*.tofu` file is a root. The
-      # unquoted pattern, validated first, is expanded by bash, so `*` matches one path segment.
+      # Every directory matching a pattern line that contains a `*.tf` or `*.tofu` file is a root. Renders the state
+      # prefix of each root, which must be unique.
       - name: Resolve roots
         id: roots
-        env:
-          INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
-          INPUT_GITHUB_TOKEN_ROOTS: ${{ inputs.github-token-roots }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          marker: |
+            *.tf
+            *.tofu
+          patterns: ${{ inputs.working-directory }}
+          require-match: true
+          template: ${{ inputs.state-prefix || '{path}' }}
+          unique: value
 
-          # Usage: validate <input name> <patterns>
-          validate() {
-            while read -r pattern; do
-              [[ -n "$pattern" ]] || continue
-              if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ || "$pattern" == /* || "$pattern" =~ (^|/)\.\.(/|$) ]]; then
-                echo "::error::Invalid pattern '$pattern' in $1: only path segments and '*' are supported"
-                exit 1
-              fi
-            done <<< "$2"
-          }
-
-          # Prints the root directories matching the patterns as a compact JSON array.
-          resolve() {
-            while read -r pattern; do
-              [[ -n "$pattern" ]] || continue
-              for dir in $pattern; do
-                files=("$dir"/*.tf "$dir"/*.tofu)
-                if [[ -d "$dir" && ${#files[@]} -gt 0 ]]; then
-                  dir="${dir%/}"
-                  echo "${dir#./}"
-                fi
-              done
-            done <<< "$1" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique'
-          }
-
-          validate working-directory "$INPUT_WORKING_DIRECTORY"
-          validate github-token-roots "$INPUT_GITHUB_TOKEN_ROOTS"
-
-          paths=""
-          while read -r pattern; do
-            [[ -n "$pattern" ]] || continue
-            # The root module files are already checked out.
-            [[ "${pattern%/}" != "." ]] || continue
-            paths+="/${pattern%/}/*.tf"$'\n'"/${pattern%/}/*.tofu"$'\n'
-          done <<< "$INPUT_WORKING_DIRECTORY"
-
-          if [[ -n "$paths" ]]; then
-            git sparse-checkout add --stdin <<< "$paths"
-          fi
-
-          roots=$(resolve "$INPUT_WORKING_DIRECTORY")
-
-          if [[ "$roots" == "[]" ]]; then
-            echo "::error::No root module matches working-directory"
-            exit 1
-          fi
-
-          github_token_roots="$roots"
-          if [[ -n "$INPUT_GITHUB_TOKEN_ROOTS" ]]; then
-            github_token_roots="[]"
-            while read -r pattern; do
-              [[ -n "$pattern" ]] || continue
-              matched=$(jq -c --argjson roots "$roots" 'map(select(IN($roots[])))' <<< "$(resolve "$pattern")")
-              if [[ "$matched" == "[]" ]]; then
-                echo "::error::Pattern '$pattern' in github-token-roots matches no root"
-                exit 1
-              fi
-              github_token_roots=$(jq -c --argjson matched "$matched" '. + $matched | unique' <<< "$github_token_roots")
-            done <<< "$INPUT_GITHUB_TOKEN_ROOTS"
-          fi
-
-          echo "roots=$roots" >> "$GITHUB_OUTPUT"
-          echo "github_token_roots=$github_token_roots" >> "$GITHUB_OUTPUT"
-          echo "Roots: $roots"
-          echo "GitHub token roots: $github_token_roots"
+      # Roots that receive the GitHub provider token. Without github-token-roots, every root receives it.
+      - name: Resolve GitHub token roots
+        id: token-roots
+        if: inputs.github-token-roots != ''
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          items: ${{ steps.roots.outputs.items }}
+          patterns: ${{ inputs.github-token-roots }}
+          require-match: true
 
       - name: Evaluate
         id: evaluate
         env:
           MODE: ${{ steps.event.outputs.mode }}
-          TRUSTED: ${{ steps.trust.outputs.trusted }}
-          ROOTS: ${{ steps.roots.outputs.roots }}
-          INPUT_STATE_PREFIX: ${{ inputs.state-prefix }}
+          TRUSTED: ${{ steps.event.outputs.trusted }}
+          ROOTS: ${{ steps.roots.outputs.paths }}
           INPUT_GITHUB_TOKEN_ROOTS: ${{ inputs.github-token-roots }}
           PLAN_SCOPE: ${{ inputs.github-token-plan-scope }}
           APPLY_SCOPE: ${{ inputs.github-token-apply-scope }}
@@ -325,27 +231,8 @@ jobs:
             exit 1
           fi
 
-          if [[ -n "$INPUT_STATE_PREFIX" && "$INPUT_STATE_PREFIX" != *"{"* && "$(jq length <<< "$ROOTS")" -ne 1 ]]; then
-            echo "::error::state-prefix without placeholders requires working-directory to match exactly one root"
-            exit 1
-          fi
-
-          # Without state-prefix, every root uses its directory as prefix.
-          state_prefixes=$(
-            jq -c --arg template "${INPUT_STATE_PREFIX:-"{path}"}" '
-              map(. as $root | {
-                key: $root,
-                value: ($template | gsub("\\{path\\}"; $root) | gsub("\\{name\\}"; $root | split("/") | last))
-              }) | from_entries' <<< "$ROOTS"
-          )
-
-          if jq -e 'any(.[]; test("[{}]"))' <<< "$state_prefixes" > /dev/null; then
-            echo "::error::state-prefix supports only the {path} and {name} placeholders"
-            exit 1
-          fi
-
-          if ! jq -e '[.[]] | length == (unique | length)' <<< "$state_prefixes" > /dev/null; then
-            echo "::error::state-prefix must expand to a unique prefix per root: $state_prefixes"
+          if [[ "$ROOTS" == "[]" ]]; then
+            echo "::error::No root module matches working-directory"
             exit 1
           fi
 
@@ -363,8 +250,6 @@ jobs:
 
           # Scopes may be newline-separated; outputs must be single-line.
           echo "github_token_scope=$(echo "$github_token_scope" | xargs)" >> "$GITHUB_OUTPUT"
-          echo "state_prefixes=$state_prefixes" >> "$GITHUB_OUTPUT"
-          echo "State prefixes: $state_prefixes"
 
   # Repo checks and static OpenTofu checks without backend or credentials.
   check:

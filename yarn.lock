@@ -3476,7 +3476,9 @@ __metadata:
   resolution: "iac-stack@workspace:workflows/iac-stack"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
+    evaluate-event: "workspace:^"
     exchange-github-token: "workspace:^"
+    match-paths: "workspace:^"
     prettier: "npm:^3.9.9"
     setup-gcp: "workspace:^"
     setup-tools: "workspace:^"
