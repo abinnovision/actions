@@ -2200,12 +2200,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"conventional-changelog-conventionalcommits@npm:10.4.0, conventional-changelog-conventionalcommits@npm:^10.0.0":
-  version: 10.4.0
-  resolution: "conventional-changelog-conventionalcommits@npm:10.4.0"
+"conventional-changelog-conventionalcommits@npm:10.4.1, conventional-changelog-conventionalcommits@npm:^10.0.0":
+  version: 10.4.1
+  resolution: "conventional-changelog-conventionalcommits@npm:10.4.1"
   dependencies:
     "@conventional-changelog/template": "npm:^1.4.0"
-  checksum: 10/e277c5e7226fc108478d5b67c6a581673b3443e022cfa3eea300e6ddf2683a93690048f9f07fb4e24b01ef174ab77c6cf04406b21afb70f9de5a7a61cb6acecf
+  checksum: 10/87e4e726b1f34bf56227bfc2b4c156a287ff858d6c47cdf418ac20d5cd2813ef13b18cb7a01628813e4f354df36179213dad321401d61897feeb27c7db1e358a
   languageName: node
   linkType: hard
 
@@ -4187,7 +4187,7 @@ __metadata:
     "@commitlint/types": "npm:^21.2.3"
     "@vercel/ncc": "npm:^0.45.0"
     chalk: "npm:^6.0.1"
-    conventional-changelog-conventionalcommits: "npm:10.4.0"
+    conventional-changelog-conventionalcommits: "npm:10.4.1"
     eslint: "npm:^10.11.0"
     prettier: "npm:^3.9.9"
     typescript: "npm:^6.0.3"
