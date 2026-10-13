@@ -18,7 +18,7 @@ on:
         default: packages/*
         description: |-
           Directory patterns of the entries to publish, one per line, matched against the entry `path`.
-          `*` matches one path segment.
+          `*` matches one path segment and skips dot directories.
           **Default:** `packages/*`
 
       npm:
@@ -67,21 +67,22 @@ jobs:
       id-token: write
       packages: write
     steps:
+      # Select the entries whose path matches an include pattern.
+      - name: Match packages
+        id: match
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          items: ${{ inputs.releases }}
+          patterns: ${{ inputs.include }}
+
       - name: Select packages
         id: select
         env:
-          RELEASES: ${{ inputs.releases }}
-          INPUT_INCLUDE: ${{ inputs.include }}
+          PACKAGES: ${{ steps.match.outputs.items }}
         run: |
           set -euo pipefail
 
-          # Each pattern becomes an anchored regex where "*" matches one path segment.
-          packages=$(jq -c --arg patterns "$INPUT_INCLUDE" '
-            ($patterns | split("\n")
-              | map(gsub("^\\s+|\\s+$"; "") | select(. != ""))
-              | map("^" + (gsub("(?<c>[.+?^${}()|\\[\\]\\\\])"; "\\\(.c)") | gsub("\\*"; "[^/]*")) + "$")) as $regexes
-            | [.[] | select(.path as $path | any($regexes[]; . as $re | $path | test($re)))]
-          ' <<< "$RELEASES")
+          packages="$PACKAGES"
 
           errors=$(jq -r '
             .[] | .name as $name
