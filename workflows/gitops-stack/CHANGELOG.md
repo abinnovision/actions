@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.0.1...gitops-stack-source-v2.1.0) (2026-10-13)
+
+
+### Features
+
+* **gitops-stack:** select pruned and deployed applications by path ([#645](https://github.com/abinnovision/actions/issues/645)) ([1a36d2d](https://github.com/abinnovision/actions/commit/1a36d2d2d5c16d42adc84d2ce12808af6e6cbbb1))
+
 ## [2.0.1](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.0.0...gitops-stack-source-v2.0.1) (2026-10-09)
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.1.0...iac-stack-source-v1.2.0) (2026-10-13)
+
+
+### Features
+
+* **iac-stack:** run several roots from one call ([#646](https://github.com/abinnovision/actions/issues/646)) ([81936f1](https://github.com/abinnovision/actions/commit/81936f1b3124451a6d12aaae64afefd57511b846))
+* **iac-stack:** run tofu test with enable-tests ([#638](https://github.com/abinnovision/actions/issues/638)) ([acc62a1](https://github.com/abinnovision/actions/commit/acc62a1e7b8d94e81fd72b6894cad6c3bebd5fd8))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.0.1...iac-stack-source-v1.1.0) (2026-10-09)
 
 
