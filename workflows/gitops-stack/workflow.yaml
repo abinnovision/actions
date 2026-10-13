@@ -301,17 +301,27 @@ jobs:
       - name: Check
         run: yarn run check
 
-      # Builds every application directory, with or without `.argocd-app`. kubeconform failures fail
-      # the step, kube-score findings are warnings.
+      # Every directory in `applications-directory` with a kustomization file is validated, with or
+      # without `.argocd-app`.
+      - name: Discover kustomizations
+        id: kustomizations
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          marker: |
+            kustomization.yaml
+            kustomization.yml
+            Kustomization
+          patterns: ${{ format('{0}/*', inputs.applications-directory) }}
+
+      # kubeconform failures fail the step, kube-score findings are warnings.
       - name: Validate manifests
         env:
-          INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
+          KUSTOMIZATIONS: ${{ steps.kustomizations.outputs.items }}
           INPUT_ENABLE_KUBECONFORM: ${{ inputs.enable-kubeconform }}
           INPUT_ENABLE_KUBE_SCORE: ${{ inputs.enable-kube-score }}
           INPUT_KUBECONFORM_SCHEMA_LOCATIONS: ${{ inputs.kubeconform-schema-locations }}
         run: |
           set -euo pipefail
-          shopt -s nullglob
 
           tools=(kustomize)
           [[ "$INPUT_ENABLE_KUBECONFORM" == "true" ]] && tools+=(kubeconform)
@@ -336,12 +346,7 @@ jobs:
           failed=()
           mkdir -p "$RUNNER_TEMP/manifests" "$RUNNER_TEMP/kubeconform-cache"
 
-          for path in "${INPUT_APPLICATIONS_DIRECTORY%/}"/*/; do
-            app=$(basename "$path")
-            if [[ ! -f "$path/kustomization.yaml" && ! -f "$path/kustomization.yml" && ! -f "$path/Kustomization" ]]; then
-              echo "::notice::Skipping $app: no kustomization file"
-              continue
-            fi
+          while IFS=$'\t' read -r path app; do
             logs="$RUNNER_TEMP/validation/$app"
             manifests="$RUNNER_TEMP/manifests/$app.yaml"
             mkdir -p "$logs"
@@ -369,7 +374,7 @@ jobs:
             fi
 
             echo "::endgroup::"
-          done
+          done < <(jq -r '.[] | [.path, .name] | @tsv' <<< "$KUSTOMIZATIONS")
 
           if [[ ${#failed[@]} -gt 0 ]]; then
             echo "::error::Validation failed for: ${failed[*]}"
