@@ -24,7 +24,9 @@
 	},
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
+		"evaluate-event": "workspace:^",
 		"exchange-github-token": "workspace:^",
+		"match-paths": "workspace:^",
 		"setup-gcp": "workspace:^",
 		"setup-tools": "workspace:^"
 	},
