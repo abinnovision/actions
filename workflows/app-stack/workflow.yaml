@@ -76,7 +76,7 @@ on:
         default: "apps/*"
         description: |-
           Units pruned into the source payload, one directory pattern per line.
-          `*` matches exactly one path segment. Only directories with a `package.json` count.
+          `*` matches exactly one path segment and skips dot directories. Only directories with a `package.json` count.
           `.` selects the repository root, which is not pruned: the source payload already holds the whole tree.
           **Default:** `apps/*`
           **Example:** `apps/*` and `services/*` on separate lines
@@ -86,7 +86,7 @@ on:
         default: "packages/*"
         description: |-
           Units packed into the dist payload, one directory pattern per line.
-          `*` matches exactly one path segment. Only directories with a `package.json` count.
+          `*` matches exactly one path segment and skips dot directories. Only directories with a `package.json` count.
           `.` selects the repository root.
           **Default:** `packages/*`
           **Example:** `packages/*` and `libs/*` on separate lines
@@ -119,14 +119,14 @@ jobs:
       contents: read
     outputs:
       # Commit SHA to check out.
-      commit-sha: ${{ steps.event.outputs.commit_sha }}
+      commit-sha: ${{ steps.event.outputs.commit-sha }}
 
       # Pipeline mode (pr, main or none).
       mode: ${{ steps.event.outputs.mode }}
 
       # Unit paths as compact JSON arrays, `.` for the repository root.
-      source-units: ${{ steps.units.outputs.source-units }}
-      dist-units: ${{ steps.units.outputs.dist-units }}
+      source-units: ${{ steps.source-units.outputs.paths }}
+      dist-units: ${{ steps.dist-units.outputs.paths }}
 
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
@@ -135,72 +135,21 @@ jobs:
       # Resolve the commit SHA and mode for this event.
       - name: Evaluate event
         id: event
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-          DEFAULT_BRANCH: ${{ inputs.default-branch }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
-        run: |
-          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
-            echo "::error::'pull_request_target' is not supported by app-stack. Switch the caller to 'pull_request'."
-            exit 1
-          fi
+        uses: abinnovision/actions@evaluate-event-dev
+        with:
+          default-branch: ${{ inputs.default-branch }}
 
-          mode="none"
-
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            mode="pr"
-          elif [[ "$EVENT_NAME" == "push" && "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
-            mode="main"
-          fi
-
-          echo "commit_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-
-          echo "Event: $EVENT_NAME"
-          echo "Commit SHA: $HEAD_SHA"
-          echo "Mode: $mode"
-
-      # Check out the root files of the resolved commit only; blobs are fetched on demand, so the
-      # credentials stay for `git sparse-checkout add`.
+      # Check out the root files of the resolved commit only; unit discovery reads the git tree.
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ steps.event.outputs.commit_sha }}
+          ref: ${{ steps.event.outputs.commit-sha }}
           submodules: false
           filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /*
             !/*/
-
-      # Add the package.json of every directory matching a unit pattern to the sparse checkout.
-      - name: Checkout unit manifests
-        env:
-          INPUT_SOURCE_UNITS: ${{ inputs.source-units }}
-          INPUT_DIST_UNITS: ${{ inputs.dist-units }}
-        run: |
-          set -euo pipefail
-
-          manifests() {
-            local output="$1" patterns="$2" pattern
-            while read -r pattern; do
-              [[ -n "$pattern" ]] || continue
-              if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ ]]; then
-                echo "::error::Invalid pattern '$pattern' in $output: only path segments and '*' are supported" >&2
-                exit 1
-              fi
-              # The root package.json is already checked out.
-              [[ "${pattern%/}" != "." ]] || continue
-              echo "/${pattern%/}/package.json"
-            done <<< "$patterns"
-          }
-
-          paths=$(manifests source-units "$INPUT_SOURCE_UNITS"; manifests dist-units "$INPUT_DIST_UNITS")
-          echo "$paths"
-          if [[ -n "$paths" ]]; then
-            git sparse-checkout add --stdin <<< "$paths"
-          fi
 
       # Optional: without a Makefile, dependencies are installed with `yarn install --immutable`.
       - name: Validate Makefile
@@ -214,46 +163,23 @@ jobs:
             exit 1
           fi
 
-      # Every directory matching a pattern line that contains a package.json is a unit. The unquoted
-      # pattern, validated by the previous step, is expanded by bash, so `*` matches one path segment.
-      - name: Resolve units
-        id: units
-        env:
-          INPUT_SOURCE_UNITS: ${{ inputs.source-units }}
-          INPUT_DIST_UNITS: ${{ inputs.dist-units }}
-          REPOSITORY_NAME: ${{ github.event.repository.name }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
+      # Every directory matching a source-units pattern that contains a package.json is a source unit.
+      - name: Resolve source units
+        id: source-units
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          marker: package.json
+          patterns: ${{ inputs.source-units }}
+          unique: name
 
-          resolve() {
-            local output="$1" patterns="$2" pattern dir units duplicates
-            units=$(
-              while read -r pattern; do
-                [[ -n "$pattern" ]] || continue
-                for dir in $pattern; do
-                  if [[ -f "$dir/package.json" ]]; then
-                    echo "${dir%/}"
-                  fi
-                done
-              done <<< "$patterns" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique'
-            )
-
-            duplicates=$(jq -r --arg root "$REPOSITORY_NAME" '
-              group_by(if . == "." then $root else split("/") | last end)
-              | map(select(length > 1) | join(", ")) | join("; ")
-            ' <<< "$units")
-            if [[ -n "$duplicates" ]]; then
-              echo "::error::Duplicate basenames in $output: $duplicates"
-              exit 1
-            fi
-
-            echo "$output=$units" >> "$GITHUB_OUTPUT"
-            echo "$output: $units"
-          }
-
-          resolve source-units "$INPUT_SOURCE_UNITS"
-          resolve dist-units "$INPUT_DIST_UNITS"
+      # Every directory matching a dist-units pattern that contains a package.json is a dist unit.
+      - name: Resolve dist units
+        id: dist-units
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          marker: package.json
+          patterns: ${{ inputs.dist-units }}
+          unique: name
 
       # Parse test types.
       - name: Evaluate
