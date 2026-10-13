@@ -54,8 +54,10 @@ on:
         default: ""
         description: |-
           Prefix of the GCS state object, so several roots can share one bucket.
-          Only allowed when `working-directory` matches exactly one root.
+          `{path}` expands to the root directory and `{name}` to its last segment. Expanded prefixes must be unique.
+          A prefix without placeholders is only allowed when `working-directory` matches exactly one root.
           **Default:** Falls back to the root directory if not provided.
+          **Example:** `{name}`, `infra/{path}`
 
       default-branch:
         type: string
@@ -110,6 +112,16 @@ on:
           (`repo:owner/name`, `org:name`, `enterprise:slug`), whitespace-separated.
           **Default:** Empty, the token is scoped to the current repository.
 
+      github-token-roots:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Roots that receive the exchanged GitHub token, one pattern per line, with the same
+          semantics as `working-directory`. Every pattern must match a root.
+          **Default:** Empty, every root receives the token.
+          **Example:** `tofu/github`
+
 permissions: {}
 
 env:
@@ -144,6 +156,12 @@ jobs:
 
       # Root module directories as a compact JSON array.
       roots: ${{ steps.roots.outputs.roots }}
+
+      # Roots that receive the GitHub provider token, as a compact JSON array.
+      github-token-roots: ${{ steps.roots.outputs.github_token_roots }}
+
+      # State prefix per root as a compact JSON object.
+      state-prefixes: ${{ steps.evaluate.outputs.state_prefixes }}
     steps:
       # Resolve the commit SHA and mode for this event.
       - name: Evaluate event
@@ -211,27 +229,24 @@ jobs:
         id: roots
         env:
           INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+          INPUT_GITHUB_TOKEN_ROOTS: ${{ inputs.github-token-roots }}
         run: |
           set -euo pipefail
           shopt -s nullglob
 
-          paths=""
-          while read -r pattern; do
-            [[ -n "$pattern" ]] || continue
-            if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ || "$pattern" == /* || "$pattern" =~ (^|/)\.\.(/|$) ]]; then
-              echo "::error::Invalid pattern '$pattern' in working-directory: only path segments and '*' are supported"
-              exit 1
-            fi
-            # The root module files are already checked out.
-            [[ "${pattern%/}" != "." ]] || continue
-            paths+="/${pattern%/}/*.tf"$'\n'"/${pattern%/}/*.tofu"$'\n'
-          done <<< "$INPUT_WORKING_DIRECTORY"
+          # Usage: validate <input name> <patterns>
+          validate() {
+            while read -r pattern; do
+              [[ -n "$pattern" ]] || continue
+              if [[ ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ || "$pattern" == /* || "$pattern" =~ (^|/)\.\.(/|$) ]]; then
+                echo "::error::Invalid pattern '$pattern' in $1: only path segments and '*' are supported"
+                exit 1
+              fi
+            done <<< "$2"
+          }
 
-          if [[ -n "$paths" ]]; then
-            git sparse-checkout add --stdin <<< "$paths"
-          fi
-
-          roots=$(
+          # Prints the root directories matching the patterns as a compact JSON array.
+          resolve() {
             while read -r pattern; do
               [[ -n "$pattern" ]] || continue
               for dir in $pattern; do
@@ -241,16 +256,49 @@ jobs:
                   echo "${dir#./}"
                 fi
               done
-            done <<< "$INPUT_WORKING_DIRECTORY" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique'
-          )
+            done <<< "$1" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique'
+          }
+
+          validate working-directory "$INPUT_WORKING_DIRECTORY"
+          validate github-token-roots "$INPUT_GITHUB_TOKEN_ROOTS"
+
+          paths=""
+          while read -r pattern; do
+            [[ -n "$pattern" ]] || continue
+            # The root module files are already checked out.
+            [[ "${pattern%/}" != "." ]] || continue
+            paths+="/${pattern%/}/*.tf"$'\n'"/${pattern%/}/*.tofu"$'\n'
+          done <<< "$INPUT_WORKING_DIRECTORY"
+
+          if [[ -n "$paths" ]]; then
+            git sparse-checkout add --stdin <<< "$paths"
+          fi
+
+          roots=$(resolve "$INPUT_WORKING_DIRECTORY")
 
           if [[ "$roots" == "[]" ]]; then
             echo "::error::No root module matches working-directory"
             exit 1
           fi
 
+          github_token_roots="$roots"
+          if [[ -n "$INPUT_GITHUB_TOKEN_ROOTS" ]]; then
+            github_token_roots="[]"
+            while read -r pattern; do
+              [[ -n "$pattern" ]] || continue
+              matched=$(jq -c --argjson roots "$roots" 'map(select(IN($roots[])))' <<< "$(resolve "$pattern")")
+              if [[ "$matched" == "[]" ]]; then
+                echo "::error::Pattern '$pattern' in github-token-roots matches no root"
+                exit 1
+              fi
+              github_token_roots=$(jq -c --argjson matched "$matched" '. + $matched | unique' <<< "$github_token_roots")
+            done <<< "$INPUT_GITHUB_TOKEN_ROOTS"
+          fi
+
           echo "roots=$roots" >> "$GITHUB_OUTPUT"
+          echo "github_token_roots=$github_token_roots" >> "$GITHUB_OUTPUT"
           echo "Roots: $roots"
+          echo "GitHub token roots: $github_token_roots"
 
       - name: Evaluate
         id: evaluate
@@ -259,6 +307,7 @@ jobs:
           TRUSTED: ${{ steps.trust.outputs.trusted }}
           ROOTS: ${{ steps.roots.outputs.roots }}
           INPUT_STATE_PREFIX: ${{ inputs.state-prefix }}
+          INPUT_GITHUB_TOKEN_ROOTS: ${{ inputs.github-token-roots }}
           PLAN_SCOPE: ${{ inputs.github-token-plan-scope }}
           APPLY_SCOPE: ${{ inputs.github-token-apply-scope }}
           BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
@@ -271,8 +320,32 @@ jobs:
             github_token_scope="$APPLY_SCOPE"
           fi
 
-          if [[ -n "$INPUT_STATE_PREFIX" && "$(jq length <<< "$ROOTS")" -ne 1 ]]; then
-            echo "::error::state-prefix requires working-directory to match exactly one root"
+          if [[ -n "$INPUT_GITHUB_TOKEN_ROOTS" && -z "$PLAN_SCOPE" && -z "$APPLY_SCOPE" ]]; then
+            echo "::error::github-token-roots requires github-token-plan-scope or github-token-apply-scope"
+            exit 1
+          fi
+
+          if [[ -n "$INPUT_STATE_PREFIX" && "$INPUT_STATE_PREFIX" != *"{"* && "$(jq length <<< "$ROOTS")" -ne 1 ]]; then
+            echo "::error::state-prefix without placeholders requires working-directory to match exactly one root"
+            exit 1
+          fi
+
+          # Without state-prefix, every root uses its directory as prefix.
+          state_prefixes=$(
+            jq -c --arg template "${INPUT_STATE_PREFIX:-"{path}"}" '
+              map(. as $root | {
+                key: $root,
+                value: ($template | gsub("\\{path\\}"; $root) | gsub("\\{name\\}"; $root | split("/") | last))
+              }) | from_entries' <<< "$ROOTS"
+          )
+
+          if jq -e 'any(.[]; test("[{}]"))' <<< "$state_prefixes" > /dev/null; then
+            echo "::error::state-prefix supports only the {path} and {name} placeholders"
+            exit 1
+          fi
+
+          if ! jq -e '[.[]] | length == (unique | length)' <<< "$state_prefixes" > /dev/null; then
+            echo "::error::state-prefix must expand to a unique prefix per root: $state_prefixes"
             exit 1
           fi
 
@@ -290,6 +363,8 @@ jobs:
 
           # Scopes may be newline-separated; outputs must be single-line.
           echo "github_token_scope=$(echo "$github_token_scope" | xargs)" >> "$GITHUB_OUTPUT"
+          echo "state_prefixes=$state_prefixes" >> "$GITHUB_OUTPUT"
+          echo "State prefixes: $state_prefixes"
 
   # Repo checks and static OpenTofu checks without backend or credentials.
   check:
@@ -374,7 +449,7 @@ jobs:
         root: ${{ fromJSON(needs.configure.outputs.roots) }}
     env:
       WORKING_DIR: ${{ matrix.root }}
-      STATE_PREFIX: ${{ inputs.state-prefix || matrix.root }}
+      STATE_PREFIX: ${{ fromJSON(needs.configure.outputs.state-prefixes)[matrix.root] }}
     permissions:
       contents: read
       id-token: write
@@ -422,7 +497,9 @@ jobs:
       - &github-token
         id: github-token
         name: Exchange token for GitHub provider
-        if: needs.configure.outputs.github-token-scope != ''
+        if: >-
+          needs.configure.outputs.github-token-scope != ''
+          && contains(fromJSON(needs.configure.outputs.github-token-roots), matrix.root)
         uses: abinnovision/actions@exchange-github-token-dev
         with:
           broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
@@ -504,7 +581,7 @@ jobs:
         root: ${{ fromJSON(needs.configure.outputs.roots) }}
     env:
       WORKING_DIR: ${{ matrix.root }}
-      STATE_PREFIX: ${{ inputs.state-prefix || matrix.root }}
+      STATE_PREFIX: ${{ fromJSON(needs.configure.outputs.state-prefixes)[matrix.root] }}
     permissions:
       contents: read
       id-token: write

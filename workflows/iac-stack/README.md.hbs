@@ -77,7 +77,7 @@ jobs:
 
 [//]: # "x-release-please-end"
 
-Repositories with several roots list one pattern per line in `working-directory`, for example `tofu/*`. Concurrency is owned by the caller. `state-prefix` is only allowed when a single root matches.
+Repositories with several roots list one pattern per line in `working-directory`, for example `tofu/*`, and keep a single caller job (see [Several roots](#several-roots)). Concurrency is owned by the caller.
 
 ## Migrating from opentofu-stack
 
@@ -123,6 +123,23 @@ token broker. Use the read-only scopes for plan and the write scopes for apply.
 with:
   github-token-plan-scope: contents:read
   github-token-apply-scope: contents:write
+```
+
+### Several roots
+
+One call covers every root. `state-prefix` takes the placeholders `{path}` (root directory) and `{name}` (its last
+segment), so existing state objects keep their prefix. `github-token-roots` limits the exchanged GitHub token to the
+roots that need it; the other roots run without `GITHUB_TOKEN`.
+
+```yaml
+with:
+  working-directory: tofu/*
+  # tofu/core -> core, tofu/github -> github
+  state-prefix: "{name}"
+  github-token-roots: tofu/github
+  github-token-resources: org:example
+  github-token-plan-scope: administration:read
+  github-token-apply-scope: administration:write
 ```
 
 ## Inputs
