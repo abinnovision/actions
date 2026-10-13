@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.7.4](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.7.3...polyglot-monorepo-stack-source-v2.7.4) (2026-10-13)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 1.2.1
+
 ## [2.7.3](https://github.com/abinnovision/actions/compare/polyglot-monorepo-stack-source-v2.7.2...polyglot-monorepo-stack-source-v2.7.3) (2026-10-09)
 
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.0.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v3.0.0...gitops-update-tags-source-v3.0.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **gitops-update-tags:** split image tags and query images safely ([#661](https://github.com/abinnovision/actions/issues/661)) ([ac74514](https://github.com/abinnovision/actions/commit/ac745146612e2324bf314cb5fb255d21cac777dc))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 1.2.1
+
 ## [3.0.0](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v2.1.1...gitops-update-tags-source-v3.0.0) (2026-10-09)
 
 

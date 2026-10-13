@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.1](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.3.0...iac-stack-source-v1.3.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **iac-stack:** iterate roots without word splitting ([#658](https://github.com/abinnovision/actions/issues/658)) ([ae2ec3d](https://github.com/abinnovision/actions/commit/ae2ec3d94d01a3caccb6ec9793e5e1fc6e9fe536))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 1.2.1
+
 ## [1.3.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.2.0...iac-stack-source-v1.3.0) (2026-10-13)
 
 

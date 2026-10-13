@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.2.0...setup-tools-source-v1.2.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **setup-tools:** anchor tool-versions matches ([#659](https://github.com/abinnovision/actions/issues/659)) ([ebbc3b0](https://github.com/abinnovision/actions/commit/ebbc3b03d05e7776c13afaaf6aba597de6434634))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.1.0...setup-tools-source-v1.2.0) (2026-10-09)
 
 
