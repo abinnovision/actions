@@ -230,7 +230,7 @@ exchange is skipped. Dependabot pull requests keep cache writes. `Check` and `Te
 ## Units
 
 A unit is a directory with a `package.json`. Two inputs select them, one directory pattern per line,
-where `*` matches exactly one path segment:
+where `*` matches exactly one path segment and skips dot directories:
 
 | Input          | Default      | On push to `default-branch`                                              |
 | :------------- | :----------- | :----------------------------------------------------------------------- |
@@ -245,8 +245,8 @@ with:
 ```
 
 Every source unit needs a `name` in its `package.json`, and Turbo must be a dependency in the root
-`package.json`. Basenames must be unique within the source units and within the dist units;
-`Configure` fails otherwise. Packing is not filtered by `private`. `turbo boundaries` runs in `Check`
+`package.json`. Basenames must be unique within the source units and within the dist units, and must
+start with a letter or digit followed by letters, digits, `.`, `_` or `-`; `Configure` fails otherwise. Packing is not filtered by `private`. `turbo boundaries` runs in `Check`
 when Turbo is a dependency.
 
 ### Single-package repositories
