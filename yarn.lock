@@ -3296,6 +3296,7 @@ __metadata:
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     exchange-github-token: "workspace:^"
+    match-paths: "workspace:^"
     prettier: "npm:^3.9.9"
     setup-gcp: "workspace:^"
     setup-tools: "workspace:^"

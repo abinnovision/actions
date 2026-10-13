@@ -135,24 +135,31 @@ jobs:
       - name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
 
+      # The application must be a directory containing a kustomization file.
+      - name: Resolve application
+        id: application
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          marker: |
+            kustomization.yaml
+            kustomization.yml
+            Kustomization
+          patterns: ${{ format('{0}/{1}', inputs.applications-directory, inputs.application) }}
+          require-match: true
+
       - name: Validate application
         env:
-          INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
-          INPUT_APPLICATION: ${{ inputs.application }}
+          APPLICATION_PATHS: ${{ steps.application.outputs.paths }}
         run: |
-          app_dir="$INPUT_APPLICATIONS_DIRECTORY/$INPUT_APPLICATION"
+          app_dir=$(jq -r '.[0]' <<< "$APPLICATION_PATHS")
 
-          if [[ ! -d "$app_dir" ]]; then
-            echo "::error::Application directory not found: $app_dir"
-            echo "::error::Available applications:"
-            ls -1 "$INPUT_APPLICATIONS_DIRECTORY" || echo "  (none)"
-            exit 1
-          fi
-
-          if [[ ! -f "$app_dir/kustomization.yaml" ]]; then
-            echo "::error::kustomization.yaml not found in $app_dir"
-            exit 1
-          fi
+          kustomization=""
+          for name in kustomization.yaml kustomization.yml Kustomization; do
+            if [[ -f "$app_dir/$name" ]]; then
+              kustomization="$app_dir/$name"
+              break
+            fi
+          done
 
           echo "Application directory validated: $app_dir"
 
@@ -161,18 +168,18 @@ jobs:
           while IFS=':' read -r image tag; do
             [[ -z "$image" ]] && continue
 
-            if yq eval ".images[] | select(.name == \"$image\")" "$app_dir/kustomization.yaml" | grep -q .; then
+            if yq eval ".images[] | select(.name == \"$image\")" "$kustomization" | grep -q .; then
               echo "Image name validated: $image"
             else
-              echo "::error::Image '$image' not found in kustomization.yaml"
+              echo "::error::Image '$image' not found in ${kustomization##*/}"
               MISSING_IMAGES="${MISSING_IMAGES}${image}, "
             fi
           done <<< "$PARSED_UPDATES"
 
           if [[ -n "$MISSING_IMAGES" ]]; then
-            echo "::error::Images not found in kustomization.yaml: ${MISSING_IMAGES%, }"
+            echo "::error::Images not found in ${kustomization##*/}: ${MISSING_IMAGES%, }"
             echo "::error::Available images:"
-            yq eval '.images[].name' "$app_dir/kustomization.yaml" || echo "  (none)"
+            yq eval '.images[].name' "$kustomization" || echo "  (none)"
             exit 1
           fi
 
@@ -186,8 +193,8 @@ jobs:
             kustomize edit set image "${image}=*:${tag}"
           done <<< "$PARSED_UPDATES"
 
-          echo "::group::Changes to kustomization.yaml"
-          git diff kustomization.yaml || true
+          echo "::group::Changes to the kustomization file"
+          git diff -- . || true
           echo "::endgroup::"
 
       - name: Format files
