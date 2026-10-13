@@ -3028,6 +3028,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"evaluate-event@workspace:actions/evaluate-event":
+  version: 0.0.0-use.local
+  resolution: "evaluate-event@workspace:actions/evaluate-event"
+  dependencies:
+    "@abinnovision/eslint-config-base": "npm:^3.4.2"
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    "@actions/core": "npm:^3.0.1"
+    "@actions/github": "npm:^9.1.1"
+    "@types/node": "npm:^26.6.5"
+    "@vercel/ncc": "npm:^0.45.0"
+    eslint: "npm:^10.12.0"
+    prettier: "npm:^3.9.9"
+    typescript: "npm:^6.0.3"
+    vite: "npm:^8.3.4"
+    vitest: "npm:^5.0.3"
+  languageName: unknown
+  linkType: soft
+
 "events@npm:^3.0.0, events@npm:^3.3.0":
   version: 3.3.0
   resolution: "events@npm:3.3.0"

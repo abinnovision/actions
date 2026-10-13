@@ -5,6 +5,9 @@
 	"tag-separator": "-source-",
 	"plugins": [{ "type": "node-workspace" }],
 	"packages": {
+		"actions/evaluate-event": {
+			"extra-files": ["README.md"]
+		},
 		"actions/exchange-github-token": {
 			"extra-files": ["README.md"]
 		},

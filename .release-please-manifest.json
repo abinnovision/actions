@@ -1,4 +1,5 @@
 {
+	"actions/evaluate-event": "1.0.0",
 	"actions/exchange-github-token": "1.4.1",
 	"actions/match-paths": "1.0.0",
 	"actions/run-commitlint": "1.3.6",

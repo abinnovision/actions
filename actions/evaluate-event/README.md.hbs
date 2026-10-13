@@ -1,0 +1,25 @@
+# {{name}}
+
+{{description}}
+
+- `commit-sha` is the pull request head, the merge group head or the pushed commit, in that order.
+- `mode` is `pr` for `pull_request`, `main` for a `push` to `refs/heads/<default-branch>` and
+  `none` otherwise.
+- `trusted` is `false` for a `pull_request` from a fork or from `dependabot[bot]`. The action then
+  emits a notice that credentialed jobs are skipped.
+
+## Usage
+
+{{{usage-example type="action" name=name inputs=inputs version=version}}}
+
+## Latest versions
+
+{{{version-examples type="action" name=name version=version}}}
+
+## Inputs
+
+{{> inputs-table inputs}}
+
+## Outputs
+
+{{> outputs-table outputs}}
