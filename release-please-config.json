@@ -8,6 +8,9 @@
 		"actions/exchange-github-token": {
 			"extra-files": ["README.md"]
 		},
+		"actions/match-paths": {
+			"extra-files": ["README.md"]
+		},
 		"actions/run-commitlint": {
 			"extra-files": ["README.md"]
 		},

@@ -10,7 +10,10 @@
 			"dependsOn": ["format:fix", "lint:fix"]
 		},
 		"check": {
-			"dependsOn": ["format:check", "lint:check"]
+			"dependsOn": ["format:check", "lint:check", "test"]
+		},
+		"test": {
+			"inputs": ["$TURBO_DEFAULT$"]
 		},
 		"format:fix": {
 			"cache": false
