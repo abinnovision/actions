@@ -17,12 +17,12 @@ the entries whose `path` matches `include`.
 | `<name>`         | Once per selected entry                               | Extracts the payload, builds and pushes the image, writes an image summary      |
 | `GitOps Updates` | When `gitops-routes` or `gitops-config` is set and no image build failed | Dispatches one `gitops-workflow-file` run per target repository and application |
 
-- `include` holds directory patterns, one per line; `*` matches exactly one path segment
-  (default `apps/*`)
+- `include` holds directory patterns, one per line; `*` matches exactly one path segment and
+  skips dot directories (default `apps/*`). An entry without a `path` fails `Prepare`
 - `Prepare` fails when a selected entry has a `schema` other than `1` or no `payloads.source`
-- `image` is resolved per unit by plain string replacement: `{path}` becomes the entry's `path`,
-  `{name}` its `name` (e.g. `app-{name}` -> `app-backend`). The result is lowercased, as OCI
-  repository names must be. A value without placeholders, such as `image: recaptcha-v3` for a
+- `image` is resolved per unit: `{path}` becomes the entry's `path`, `{name}` its `name`
+  (e.g. `app-{name}` -> `app-backend`); other placeholders fail `Prepare`. The result is lowercased,
+  as OCI repository names must be. A value without placeholders, such as `image: recaptcha-v3` for a
   single-package repository, names the image directly
 
 ## Conventions
