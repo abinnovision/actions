@@ -76,35 +76,35 @@ runs:
         fi
 
         # Check for each supported tool
-        if grep -qE '^nodejs' "$TOOL_VERSIONS_FILE"; then
+        if grep -qE '^nodejs[[:space:]]' "$TOOL_VERSIONS_FILE"; then
           echo "has-nodejs=true" >> $GITHUB_OUTPUT
-          echo "node-version=$(grep -E '^nodejs' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+          echo "node-version=$(grep -E '^nodejs[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
         fi
 
-        if grep -qE '^uv ' "$TOOL_VERSIONS_FILE"; then
+        if grep -qE '^uv[[:space:]]' "$TOOL_VERSIONS_FILE"; then
           echo "has-uv=true" >> $GITHUB_OUTPUT
-          echo "uv-version=$(grep -E '^uv ' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+          echo "uv-version=$(grep -E '^uv[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
         fi
 
-        if grep -qE '^python' "$TOOL_VERSIONS_FILE"; then
+        if grep -qE '^python[[:space:]]' "$TOOL_VERSIONS_FILE"; then
           echo "has-python=true" >> $GITHUB_OUTPUT
-          echo "python-version=$(grep -E '^python' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+          echo "python-version=$(grep -E '^python[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
         fi
 
-        if grep -qE '^golang' "$TOOL_VERSIONS_FILE"; then
+        if grep -qE '^golang[[:space:]]' "$TOOL_VERSIONS_FILE"; then
           echo "has-golang=true" >> $GITHUB_OUTPUT
-          echo "go-version=$(grep -E '^golang' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+          echo "go-version=$(grep -E '^golang[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
         fi
 
-        if grep -qE '^opentofu ' "$TOOL_VERSIONS_FILE"; then
+        if grep -qE '^opentofu[[:space:]]' "$TOOL_VERSIONS_FILE"; then
           echo "has-opentofu=true" >> $GITHUB_OUTPUT
-          echo "opentofu-version=$(grep -E '^opentofu ' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+          echo "opentofu-version=$(grep -E '^opentofu[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
         fi
 
         for tool in kustomize kubeconform kube-score argocd; do
-          if grep -qE "^${tool} " "$TOOL_VERSIONS_FILE"; then
+          if grep -qE "^${tool}[[:space:]]" "$TOOL_VERSIONS_FILE"; then
             echo "has-k8s-tools=true" >> $GITHUB_OUTPUT
-            echo "${tool}-version=$(grep -E "^${tool} " "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+            echo "${tool}-version=$(grep -E "^${tool}[[:space:]]" "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
           fi
         done
 
