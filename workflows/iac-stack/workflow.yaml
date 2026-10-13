@@ -283,25 +283,25 @@ jobs:
         env:
           ROOTS: ${{ needs.configure.outputs.roots }}
         run: |
-          for root in $(jq -r '.[]' <<< "$ROOTS"); do
+          while IFS= read -r root; do
             tofu -chdir="$root" fmt -check -recursive
-          done
+          done < <(jq -r '.[]' <<< "$ROOTS")
 
       - name: Initialize OpenTofu (without backend)
         env:
           ROOTS: ${{ needs.configure.outputs.roots }}
         run: |
-          for root in $(jq -r '.[]' <<< "$ROOTS"); do
+          while IFS= read -r root; do
             tofu -chdir="$root" init -backend=false -input=false
-          done
+          done < <(jq -r '.[]' <<< "$ROOTS")
 
       - name: Validate
         env:
           ROOTS: ${{ needs.configure.outputs.roots }}
         run: |
-          for root in $(jq -r '.[]' <<< "$ROOTS"); do
+          while IFS= read -r root; do
             tofu -chdir="$root" validate
-          done
+          done < <(jq -r '.[]' <<< "$ROOTS")
 
       # Roots without test files are skipped.
       - name: Test
@@ -310,14 +310,14 @@ jobs:
           ROOTS: ${{ needs.configure.outputs.roots }}
         run: |
           shopt -s nullglob
-          for root in $(jq -r '.[]' <<< "$ROOTS"); do
+          while IFS= read -r root; do
             files=("$root"/*.tftest.hcl "$root"/*.tofutest.hcl "$root"/tests/*.tftest.hcl "$root"/tests/*.tofutest.hcl)
             if [[ ${#files[@]} -eq 0 ]]; then
               echo "::notice::No tests found in $root, skipping"
               continue
             fi
             tofu -chdir="$root" test -no-color
-          done
+          done < <(jq -r '.[]' <<< "$ROOTS")
 
   # Plan each root against the real state and report it on the pull request.
   plan:
