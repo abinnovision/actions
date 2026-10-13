@@ -122,7 +122,7 @@ on:
         default: ""
         description: |-
           Newline-separated application path patterns whose sync prunes resources that are no longer defined in the source.
-          `*` matches exactly one path segment.
+          `*` matches exactly one path segment and skips dot directories.
           **Note:** Resources removed from the manifests of these applications are deleted during sync
           **Example:** `k8s/applications/staging`, `k8s/applications/preview-*`
 
@@ -132,7 +132,7 @@ on:
         default: "k8s/applications/*"
         description: |-
           Newline-separated application path patterns that get a `Deploy` job. Other applications only get a `Preview`.
-          `*` matches exactly one path segment.
+          `*` matches exactly one path segment and skips dot directories.
           **Note:** Update it together with `applications-directory`
           **Example:** `k8s/applications/staging`, `k8s/applications/preview-*`
 
@@ -169,182 +169,86 @@ jobs:
       contents: read
     outputs:
       # Commit SHA to check out.
-      commit-sha: ${{ steps.event.outputs.commit_sha }}
+      commit-sha: ${{ steps.event.outputs.commit-sha }}
 
       # Pipeline mode (pr, main or none).
       mode: ${{ steps.event.outputs.mode }}
 
       # Whether credentialed jobs may run: false for fork and Dependabot pull requests.
-      trusted: ${{ steps.trust.outputs.trusted }}
+      trusted: ${{ steps.event.outputs.trusted }}
 
-      # Applications with an `.argocd-app` file as a compact JSON array of {name, argocd-app, prune, deploy}.
-      applications: ${{ steps.discover.outputs.applications }}
+      # Applications with an `.argocd-app` file as a compact JSON array of {path, name, content, prune}, where
+      # `content` is the ArgoCD application name.
+      applications: ${{ steps.prune.outputs.items }}
 
       # Applications matching `deploy-applications`, in the same format.
-      deployments: ${{ steps.discover.outputs.deployments }}
+      deployments: ${{ steps.deploy.outputs.items }}
     steps:
-      # Resolve the commit SHA and mode for this event.
+      # Resolve the commit SHA, mode and trust for this event. Pull requests from forks and Dependabot cannot use
+      # credentials.
       - name: Evaluate event
         id: event
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-          DEFAULT_BRANCH: ${{ inputs.default-branch }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
-        run: |
-          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
-            echo "::error::'pull_request_target' is not supported by gitops-stack. Switch the caller to 'pull_request'."
-            exit 1
-          fi
-
-          mode="none"
-
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            mode="pr"
-          elif [[ "$EVENT_NAME" == "push" && "$REF" == "refs/heads/$DEFAULT_BRANCH" ]]; then
-            mode="main"
-          fi
-
-          echo "commit_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-
-          echo "Event: $EVENT_NAME"
-          echo "Commit SHA: $HEAD_SHA"
-          echo "Mode: $mode"
-
-      # Pull requests from forks and Dependabot cannot use credentials.
-      - name: Evaluate trust
-        id: trust
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          ACTOR: ${{ github.actor }}
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          trusted="true"
-
-          if [[ "$EVENT_NAME" == "pull_request" && ( "$HEAD_REPOSITORY" != "$REPOSITORY" || "$ACTOR" == "dependabot[bot]" ) ]]; then
-            trusted="false"
-            echo "::notice::Pull requests from forks and Dependabot cannot use credentials, skipping credentialed jobs"
-          fi
-
-          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
-          echo "Trusted: $trusted"
+        uses: abinnovision/actions@evaluate-event-dev
+        with:
+          default-branch: ${{ inputs.default-branch }}
 
       # Check out the root files of the resolved commit only; blobs are fetched on demand, so the
-      # credentials stay for `git sparse-checkout add`.
+      # credentials stay for reading the `.argocd-app` files.
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ steps.event.outputs.commit_sha }}
+          ref: ${{ steps.event.outputs.commit-sha }}
           filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /*
             !/*/
 
-      # Applications are listed from the git tree; only the `.argocd-app` files are checked out.
+      # Every directory in `applications-directory` with an `.argocd-app` file is an application. The first line of
+      # the file is the ArgoCD application name.
       - name: Discover applications
         id: discover
-        env:
-          INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
-          INPUT_PRUNE_APPLICATIONS: ${{ inputs.prune-applications }}
-          INPUT_DEPLOY_APPLICATIONS: ${{ inputs.deploy-applications }}
-          INPUT_SYNC_PRUNE: ${{ inputs.sync-prune }}
-        run: |
-          set -euo pipefail
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          marker: .argocd-app
+          read-marker: true
+          patterns: ${{ format('{0}/*', inputs.applications-directory) }}
+          require-match: true
 
-          dir="${INPUT_APPLICATIONS_DIRECTORY%/}"
-          prune_patterns="$INPUT_PRUNE_APPLICATIONS"
-          deploy_patterns="$INPUT_DEPLOY_APPLICATIONS"
+      # `sync-prune` is replaced by `prune-applications`.
+      - name: Warn about sync-prune
+        if: inputs.sync-prune
+        run: echo "::warning::sync-prune is deprecated, use prune-applications instead"
 
-          if [[ "$INPUT_SYNC_PRUNE" == "true" ]]; then
-            echo "::warning::sync-prune is deprecated, use prune-applications instead"
-            prune_patterns="$dir/*"
-          fi
+      # Flags the applications whose sync prunes; `sync-prune` prunes every application.
+      - name: Select pruned applications
+        id: prune
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          items: ${{ steps.discover.outputs.items }}
+          patterns: ${{ inputs.sync-prune && format('{0}/*', inputs.applications-directory) || inputs.prune-applications }}
+          flag: prune
 
-          while read -r pattern; do
-            if [[ -n "$pattern" && ( ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ || "$pattern" == /* || "$pattern" =~ (^|/)\.\.(/|$) ) ]]; then
-              echo "::error::Invalid application pattern '$pattern': only path segments and '*' are supported"
-              exit 1
-            fi
-          done <<< "$prune_patterns"$'\n'"$deploy_patterns"
+      # Applications that get a `Deploy` job.
+      - name: Select deployed applications
+        id: deploy
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          items: ${{ steps.prune.outputs.items }}
+          patterns: ${{ inputs.deploy-applications }}
 
-          # Whether the path matches one of the newline-separated patterns, where `*` matches one path segment.
-          matches() {
-            local pattern regex
-            while read -r pattern; do
-              [[ -n "$pattern" ]] || continue
-              regex="${pattern%/}"
-              regex="${regex//./\\.}"
-              regex="^${regex//\*/[^/]*}$"
-              [[ "$1" =~ $regex ]] && return 0
-            done <<< "$2"
-            return 1
-          }
-
-          if [[ ! "$dir" =~ ^[A-Za-z0-9._/-]+$ || "$dir" == /* || "$dir" =~ (^|/)\.\.(/|$) ]]; then
-            echo "::error::Invalid applications-directory '$dir': only path segments are supported"
-            exit 1
-          fi
-
-          if [[ "$(git cat-file -t "HEAD:$dir" 2> /dev/null)" != "tree" ]]; then
-            echo "::error::Applications directory '$dir' does not exist"
-            exit 1
-          fi
-
-          git sparse-checkout add "/$dir/*/.argocd-app"
-
-          # Application names flow into job names, paths and environment names of later jobs.
-          name_pattern='^[A-Za-z0-9][A-Za-z0-9._-]*$'
-
-          applications="[]"
-          while read -r path; do
-            name="${path##*/}"
-
-            if [[ ! "$name" =~ $name_pattern ]]; then
-              printf '::error::Invalid application directory name %q, names must match %s\n' "$name" "$name_pattern"
-              exit 1
-            fi
-
-            if [[ ! -f "$path/.argocd-app" ]]; then
-              echo "Skipping $name: no .argocd-app"
-              continue
-            fi
-
-            argocd_app=$(head -n 1 "$path/.argocd-app" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-            if [[ -z "$argocd_app" ]]; then
-              echo "::error::ArgoCD application name is empty in $path/.argocd-app"
-              exit 1
-            fi
-
-            prune=false
-            deploy=false
-            matches "$path" "$prune_patterns" && prune=true
-            matches "$path" "$deploy_patterns" && deploy=true
-
-            echo "Found ArgoCD application: $name -> $argocd_app (prune: $prune, deploy: $deploy)"
-            applications=$(jq -c --arg name "$name" --arg app "$argocd_app" --argjson prune "$prune" --argjson deploy "$deploy" \
-              '. + [{name: $name, "argocd-app": $app, prune: $prune, deploy: $deploy}]' <<< "$applications")
-          done < <(git ls-tree -d --name-only HEAD "$dir/")
-
-          deployments=$(jq -c 'map(select(.deploy))' <<< "$applications")
-          if [[ "$applications" != "[]" && "$deployments" == "[]" ]]; then
-            echo "::warning::No application matches deploy-applications, nothing is deployed"
-          fi
-
-          echo "applications=$applications" >> "$GITHUB_OUTPUT"
-          echo "deployments=$deployments" >> "$GITHUB_OUTPUT"
-          echo "Applications: $applications"
-          echo "Deployments: $deployments"
+      # Applications exist, but none gets a `Deploy` job.
+      - name: Warn about no deployments
+        if: steps.deploy.outputs.items == '[]' && steps.prune.outputs.items != '[]'
+        run: echo "::warning::No application matches deploy-applications, nothing is deployed"
 
       # The ArgoCD and DEX settings are only needed when a credentialed lane has applications to run.
       - name: Validate config
         env:
           MODE: ${{ steps.event.outputs.mode }}
-          TRUSTED: ${{ steps.trust.outputs.trusted }}
+          TRUSTED: ${{ steps.event.outputs.trusted }}
           # Preview runs every application, Deploy only those matching `deploy-applications`.
-          APPLICATIONS: ${{ steps.event.outputs.mode == 'main' && steps.discover.outputs.deployments || steps.discover.outputs.applications }}
+          APPLICATIONS: ${{ steps.event.outputs.mode == 'main' && steps.deploy.outputs.items || steps.prune.outputs.items }}
           ARGOCD_SERVER: ${{ inputs.argocd-server || vars.ARGOCD_CORE_SERVER }}
           DEX_ENDPOINT: ${{ inputs.dex-endpoint || vars.DEX_CORE_ENDPOINT }}
           DEX_CLIENT_ID: ${{ inputs.dex-client-id || vars.DEX_CORE_GITHUB_ACTIONS_CLIENT }}
@@ -565,7 +469,7 @@ jobs:
         id: argocd-diff
         env:
           REVISION: ${{ needs.configure.outputs.commit-sha }}
-          ARGOCD_APP: ${{ matrix.application['argocd-app'] }}
+          ARGOCD_APP: ${{ matrix.application.content }}
         run: |
           set +e
 
@@ -605,7 +509,7 @@ jobs:
           message: |
             ## 🔍 Changes detected in `${{ matrix.application.name }}`
 
-            This PR contains changes to the ArgoCD Application **${{ matrix.application['argocd-app'] }}** at ${{ needs.configure.outputs.commit-sha }}.
+            This PR contains changes to the ArgoCD Application **${{ matrix.application.content }}** at ${{ needs.configure.outputs.commit-sha }}.
 
             ```diff
             ${{ steps.argocd-diff.outputs.diff_content }}
@@ -623,7 +527,7 @@ jobs:
           message: |
             ## No changes in `${{ matrix.application.name }}`
 
-            The ArgoCD Application **${{ matrix.application['argocd-app'] }}** has no changes at ${{ needs.configure.outputs.commit-sha }}.
+            The ArgoCD Application **${{ matrix.application.content }}** has no changes at ${{ needs.configure.outputs.commit-sha }}.
           comment-tag: application-${{ matrix.application.name }}
           create-if-not-exists: false
 
@@ -634,7 +538,7 @@ jobs:
           message: |
             ## Preview failed for `${{ matrix.application.name }}`
 
-            The diff of the ArgoCD Application **${{ matrix.application['argocd-app'] }}** at ${{ needs.configure.outputs.commit-sha }} failed, see the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+            The diff of the ArgoCD Application **${{ matrix.application.content }}** at ${{ needs.configure.outputs.commit-sha }} failed, see the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
           comment-tag: application-${{ matrix.application.name }}
           create-if-not-exists: false
 
@@ -654,7 +558,7 @@ jobs:
     # An empty name runs the job without an environment.
     environment:
       name: ${{ inputs.enable-github-deployments && matrix.application.name || '' }}
-      url: https://${{ inputs.argocd-server || vars.ARGOCD_CORE_SERVER }}/applications/${{ matrix.application['argocd-app'] }}
+      url: https://${{ inputs.argocd-server || vars.ARGOCD_CORE_SERVER }}/applications/${{ matrix.application.content }}
     permissions:
       contents: read
       id-token: write
@@ -667,7 +571,7 @@ jobs:
       - name: Check sync status
         id: check-sync
         env:
-          ARGOCD_APP: ${{ matrix.application['argocd-app'] }}
+          ARGOCD_APP: ${{ matrix.application.content }}
           INPUT_SKIP_IF_SYNCED: ${{ inputs.skip-if-synced }}
         run: |
           set -euo pipefail
@@ -693,7 +597,7 @@ jobs:
       - name: Sync ArgoCD Application
         if: steps.check-sync.outputs.sync_required == 'true'
         env:
-          ARGOCD_APP: ${{ matrix.application['argocd-app'] }}
+          ARGOCD_APP: ${{ matrix.application.content }}
           APP_PRUNE: ${{ matrix.application.prune }}
           INPUT_SYNC_TIMEOUT: ${{ inputs.sync-timeout }}
         run: |

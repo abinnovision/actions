@@ -19,10 +19,11 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
   `validation-logs` artifact. Directories without a `kustomization.yaml`, `kustomization.yml` or `Kustomization` file
   are skipped
 - Directories with an `.argocd-app` file also get a `Preview` and a `Deploy` job. ArgoCD renders the manifests
-  server-side, so these jobs only check out the root files
+  server-side, so these jobs only check out the root files. `Configure` fails when no directory has an `.argocd-app`
+  file; dot directories are skipped
 - `prune-applications` and `deploy-applications` select applications by path, one pattern per line, where `*` matches
-  exactly one path segment. Pruning is off by default. `deploy-applications` defaults to `k8s/applications/*`, so it
-  must be updated together with `applications-directory`
+  exactly one path segment and skips dot directories. Pruning is off by default. `deploy-applications` defaults to
+  `k8s/applications/*`, so it must be updated together with `applications-directory`
 - The preview comment is updated on every run: it shows the diff, notes that there are no changes or that the preview
   failed
 - With `enable-github-deployments`, each `Deploy` job runs in a GitHub environment named after the application, linked
@@ -30,7 +31,7 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
   already in sync
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to ArgoCD
 - `pull_request_target` is rejected
-- Application directory names must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
+- Names of application directories with an `.argocd-app` file must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
 - Concurrency is owned by the caller
 - Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 
@@ -307,8 +308,8 @@ with:
 | `sync-timeout`                 | Timeout in seconds for the post-trigger check that the sync operation started without immediate errors.<br>**Note:** The sync itself runs asynchronously; this only bounds a short check, not the full sync duration.<br>**Default:** `120` (2 minutes)                                                                                                                              | No       | `120`                                                                                                                                   |
 | `skip-if-synced`               | Skip deployment if application is already in sync.                                                                                                                                                                                                                                                                                                                                   | No       | `true`                                                                                                                                  |
 | `sync-prune`                   | **Deprecated:** Use `prune-applications` instead. `true` prunes every application.                                                                                                                                                                                                                                                                                                   | No       | _empty_                                                                                                                                 |
-| `prune-applications`           | Newline-separated application path patterns whose sync prunes resources that are no longer defined in the source.<br>`*` matches exactly one path segment.<br>**Note:** Resources removed from the manifests of these applications are deleted during sync<br>**Example:** `k8s/applications/staging`, `k8s/applications/preview-*`                                                  | No       | _empty_                                                                                                                                 |
-| `deploy-applications`          | Newline-separated application path patterns that get a `Deploy` job. Other applications only get a `Preview`.<br>`*` matches exactly one path segment.<br>**Note:** Update it together with `applications-directory`<br>**Example:** `k8s/applications/staging`, `k8s/applications/preview-*`                                                                                        | No       | `k8s/applications/*`                                                                                                                    |
+| `prune-applications`           | Newline-separated application path patterns whose sync prunes resources that are no longer defined in the source.<br>`*` matches exactly one path segment and skips dot directories.<br>**Note:** Resources removed from the manifests of these applications are deleted during sync<br>**Example:** `k8s/applications/staging`, `k8s/applications/preview-*`                        | No       | _empty_                                                                                                                                 |
+| `deploy-applications`          | Newline-separated application path patterns that get a `Deploy` job. Other applications only get a `Preview`.<br>`*` matches exactly one path segment and skips dot directories.<br>**Note:** Update it together with `applications-directory`<br>**Example:** `k8s/applications/staging`, `k8s/applications/preview-*`                                                              | No       | `k8s/applications/*`                                                                                                                    |
 | `enable-pr-comments`           | Enable posting diff comments on pull requests.                                                                                                                                                                                                                                                                                                                                       | No       | `true`                                                                                                                                  |
 | `enable-github-deployments`    | Run each deploy job in a GitHub environment named after the application, with a link to the ArgoCD UI.<br>**Note:** Changes the OIDC subject of deploy jobs to `repo:<owner>/<repo>:environment:<application>`                                                                                                                                                                       | No       | `true`                                                                                                                                  |
 

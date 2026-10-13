@@ -3282,6 +3282,8 @@ __metadata:
   resolution: "gitops-stack@workspace:workflows/gitops-stack"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
+    evaluate-event: "workspace:^"
+    match-paths: "workspace:^"
     prettier: "npm:^3.9.9"
     setup-oidc-token-cli: "workspace:^"
     setup-tools: "workspace:^"
