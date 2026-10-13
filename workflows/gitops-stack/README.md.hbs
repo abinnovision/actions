@@ -19,10 +19,11 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
   `validation-logs` artifact. Directories without a `kustomization.yaml`, `kustomization.yml` or `Kustomization` file
   are skipped
 - Directories with an `.argocd-app` file also get a `Preview` and a `Deploy` job. ArgoCD renders the manifests
-  server-side, so these jobs only check out the root files
+  server-side, so these jobs only check out the root files. `Configure` fails when no directory has an `.argocd-app`
+  file; dot directories are skipped
 - `prune-applications` and `deploy-applications` select applications by path, one pattern per line, where `*` matches
-  exactly one path segment. Pruning is off by default. `deploy-applications` defaults to `k8s/applications/*`, so it
-  must be updated together with `applications-directory`
+  exactly one path segment and skips dot directories. Pruning is off by default. `deploy-applications` defaults to
+  `k8s/applications/*`, so it must be updated together with `applications-directory`
 - The preview comment is updated on every run: it shows the diff, notes that there are no changes or that the preview
   failed
 - With `enable-github-deployments`, each `Deploy` job runs in a GitHub environment named after the application, linked
@@ -30,7 +31,7 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
   already in sync
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to ArgoCD
 - `pull_request_target` is rejected
-- Application directory names must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
+- Names of application directories with an `.argocd-app` file must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
 - Concurrency is owned by the caller
 - Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 
