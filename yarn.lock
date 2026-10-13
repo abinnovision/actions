@@ -946,7 +946,7 @@ __metadata:
     "@actions/github": "npm:^9.1.1"
     "@actions/tool-cache": "npm:^4.0.0"
     "@types/semver": "npm:^7.8.0"
-    eslint: "npm:^10.11.0"
+    eslint: "npm:^10.12.0"
     prettier: "npm:^3.9.9"
     semver: "npm:^7.8.5"
     typescript: "npm:^6.0.3"
@@ -2698,9 +2698,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint@npm:^10.11.0":
-  version: 10.11.0
-  resolution: "eslint@npm:10.11.0"
+"eslint@npm:^10.12.0":
+  version: 10.12.0
+  resolution: "eslint@npm:10.12.0"
   dependencies:
     "@eslint-community/eslint-utils": "npm:^4.8.0"
     "@eslint-community/regexpp": "npm:^4.12.2"
@@ -2739,7 +2739,7 @@ __metadata:
       optional: true
   bin:
     eslint: bin/eslint.js
-  checksum: 10/b4de8711cae009d6978e3760d400d5b2cba4117625764d9b1b77969c61f4db7dfa7bfb2754c0a22b3d9f35960a3e4f03bd579104d2c25894490bf3cf7b448cac
+  checksum: 10/1cff87e4db79d4c9b6bd0af4c2aa483d88936a16f70e73af192a2aeee5ec597ad1de5d42ba1242336c27b25be6f0e503e4ea41ca036ab134eb5f4b4c24af15b9
   languageName: node
   linkType: hard
 
@@ -2814,7 +2814,7 @@ __metadata:
     "@actions/github": "npm:^9.1.1"
     "@internal/action-tool-installer": "workspace:^"
     "@vercel/ncc": "npm:^0.45.0"
-    eslint: "npm:^10.11.0"
+    eslint: "npm:^10.12.0"
     prettier: "npm:^3.9.9"
     typescript: "npm:^6.0.3"
   languageName: unknown
@@ -4188,7 +4188,7 @@ __metadata:
     "@vercel/ncc": "npm:^0.45.0"
     chalk: "npm:^6.0.1"
     conventional-changelog-conventionalcommits: "npm:10.4.1"
-    eslint: "npm:^10.11.0"
+    eslint: "npm:^10.12.0"
     prettier: "npm:^3.9.9"
     typescript: "npm:^6.0.3"
   languageName: unknown
@@ -4204,7 +4204,7 @@ __metadata:
     "@actions/github": "npm:^9.1.1"
     "@types/semver": "npm:^7.8.0"
     "@vercel/ncc": "npm:^0.45.0"
-    eslint: "npm:^10.11.0"
+    eslint: "npm:^10.12.0"
     prettier: "npm:^3.9.9"
     release-please: "patch:release-please@npm%3A17.2.1#~/.yarn/patches/release-please-npm-17.2.1-b0a2026871.patch"
     semver: "npm:^7.8.5"
@@ -4249,7 +4249,7 @@ __metadata:
     "@actions/github": "npm:^9.1.1"
     "@internal/action-tool-installer": "workspace:^"
     "@vercel/ncc": "npm:^0.45.0"
-    eslint: "npm:^10.11.0"
+    eslint: "npm:^10.12.0"
     prettier: "npm:^3.9.9"
     typescript: "npm:^6.0.3"
   languageName: unknown
@@ -4274,7 +4274,7 @@ __metadata:
     "@actions/github": "npm:^9.1.1"
     "@internal/action-tool-installer": "workspace:^"
     "@vercel/ncc": "npm:^0.45.0"
-    eslint: "npm:^10.11.0"
+    eslint: "npm:^10.12.0"
     prettier: "npm:^3.9.9"
     typescript: "npm:^6.0.3"
   languageName: unknown
