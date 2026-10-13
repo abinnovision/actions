@@ -6,7 +6,7 @@ Runs in repositories that use [gitops-stack](../gitops-stack/README.md#repositor
 
 ## Behavior
 
-- Updates `kustomization.yaml` using `kustomize edit set image`
+- Updates the kustomization file using `kustomize edit set image`
 - Groups multiple updates into single PR per application
 - Formats files with prettier before committing
 - Optional automerge when all specified images are updated
