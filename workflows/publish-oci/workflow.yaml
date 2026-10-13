@@ -34,7 +34,7 @@ on:
         required: false
         default: "apps/*"
         description: |-
-          Directory patterns selecting the entries by `path`, one per line. `*` matches exactly one path segment.
+          Directory patterns selecting the entries by `path`, one per line. `*` matches exactly one path segment and skips dot directories.
           **Default:** `apps/*`
 
       image:
@@ -42,7 +42,7 @@ on:
         required: false
         default: "{name}"
         description: |-
-          Image repository name, used for every registry. `{path}` and `{name}` are replaced per unit, and the result is lowercased.
+          Image repository name, used for every registry. `{path}` and `{name}` are replaced per unit, and the result is lowercased. Other placeholders fail the run.
           A value without placeholders is used as is for every unit.
           **Default:** `{name}`
           **Example:** `app-{name}`
@@ -153,15 +153,23 @@ jobs:
     if: inputs.releases != '' && inputs.releases != '[]'
     permissions: {}
     outputs:
-      units: ${{ steps.select.outputs.units }}
+      units: ${{ steps.match.outputs.items }}
       # gitops-routes, or the routes converted from gitops-config.
       gitops-routes: ${{ steps.select.outputs.gitops-routes }}
     steps:
-      - name: Select and validate units
+      # Selects the entries whose path matches an include pattern and renders the image of each into `value`.
+      - name: Match units
+        id: match
+        uses: abinnovision/actions@match-paths-dev
+        with:
+          items: ${{ inputs.releases }}
+          patterns: ${{ inputs.include }}
+          template: ${{ inputs.image }}
+
+      - name: Validate units
         id: select
         env:
-          RELEASES: ${{ inputs.releases }}
-          INPUT_INCLUDE: ${{ inputs.include }}
+          UNITS: ${{ steps.match.outputs.items }}
           INPUT_REGISTRY: ${{ inputs.registry }}
           INPUT_GHCR: ${{ inputs.ghcr }}
           INPUT_GCP_AUTH: ${{ inputs.gcp-auth }}
@@ -223,18 +231,11 @@ jobs:
             invalid = 1
           } END { exit invalid }' <<< "$gitops_routes"
 
-          # Each include line becomes an anchored regex: metacharacters are escaped, "*" matches one path segment.
-          units=$(jq -c --arg lines "$INPUT_INCLUDE" '
-            [ $lines | split("\n")[] | gsub("^\\s+|\\s+$"; "") | select(. != "")
-              | "^" + (split("*") | map(gsub("(?<c>[.\\[\\]{}()+?^$|\\\\])"; "\\\(.c)")) | join("[^/]*")) + "$" ] as $patterns
-            | map(select((.path // "") as $path | any($patterns[]; . as $re | $path | test($re))))
-          ' <<< "$RELEASES")
-
           errors=$(jq -r '.[]
             | if .schema != 1 then "Entry \(.path) has schema \(.schema), this workflow supports schema 1"
               elif .payloads.source == null then "Entry \(.path) has no source payload (payloads.source)"
               else empty end
-          ' <<< "$units")
+          ' <<< "$UNITS")
 
           if [[ -n "$errors" ]]; then
             while IFS= read -r error; do
@@ -243,12 +244,11 @@ jobs:
             exit 1
           fi
 
-          echo "units=$units" >> "$GITHUB_OUTPUT"
           if [[ -n "$gitops_routes" ]]; then
             delimiter="EOF_$(openssl rand -hex 8)"
             printf 'gitops-routes<<%s\n%s\n%s\n' "$delimiter" "$gitops_routes" "$delimiter" >> "$GITHUB_OUTPUT"
           fi
-          echo "Units: $(jq -r 'map(.name) | join(", ")' <<< "$units")"
+          echo "Units: $(jq -r 'map(.name) | join(", ")' <<< "$UNITS")"
 
   # Build and push one image per unit that has a Dockerfile.
   build:
@@ -287,7 +287,7 @@ jobs:
         env:
           APP: ${{ matrix.entry.name }}
           APP_PATH: ${{ matrix.entry.path }}
-          INPUT_IMAGE: ${{ inputs.image }}
+          IMAGE: ${{ matrix.entry.value }}
           GITOPS_ROUTES: ${{ needs.prepare.outputs.gitops-routes }}
         run: |
           set -euo pipefail
@@ -302,10 +302,8 @@ jobs:
             exit 0
           fi
 
-          # Plain string replacement; values are never evaluated. Lowercased, as OCI repository names must be.
-          image="${INPUT_IMAGE//"{path}"/"$APP_PATH"}"
-          image="${image//"{name}"/"$APP"}"
-          image="${image,,}"
+          # The image rendered by Prepare, lowercased as OCI repository names must be.
+          image="${IMAGE,,}"
 
           turbo_cache="false"
           if [[ -f payload/turbo.json ]]; then
@@ -589,14 +587,13 @@ jobs:
           # CSV format: name,type,target-repo,application[,image-name]
           GITOPS_ROUTES: ${{ needs.prepare.outputs.gitops-routes }}
           UNITS: ${{ needs.prepare.outputs.units }}
-          INPUT_IMAGE: ${{ inputs.image }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
 
           resolved_file=$(mktemp)
 
-          while IFS=$'\t' read -r app app_path deployment_tag channel; do
+          while IFS=$'\t' read -r app image deployment_tag channel; do
             type="release"
             if [[ -n "$channel" ]]; then
               type="prerelease"
@@ -610,10 +607,8 @@ jobs:
               continue
             fi
 
-            # Same plain string replacement as the build job.
-            default_image="${INPUT_IMAGE//"{path}"/"$app_path"}"
-            default_image="${default_image//"{name}"/"$app"}"
-            default_image="${default_image,,}"
+            # The image rendered by Prepare, lowercased like in the build job.
+            default_image="${image,,}"
 
             while IFS=, read -r _ _ target_repo deploy_app image_name; do
               image_name="${image_name:-$default_image}"
@@ -626,7 +621,7 @@ jobs:
                 '{targetRepo: $repo, application: $application, update: $update}' >> "$resolved_file"
               echo "Collected $app -> $target_repo ($deploy_app): $image_name:$deployment_tag"
             done <<< "$unit_routes"
-          done < <(jq -r '.[] | [.name, .path, .version, .channel // ""] | @tsv' <<< "$UNITS")
+          done < <(jq -r '.[] | [.name, .value, .version, .channel // ""] | @tsv' <<< "$UNITS")
 
           # Batch all updates targeting the same repository and application into one entry
           groups=$(jq -s -c 'group_by(.targetRepo + "|" + .application)
