@@ -11,7 +11,7 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 | `Configure`        | Always                                                          | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, validates the configuration and discovers applications |
 | `Check`            | Always                                                          | Repository baseline checks (install, dedupe, `check`), then validates the manifests of every application, without credentials |
 | `Preview: <name>`  | Trusted pull requests, one job per application with `.argocd-app` | Posts the ArgoCD diff as a PR comment                                                                                    |
-| `Deploy: <name>`   | Push to `default-branch`, one job per application with `.argocd-app` | Triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health)                   |
+| `Deploy: <name>`   | Push to `default-branch`, one job per application with `.argocd-app` matching `deploy-applications` | Triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health)                   |
 | `Status`           | Always                                                          | Single required status check, fails when any other job failed or was cancelled                                            |
 
 - Every directory in `applications-directory` is an application and is validated in `Check`: `kustomize build`
@@ -20,6 +20,9 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
   are skipped
 - Directories with an `.argocd-app` file also get a `Preview` and a `Deploy` job. ArgoCD renders the manifests
   server-side, so these jobs only check out the root files
+- `prune-applications` and `deploy-applications` select applications by path, one pattern per line, where `*` matches
+  exactly one path segment. Pruning is off by default. `deploy-applications` defaults to `k8s/applications/*`, so it
+  must be updated together with `applications-directory`
 - The preview comment is updated on every run: it shows the diff, notes that there are no changes or that the preview
   failed
 - With `enable-github-deployments`, each `Deploy` job runs in a GitHub environment named after the application, linked
@@ -261,14 +264,22 @@ with:
 	sync-timeout: 300 # bounds only the immediate post-trigger error check, not the full sync
 ```
 
-### Conditional Pruning
+### Pruning and Deploying per Application
 
-`sync-prune` is a plain boolean input, so it can be set to any expression evaluated by the calling workflow:
+With `staging`, `production` and `preview-*` applications, this prunes and deploys only `staging` and `preview-*`.
+`production` only gets a `Preview`:
 
 ```yaml
 with:
-	sync-prune: $\{{ github.ref == 'refs/heads/main' }}
+  prune-applications: |
+    k8s/applications/staging
+    k8s/applications/preview-*
+  deploy-applications: |
+    k8s/applications/staging
+    k8s/applications/preview-*
 ```
+
+`sync-prune` is deprecated: `true` prunes every application and `Configure` emits a warning.
 
 ## Inputs
 

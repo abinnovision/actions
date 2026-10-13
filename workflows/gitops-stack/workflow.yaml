@@ -114,8 +114,27 @@ on:
         required: false
         default: false
         description: |-
-          Enable pruning of resources that are no longer defined in the source.
-          **Note:** When enabled, resources removed from manifests will be deleted during sync
+          **Deprecated:** Use `prune-applications` instead. `true` prunes every application.
+
+      prune-applications:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Newline-separated application path patterns whose sync prunes resources that are no longer defined in the source.
+          `*` matches exactly one path segment.
+          **Note:** Resources removed from the manifests of these applications are deleted during sync
+          **Example:** `k8s/applications/staging`, `k8s/applications/preview-*`
+
+      deploy-applications:
+        type: string
+        required: false
+        default: "k8s/applications/*"
+        description: |-
+          Newline-separated application path patterns that get a `Deploy` job. Other applications only get a `Preview`.
+          `*` matches exactly one path segment.
+          **Note:** Update it together with `applications-directory`
+          **Example:** `k8s/applications/staging`, `k8s/applications/preview-*`
 
       # PR comment configuration
       enable-pr-comments:
@@ -158,8 +177,11 @@ jobs:
       # Whether credentialed jobs may run: false for fork and Dependabot pull requests.
       trusted: ${{ steps.trust.outputs.trusted }}
 
-      # Applications with an `.argocd-app` file as a compact JSON array of {name, argocd-app}.
+      # Applications with an `.argocd-app` file as a compact JSON array of {name, argocd-app, prune, deploy}.
       applications: ${{ steps.discover.outputs.applications }}
+
+      # Applications matching `deploy-applications`, in the same format.
+      deployments: ${{ steps.discover.outputs.deployments }}
     steps:
       # Resolve the commit SHA and mode for this event.
       - name: Evaluate event
@@ -226,10 +248,40 @@ jobs:
         id: discover
         env:
           INPUT_APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
+          INPUT_PRUNE_APPLICATIONS: ${{ inputs.prune-applications }}
+          INPUT_DEPLOY_APPLICATIONS: ${{ inputs.deploy-applications }}
+          INPUT_SYNC_PRUNE: ${{ inputs.sync-prune }}
         run: |
           set -euo pipefail
 
           dir="${INPUT_APPLICATIONS_DIRECTORY%/}"
+          prune_patterns="$INPUT_PRUNE_APPLICATIONS"
+          deploy_patterns="$INPUT_DEPLOY_APPLICATIONS"
+
+          if [[ "$INPUT_SYNC_PRUNE" == "true" ]]; then
+            echo "::warning::sync-prune is deprecated, use prune-applications instead"
+            prune_patterns="$dir/*"
+          fi
+
+          while read -r pattern; do
+            if [[ -n "$pattern" && ( ! "$pattern" =~ ^[A-Za-z0-9._/*-]+$ || "$pattern" == /* || "$pattern" =~ (^|/)\.\.(/|$) ) ]]; then
+              echo "::error::Invalid application pattern '$pattern': only path segments and '*' are supported"
+              exit 1
+            fi
+          done <<< "$prune_patterns"$'\n'"$deploy_patterns"
+
+          # Whether the path matches one of the newline-separated patterns, where `*` matches one path segment.
+          matches() {
+            local pattern regex
+            while read -r pattern; do
+              [[ -n "$pattern" ]] || continue
+              regex="${pattern%/}"
+              regex="${regex//./\\.}"
+              regex="^${regex//\*/[^/]*}$"
+              [[ "$1" =~ $regex ]] && return 0
+            done <<< "$2"
+            return 1
+          }
 
           if [[ ! "$dir" =~ ^[A-Za-z0-9._/-]+$ || "$dir" == /* || "$dir" =~ (^|/)\.\.(/|$) ]]; then
             echo "::error::Invalid applications-directory '$dir': only path segments are supported"
@@ -266,19 +318,33 @@ jobs:
               exit 1
             fi
 
-            echo "Found ArgoCD application: $name -> $argocd_app"
-            applications=$(jq -c --arg name "$name" --arg app "$argocd_app" '. + [{name: $name, "argocd-app": $app}]' <<< "$applications")
+            prune=false
+            deploy=false
+            matches "$path" "$prune_patterns" && prune=true
+            matches "$path" "$deploy_patterns" && deploy=true
+
+            echo "Found ArgoCD application: $name -> $argocd_app (prune: $prune, deploy: $deploy)"
+            applications=$(jq -c --arg name "$name" --arg app "$argocd_app" --argjson prune "$prune" --argjson deploy "$deploy" \
+              '. + [{name: $name, "argocd-app": $app, prune: $prune, deploy: $deploy}]' <<< "$applications")
           done < <(git ls-tree -d --name-only HEAD "$dir/")
 
+          deployments=$(jq -c 'map(select(.deploy))' <<< "$applications")
+          if [[ "$applications" != "[]" && "$deployments" == "[]" ]]; then
+            echo "::warning::No application matches deploy-applications, nothing is deployed"
+          fi
+
           echo "applications=$applications" >> "$GITHUB_OUTPUT"
+          echo "deployments=$deployments" >> "$GITHUB_OUTPUT"
           echo "Applications: $applications"
+          echo "Deployments: $deployments"
 
       # The ArgoCD and DEX settings are only needed when a credentialed lane has applications to run.
       - name: Validate config
         env:
           MODE: ${{ steps.event.outputs.mode }}
           TRUSTED: ${{ steps.trust.outputs.trusted }}
-          APPLICATIONS: ${{ steps.discover.outputs.applications }}
+          # Preview runs every application, Deploy only those matching `deploy-applications`.
+          APPLICATIONS: ${{ steps.event.outputs.mode == 'main' && steps.discover.outputs.deployments || steps.discover.outputs.applications }}
           ARGOCD_SERVER: ${{ inputs.argocd-server || vars.ARGOCD_CORE_SERVER }}
           DEX_ENDPOINT: ${{ inputs.dex-endpoint || vars.DEX_CORE_ENDPOINT }}
           DEX_CLIENT_ID: ${{ inputs.dex-client-id || vars.DEX_CORE_GITHUB_ACTIONS_CLIENT }}
@@ -572,7 +638,7 @@ jobs:
           comment-tag: application-${{ matrix.application.name }}
           create-if-not-exists: false
 
-  # Sync every application on the default branch.
+  # Sync every application matching `deploy-applications` on the default branch.
   deploy:
     name: "Deploy: ${{ matrix.application.name }}"
     runs-on: ubuntu-latest
@@ -580,11 +646,11 @@ jobs:
     needs:
       - configure
       - check
-    if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.applications != '[]'
+    if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.deployments != '[]'
     strategy:
       fail-fast: false
       matrix:
-        application: ${{ fromJSON(needs.configure.outputs.applications) }}
+        application: ${{ fromJSON(needs.configure.outputs.deployments) }}
     # An empty name runs the job without an environment.
     environment:
       name: ${{ inputs.enable-github-deployments && matrix.application.name || '' }}
@@ -628,7 +694,7 @@ jobs:
         if: steps.check-sync.outputs.sync_required == 'true'
         env:
           ARGOCD_APP: ${{ matrix.application['argocd-app'] }}
-          INPUT_SYNC_PRUNE: ${{ inputs.sync-prune }}
+          APP_PRUNE: ${{ matrix.application.prune }}
           INPUT_SYNC_TIMEOUT: ${{ inputs.sync-timeout }}
         run: |
           set -euo pipefail
@@ -636,7 +702,7 @@ jobs:
           echo "::group::Syncing ArgoCD application: $ARGOCD_APP"
 
           sync_args=(--async)
-          if [[ "$INPUT_SYNC_PRUNE" == "true" ]]; then
+          if [[ "$APP_PRUNE" == "true" ]]; then
             sync_args+=(--prune)
           fi
 
