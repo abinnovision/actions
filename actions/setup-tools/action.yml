@@ -1,10 +1,11 @@
 name: Setup Tools
 author: "abi group GmbH"
 description: |
-  Setup development tools from .tool-versions using native GitHub Actions.
-  Automatically installs all tools defined in the file.
-  Supports Node.js (with corepack), Python (with uv), Go, OpenTofu, and Kubernetes tools
-  (kustomize, kubeconform, kube-score, argocd).
+  Setup development tools from .tool-versions using mise.
+  Installs every tool listed in the file, and in mise.toml if present.
+  Adds extras for Node.js (corepack, yarn and Turbo caches, GitHub Packages scope),
+  Go (local toolchain only, module and build caches) and uv (cache).
+  Python implies uv.
 
 inputs:
   tool-versions-file:
@@ -12,7 +13,7 @@ inputs:
     required: true
     default: ".tool-versions"
 
-  # Node.js specific (used when nodejs is in .tool-versions)
+  # Node.js specific (used when Node.js is installed)
   node-token:
     description: "Token for GitHub Packages registry"
     required: false
@@ -26,136 +27,148 @@ inputs:
     required: false
     default: "auto"
 
-  # OpenTofu specific (used when opentofu is in .tool-versions)
-  opentofu-wrapper:
-    description: "Install the OpenTofu wrapper script that exposes stdout, stderr and exitcode as step outputs"
-    required: false
-    default: "false"
-
 outputs:
   node-version:
-    description: "Installed Node.js version (if nodejs in .tool-versions)"
-    value: ${{ steps.parse.outputs.node-version }}
+    description: "Installed Node.js version (if installed)"
+    value: ${{ steps.mise.outputs.node }}
   uv-version:
-    description: "Installed uv version (if uv or python in .tool-versions)"
-    value: ${{ steps.parse.outputs.uv-version }}
+    description: "Installed uv version (if installed)"
+    value: ${{ steps.mise.outputs.uv }}
   python-version:
-    description: "Installed Python version (if python in .tool-versions)"
-    value: ${{ steps.parse.outputs.python-version }}
+    description: "Installed Python version (if installed)"
+    value: ${{ steps.mise.outputs.python }}
   go-version:
-    description: "Installed Go version (if golang in .tool-versions)"
-    value: ${{ steps.parse.outputs.go-version }}
+    description: "Installed Go version (if installed)"
+    value: ${{ steps.mise.outputs.go }}
   opentofu-version:
-    description: "Installed OpenTofu version (if opentofu in .tool-versions)"
-    value: ${{ steps.parse.outputs.opentofu-version }}
+    description: "Installed OpenTofu version (if installed)"
+    value: ${{ steps.mise.outputs.opentofu }}
   kustomize-version:
-    description: "Installed kustomize version (if kustomize in .tool-versions)"
-    value: ${{ steps.parse.outputs.kustomize-version }}
+    description: "Installed kustomize version (if installed)"
+    value: ${{ steps.mise.outputs.kustomize }}
   kubeconform-version:
-    description: "Installed kubeconform version (if kubeconform in .tool-versions)"
-    value: ${{ steps.parse.outputs.kubeconform-version }}
+    description: "Installed kubeconform version (if installed)"
+    value: ${{ steps.mise.outputs.kubeconform }}
   kube-score-version:
-    description: "Installed kube-score version (if kube-score in .tool-versions)"
-    value: ${{ steps.parse.outputs.kube-score-version }}
+    description: "Installed kube-score version (if installed)"
+    value: ${{ steps.mise.outputs.kube-score }}
   argocd-version:
-    description: "Installed Argo CD version (if argocd in .tool-versions)"
-    value: ${{ steps.parse.outputs.argocd-version }}
+    description: "Installed Argo CD version (if installed)"
+    value: ${{ steps.mise.outputs.argocd }}
 
 runs:
   using: composite
   steps:
-    - id: parse
-      name: "Parse .tool-versions"
+    - id: prepare
+      name: "Prepare"
       shell: bash
+      env:
+        TOOL_VERSIONS_FILE: ${{ inputs.tool-versions-file }}
       run: |
-        TOOL_VERSIONS_FILE="${{ inputs.tool-versions-file }}"
-
         if [ ! -f "$TOOL_VERSIONS_FILE" ]; then
           echo "::error::File '$TOOL_VERSIONS_FILE' not found"
           exit 1
         fi
+        {
+          echo "working-directory=$(dirname "$TOOL_VERSIONS_FILE")"
+          echo "filename=$(basename "$TOOL_VERSIONS_FILE")"
+        } >> "$GITHUB_OUTPUT"
 
-        # Check for each supported tool
-        if grep -qE '^nodejs[[:space:]]' "$TOOL_VERSIONS_FILE"; then
-          echo "has-nodejs=true" >> $GITHUB_OUTPUT
-          echo "node-version=$(grep -E '^nodejs[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
+        # Python implies uv. Global config has the lowest precedence, so a project pin wins.
+        if grep -qE '^python[[:space:]]' "$TOOL_VERSIONS_FILE" && ! grep -qE '^uv[[:space:]]' "$TOOL_VERSIONS_FILE"; then
+          config="$RUNNER_TEMP/setup-tools/mise.toml"
+          mkdir -p "$(dirname "$config")"
+          printf '[tools]\nuv = "latest"\n' > "$config"
+          echo "MISE_GLOBAL_CONFIG_FILE=$config" >> "$GITHUB_ENV"
         fi
 
-        if grep -qE '^uv[[:space:]]' "$TOOL_VERSIONS_FILE"; then
-          echo "has-uv=true" >> $GITHUB_OUTPUT
-          echo "uv-version=$(grep -E '^uv[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
-        fi
-
-        if grep -qE '^python[[:space:]]' "$TOOL_VERSIONS_FILE"; then
-          echo "has-python=true" >> $GITHUB_OUTPUT
-          echo "python-version=$(grep -E '^python[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
-        fi
-
-        if grep -qE '^golang[[:space:]]' "$TOOL_VERSIONS_FILE"; then
-          echo "has-golang=true" >> $GITHUB_OUTPUT
-          echo "go-version=$(grep -E '^golang[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
-        fi
-
-        if grep -qE '^opentofu[[:space:]]' "$TOOL_VERSIONS_FILE"; then
-          echo "has-opentofu=true" >> $GITHUB_OUTPUT
-          echo "opentofu-version=$(grep -E '^opentofu[[:space:]]' "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
-        fi
-
-        for tool in kustomize kubeconform kube-score argocd; do
-          if grep -qE "^${tool}[[:space:]]" "$TOOL_VERSIONS_FILE"; then
-            echo "has-k8s-tools=true" >> $GITHUB_OUTPUT
-            echo "${tool}-version=$(grep -E "^${tool}[[:space:]]" "$TOOL_VERSIONS_FILE" | awk '{print $2}')" >> $GITHUB_OUTPUT
-          fi
-        done
-
-    # Node.js setup via internal setup-node action
-    - name: Setup Node.js
-      if: steps.parse.outputs.has-nodejs == 'true'
-      uses: abinnovision/actions@setup-node-dev
+    - id: mise
+      name: "Install tools with mise"
+      uses: jdx/mise-action@v5
+      env:
+        MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: ${{ steps.prepare.outputs.filename }}
       with:
-        token: ${{ inputs.node-token }}
-        version: ${{ steps.parse.outputs.node-version }}
-        enable-corepack: ${{ inputs.node-enable-corepack }}
-        enable-turbo-cache: ${{ inputs.node-enable-turbo-cache }}
+        # Bump manually; the version is part of the cache key.
+        version: 2026.10.9
+        working_directory: ${{ steps.prepare.outputs.working-directory }}
+        add_shims_to_path: "false"
 
-    # uv setup via astral-sh/setup-uv
-    # Installed when uv is explicitly in .tool-versions OR when python is requested (uv manages Python)
-    - name: Setup uv
-      if: steps.parse.outputs.has-uv == 'true' || steps.parse.outputs.has-python == 'true'
-      uses: astral-sh/setup-uv@v5
-      with:
-        version: ${{ steps.parse.outputs.uv-version || '' }}
-        enable-cache: true
-
-    # Install Python via uv when python is in .tool-versions
-    - name: Install Python via uv
-      if: steps.parse.outputs.has-python == 'true'
+    - name: "Verify installed tools"
       shell: bash
+      env:
+        VERSIONS: ${{ steps.mise.outputs.versions }}
       run: |
-        uv python install ${{ steps.parse.outputs.python-version }}
+        if [ -z "$VERSIONS" ] || [ "$VERSIONS" = "{}" ]; then
+          echo "::error::mise reported no installed tools"
+          exit 1
+        fi
 
-    # Go setup via actions/setup-go
-    - name: Setup Go
-      if: steps.parse.outputs.has-golang == 'true'
-      uses: actions/setup-go@v6
-      with:
-        go-version: ${{ steps.parse.outputs.go-version }}
-        cache: true
+    # Node.js
+    - id: node
+      name: "Setup Node.js extras"
+      if: steps.mise.outputs.node != ''
+      shell: bash
+      env:
+        ENABLE_COREPACK: ${{ inputs.node-enable-corepack }}
+        NODE_TOKEN: ${{ inputs.node-token }}
+      run: |
+        if [ "$ENABLE_COREPACK" = "true" ]; then
+          # Node.js 25+ no longer bundles corepack.
+          command -v corepack > /dev/null || npm install --global corepack
+          corepack enable
+        fi
+        if [ -f yarn.lock ]; then
+          scopes="$(jq -cn --arg token "$NODE_TOKEN" '{abinnovision: {npmPublishRegistry: "https://npm.pkg.github.com", npmRegistryServer: "https://npm.pkg.github.com", npmAlwaysAuth: false, npmAuthToken: $token}}')"
+          yarn config set -H --json npmScopes "$scopes"
+          echo "yarn-cache=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+        fi
 
-    # OpenTofu setup via opentofu/setup-opentofu
-    - name: Setup OpenTofu
-      if: steps.parse.outputs.has-opentofu == 'true'
-      uses: opentofu/setup-opentofu@v2
+    - name: "Cache yarn"
+      if: steps.node.outputs.yarn-cache != ''
+      uses: actions/cache@v6
       with:
-        tofu_version: ${{ steps.parse.outputs.opentofu-version }}
-        tofu_wrapper: ${{ inputs.opentofu-wrapper }}
+        path: ${{ steps.node.outputs.yarn-cache }}
+        key: setup-tools-yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock') }}
 
-    # Kubernetes tools via internal setup-k8s-tools action (empty version skips a tool)
-    - name: Setup Kubernetes tools
-      if: steps.parse.outputs.has-k8s-tools == 'true'
-      uses: abinnovision/actions@setup-k8s-tools-dev
+    - name: "Setup Turbo cache"
+      if: >-
+        steps.mise.outputs.node != '' && (inputs.node-enable-turbo-cache == 'true' ||
+        (inputs.node-enable-turbo-cache == 'auto' && hashFiles('turbo.json') != ''))
+      uses: rharkor/caching-for-turbo@v2.3.13
+
+    # Go and uv
+    - id: paths
+      name: "Resolve cache paths"
+      if: steps.mise.outputs.go != '' || steps.mise.outputs.uv != ''
+      shell: bash
+      env:
+        GO_VERSION: ${{ steps.mise.outputs.go }}
+        UV_VERSION: ${{ steps.mise.outputs.uv }}
+      run: |
+        if [ -n "$GO_VERSION" ]; then
+          # Keep the pinned Go version, as actions/setup-go does.
+          [ -n "${GOTOOLCHAIN:-}" ] || echo "GOTOOLCHAIN=local" >> "$GITHUB_ENV"
+          {
+            echo "go-mod-cache=$(go env GOMODCACHE)"
+            echo "go-build-cache=$(go env GOCACHE)"
+          } >> "$GITHUB_OUTPUT"
+        fi
+        if [ -n "$UV_VERSION" ]; then
+          echo "uv-cache=$(uv cache dir)" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: "Cache Go modules and build"
+      if: steps.paths.outputs.go-mod-cache != ''
+      uses: actions/cache@v6
       with:
-        kustomize: ${{ steps.parse.outputs.kustomize-version }}
-        kubeconform: ${{ steps.parse.outputs.kubeconform-version }}
-        kube-score: ${{ steps.parse.outputs.kube-score-version }}
-        argocd: ${{ steps.parse.outputs.argocd-version }}
+        path: |
+          ${{ steps.paths.outputs.go-mod-cache }}
+          ${{ steps.paths.outputs.go-build-cache }}
+        key: setup-tools-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise.outputs.go }}-${{ hashFiles('**/go.sum') }}
+
+    - name: "Cache uv"
+      if: steps.paths.outputs.uv-cache != ''
+      uses: actions/cache@v6
+      with:
+        path: ${{ steps.paths.outputs.uv-cache }}
+        key: setup-tools-uv-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise.outputs.python }}-${{ hashFiles('**/uv.lock') }}

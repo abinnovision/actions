@@ -23,10 +23,6 @@
 		]
 	},
 	"prettier": "@abinnovision/prettier-config",
-	"dependencies": {
-		"setup-k8s-tools": "workspace:^",
-		"setup-node": "workspace:^"
-	},
 	"devDependencies": {
 		"@abinnovision/prettier-config": "^2.2.0",
 		"prettier": "^3.9.9"

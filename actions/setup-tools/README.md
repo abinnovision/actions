@@ -1,9 +1,10 @@
 # setup-tools
 
-Setup development tools from .tool-versions using native GitHub Actions.
-Automatically installs all tools defined in the file.
-Supports Node.js (with corepack), Python (with uv), Go, OpenTofu, and Kubernetes tools
-(kustomize, kubeconform, kube-score, argocd).
+Setup development tools from .tool-versions using mise.
+Installs every tool listed in the file, and in mise.toml if present.
+Adds extras for Node.js (corepack, yarn and Turbo caches, GitHub Packages scope),
+Go (local toolchain only, module and build caches) and uv (cache).
+Python implies uv.
 
 ## Usage
 
@@ -29,10 +30,9 @@ This action can be used with different version ranges. The following ranges are 
 
 ## Inputs
 
-| Input                     | Description                                                                                  | Required | Default               |
-| :------------------------ | :------------------------------------------------------------------------------------------- | :------- | :-------------------- |
-| `tool-versions-file`      | Path to .tool-versions file                                                                  | Yes      | `.tool-versions`      |
-| `node-token`              | Token for GitHub Packages registry                                                           | No       | `${{ github.token }}` |
-| `node-enable-corepack`    | Enable corepack for Node.js                                                                  | No       | `true`                |
-| `node-enable-turbo-cache` | Enable Turbo cache (auto, true, false)                                                       | No       | `auto`                |
-| `opentofu-wrapper`        | Install the OpenTofu wrapper script that exposes stdout, stderr and exitcode as step outputs | No       | `false`               |
+| Input                     | Description                            | Required | Default               |
+| :------------------------ | :------------------------------------- | :------- | :-------------------- |
+| `tool-versions-file`      | Path to .tool-versions file            | Yes      | `.tool-versions`      |
+| `node-token`              | Token for GitHub Packages registry     | No       | `${{ github.token }}` |
+| `node-enable-corepack`    | Enable corepack for Node.js            | No       | `true`                |
+| `node-enable-turbo-cache` | Enable Turbo cache (auto, true, false) | No       | `auto`                |
