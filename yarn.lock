@@ -4738,7 +4738,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"setup-k8s-tools@workspace:^, setup-k8s-tools@workspace:actions/setup-k8s-tools":
+"setup-k8s-tools@workspace:actions/setup-k8s-tools":
   version: 0.0.0-use.local
   resolution: "setup-k8s-tools@workspace:actions/setup-k8s-tools"
   dependencies:
@@ -4754,7 +4754,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"setup-node@workspace:^, setup-node@workspace:actions/setup-node":
+"setup-node@workspace:actions/setup-node":
   version: 0.0.0-use.local
   resolution: "setup-node@workspace:actions/setup-node"
   dependencies:
@@ -4785,8 +4785,6 @@ __metadata:
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     prettier: "npm:^3.9.9"
-    setup-k8s-tools: "workspace:^"
-    setup-node: "workspace:^"
   languageName: unknown
   linkType: soft
 

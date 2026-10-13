@@ -36,7 +36,6 @@ function collectSteps(doc: YamlDocument): [string, Step[]][] {
 // Files that are exempt until they are migrated or removed.
 const EXEMPT_FILES = new Set([
 	"actions/setup-node/action.yml",
-	"actions/setup-tools/action.yml",
 	"workflows/polyglot-monorepo-stack/workflow.yaml",
 ]);
 
