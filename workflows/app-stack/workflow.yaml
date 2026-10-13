@@ -124,9 +124,9 @@ jobs:
       # Pipeline mode (pr, main or none).
       mode: ${{ steps.event.outputs.mode }}
 
-      # Unit paths as compact JSON arrays, `.` for the repository root.
-      source-units: ${{ steps.source-units.outputs.paths }}
-      dist-units: ${{ steps.dist-units.outputs.paths }}
+      # Units as compact JSON arrays of {path, name}, path `.` for the repository root.
+      source-units: ${{ steps.source-units.outputs.items }}
+      dist-units: ${{ steps.dist-units.outputs.items }}
 
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
@@ -274,9 +274,9 @@ jobs:
           set -euo pipefail
 
           # The root unit is not pruned, the payload already holds the whole tree.
-          mapfile -t units < <(jq -r '.[] | select(. != ".")' <<< "$SOURCE_UNITS")
+          units=$(jq -c '[.[] | select(.path != ".")]' <<< "$SOURCE_UNITS")
 
-          if [[ ${#units[@]} -gt 0 ]]; then
+          if [[ $(jq 'length' <<< "$units") -gt 0 ]]; then
             # Get turbo version from package.json (required to prune)
             TURBO_VERSION=$(jq -r '.devDependencies.turbo // .dependencies.turbo // empty' package.json)
 
@@ -288,7 +288,7 @@ jobs:
             echo "Turbo version: $TURBO_VERSION"
           fi
 
-          for unit in "${units[@]}"; do
+          while IFS=$'\t' read -r unit name; do
             # Package name of the unit, used as the prune scope
             scope=$(jq -r '.name // empty' "$unit/package.json")
             if [[ -z "$scope" ]]; then
@@ -298,8 +298,8 @@ jobs:
 
             # Outside the workspace so later check steps don't pick up the pruned trees.
             echo "Running turbo prune for scope: $scope"
-            yarn dlx turbo@"$TURBO_VERSION" prune --scope="$scope" --docker --out-dir="$RUNNER_TEMP/out/${unit##*/}"
-          done
+            yarn dlx turbo@"$TURBO_VERSION" prune --scope="$scope" --docker --out-dir="$RUNNER_TEMP/out/$name"
+          done < <(jq -r '.[] | [.path, .name] | @tsv' <<< "$units")
 
           # Tracked source tree (including submodules) plus the pruned unit trees under out/.
           git ls-files --recurse-submodules -z | tar --null -T - -cf "$RUNNER_TEMP/source.tar"
@@ -346,19 +346,13 @@ jobs:
         if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
         env:
           DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
-          REPOSITORY_NAME: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
 
           mkdir -p "$RUNNER_TEMP/dist"
-          mapfile -t units < <(jq -r '.[]' <<< "$DIST_UNITS")
-          for unit in "${units[@]}"; do
-            name="${unit##*/}"
-            if [[ "$unit" == "." ]]; then
-              name="$REPOSITORY_NAME"
-            fi
+          while IFS=$'\t' read -r unit name; do
             (cd "$unit" && yarn pack --out "$RUNNER_TEMP/dist/$name.tgz")
-          done
+          done < <(jq -r '.[] | [.path, .name] | @tsv' <<< "$DIST_UNITS")
 
       - name: Upload dist payload
         if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
@@ -467,8 +461,8 @@ jobs:
               channel: (if .value.type == "prerelease" then $channel else "" end),
               sha: .value.sha,
               payloads: (
-                (if $path | IN($source[]) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
-                + (if $path | IN($dist[]) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
+                (if $path | IN($source[].path) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
+                + (if $path | IN($dist[].path) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
               )
             }]' <<< "$VERSIONS")
 
