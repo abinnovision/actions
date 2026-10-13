@@ -190,7 +190,8 @@ same `releases` value to each.
 
 A unit is a directory that contains a `package.json`. Units are selected by directory patterns, one per line (blank
 lines ignored), where `*` matches exactly one path segment and never `/`: `apps/*` matches `apps/web` but not
-`apps/web/admin`. Stacks and publish workflows use the same semantics.
+`apps/web/admin`. `*` skips dot directories such as `apps/.cache`. Stacks and publish workflows use the same
+semantics.
 
 - Stack inputs: `source-units` (default `apps/*`) and `dist-units` (default `packages/*`).
 - The pattern `.` selects the repository root. Its `name` is the repository name; publish workflows select it with

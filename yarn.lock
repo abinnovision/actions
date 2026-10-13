@@ -3945,7 +3945,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"match-paths@workspace:actions/match-paths":
+"match-paths@workspace:^, match-paths@workspace:actions/match-paths":
   version: 0.0.0-use.local
   resolution: "match-paths@workspace:actions/match-paths"
   dependencies:
@@ -4381,6 +4381,7 @@ __metadata:
   resolution: "publish-npm@workspace:workflows/publish-npm"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
+    match-paths: "workspace:^"
     prettier: "npm:^3.9.9"
   languageName: unknown
   linkType: soft
