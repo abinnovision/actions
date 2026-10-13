@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.2.0...iac-stack-source-v1.3.0) (2026-10-13)
+
+
+### Features
+
+* **iac-stack:** resolve roots and state prefixes with shared actions ([#652](https://github.com/abinnovision/actions/issues/652)) ([f49f29f](https://github.com/abinnovision/actions/commit/f49f29f7a5e76ccbdfb8b7947002ab3b3b77208c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * evaluate-event bumped to 1.1.0
+    * match-paths bumped to 1.1.0
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.1.0...iac-stack-source-v1.2.0) (2026-10-13)
 
 

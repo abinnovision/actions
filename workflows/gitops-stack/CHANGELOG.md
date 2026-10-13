@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.1](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.1.0...gitops-stack-source-v2.1.1) (2026-10-13)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * evaluate-event bumped to 1.1.0
+    * match-paths bumped to 1.1.0
+
 ## [2.1.0](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.0.1...gitops-stack-source-v2.1.0) (2026-10-13)
 
 

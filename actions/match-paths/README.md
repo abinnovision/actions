@@ -40,7 +40,7 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@match-paths-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@match-paths-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@match-paths-v1.1.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 

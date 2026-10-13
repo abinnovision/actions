@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.1](https://github.com/abinnovision/actions/compare/publish-npm-source-v1.0.0...publish-npm-source-v1.0.1) (2026-10-13)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * match-paths bumped to 1.1.0
+
 ## 1.0.0 (2026-10-03)
 
 
