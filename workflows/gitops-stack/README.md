@@ -6,13 +6,13 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 ## Behavior
 
-| Job               | Runs                                                                 | Does                                                                                                                                |
-| :---------------- | :------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
-| `Configure`       | Always                                                               | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, validates the configuration and discovers applications |
-| `Check`           | Always                                                               | Repository baseline checks (install, dedupe, `check`), then validates the manifests of every application, without credentials       |
-| `Preview: <name>` | Trusted pull requests, one job per application with `.argocd-app`    | Posts the ArgoCD diff as a PR comment                                                                                               |
-| `Deploy: <name>`  | Push to `default-branch`, one job per application with `.argocd-app` | Triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health)                                 |
-| `Status`          | Always                                                               | Single required status check, fails when any other job failed or was cancelled                                                      |
+| Job               | Runs                                                                                                | Does                                                                                                                                |
+| :---------------- | :-------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure`       | Always                                                                                              | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, validates the configuration and discovers applications |
+| `Check`           | Always                                                                                              | Repository baseline checks (install, dedupe, `check`), then validates the manifests of every application, without credentials       |
+| `Preview: <name>` | Trusted pull requests, one job per application with `.argocd-app`                                   | Posts the ArgoCD diff as a PR comment                                                                                               |
+| `Deploy: <name>`  | Push to `default-branch`, one job per application with `.argocd-app` matching `deploy-applications` | Triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health)                                 |
+| `Status`          | Always                                                                                              | Single required status check, fails when any other job failed or was cancelled                                                      |
 
 - Every directory in `applications-directory` is an application and is validated in `Check`: `kustomize build`
   (with Helm), `kubeconform` (fails the job) and `kube-score` (warnings only). The logs are uploaded as the
@@ -20,6 +20,9 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
   are skipped
 - Directories with an `.argocd-app` file also get a `Preview` and a `Deploy` job. ArgoCD renders the manifests
   server-side, so these jobs only check out the root files
+- `prune-applications` and `deploy-applications` select applications by path, one pattern per line, where `*` matches
+  exactly one path segment. Pruning is off by default. `deploy-applications` defaults to `k8s/applications/*`, so it
+  must be updated together with `applications-directory`
 - The preview comment is updated on every run: it shows the diff, notes that there are no changes or that the preview
   failed
 - With `enable-github-deployments`, each `Deploy` job runs in a GitHub environment named after the application, linked
@@ -271,14 +274,22 @@ with:
 	sync-timeout: 300 # bounds only the immediate post-trigger error check, not the full sync
 ```
 
-### Conditional Pruning
+### Pruning and Deploying per Application
 
-`sync-prune` is a plain boolean input, so it can be set to any expression evaluated by the calling workflow:
+With `staging`, `production` and `preview-*` applications, this prunes and deploys only `staging` and `preview-*`.
+`production` only gets a `Preview`:
 
 ```yaml
 with:
-	sync-prune: ${{ github.ref == 'refs/heads/main' }}
+  prune-applications: |
+    k8s/applications/staging
+    k8s/applications/preview-*
+  deploy-applications: |
+    k8s/applications/staging
+    k8s/applications/preview-*
 ```
+
+`sync-prune` is deprecated: `true` prunes every application and `Configure` emits a warning.
 
 ## Inputs
 
@@ -295,7 +306,9 @@ with:
 | `kubeconform-schema-locations` | Newline-separated list of kubeconform schema locations.<br>**Default:** Default Kubernetes schemas + Datree CRDs catalog<br>**Example:**<br>`<br>default<br>https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>https://storage.googleapis.com/custom-crds/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>` | No       | `default<br>https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json<br>` |
 | `sync-timeout`                 | Timeout in seconds for the post-trigger check that the sync operation started without immediate errors.<br>**Note:** The sync itself runs asynchronously; this only bounds a short check, not the full sync duration.<br>**Default:** `120` (2 minutes)                                                                                                                              | No       | `120`                                                                                                                                   |
 | `skip-if-synced`               | Skip deployment if application is already in sync.                                                                                                                                                                                                                                                                                                                                   | No       | `true`                                                                                                                                  |
-| `sync-prune`                   | Enable pruning of resources that are no longer defined in the source.<br>**Note:** When enabled, resources removed from manifests will be deleted during sync                                                                                                                                                                                                                        | No       | _empty_                                                                                                                                 |
+| `sync-prune`                   | **Deprecated:** Use `prune-applications` instead. `true` prunes every application.                                                                                                                                                                                                                                                                                                   | No       | _empty_                                                                                                                                 |
+| `prune-applications`           | Newline-separated application path patterns whose sync prunes resources that are no longer defined in the source.<br>`*` matches exactly one path segment.<br>**Note:** Resources removed from the manifests of these applications are deleted during sync<br>**Example:** `k8s/applications/staging`, `k8s/applications/preview-*`                                                  | No       | _empty_                                                                                                                                 |
+| `deploy-applications`          | Newline-separated application path patterns that get a `Deploy` job. Other applications only get a `Preview`.<br>`*` matches exactly one path segment.<br>**Note:** Update it together with `applications-directory`<br>**Example:** `k8s/applications/staging`, `k8s/applications/preview-*`                                                                                        | No       | `k8s/applications/*`                                                                                                                    |
 | `enable-pr-comments`           | Enable posting diff comments on pull requests.                                                                                                                                                                                                                                                                                                                                       | No       | `true`                                                                                                                                  |
 | `enable-github-deployments`    | Run each deploy job in a GitHub environment named after the application, with a link to the ArgoCD UI.<br>**Note:** Changes the OIDC subject of deploy jobs to `repo:<owner>/<repo>:environment:<application>`                                                                                                                                                                       | No       | `true`                                                                                                                                  |
 
