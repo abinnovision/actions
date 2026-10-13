@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.4](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.3...app-stack-source-v1.0.4) (2026-10-13)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * evaluate-event bumped to 1.1.0
+    * match-paths bumped to 1.1.0
+
 ## [1.0.3](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.2...app-stack-source-v1.0.3) (2026-10-09)
 
 

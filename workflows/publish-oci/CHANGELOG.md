@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.3](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.1.2...publish-oci-source-v1.1.3) (2026-10-13)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * match-paths bumped to 1.1.0
+
 ## [1.1.2](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.1.1...publish-oci-source-v1.1.2) (2026-10-09)
 
 

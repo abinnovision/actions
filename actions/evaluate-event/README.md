@@ -30,7 +30,7 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@evaluate-event-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@evaluate-event-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@evaluate-event-v1.1.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 
