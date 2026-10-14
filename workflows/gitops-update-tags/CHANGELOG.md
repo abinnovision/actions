@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.2](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v3.0.1...gitops-update-tags-source-v3.0.2) (2026-10-14)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 2.0.0
+
 ## [3.0.1](https://github.com/abinnovision/actions/compare/gitops-update-tags-source-v3.0.0...gitops-update-tags-source-v3.0.1) (2026-10-13)
 
 
