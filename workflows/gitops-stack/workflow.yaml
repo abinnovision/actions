@@ -509,7 +509,7 @@ jobs:
 
       - name: Comment on PR
         if: inputs.enable-pr-comments && steps.argocd-diff.outputs.has_changes == 'true'
-        uses: thollander/actions-comment-pull-request@v3
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           message: |
             ## 🔍 Changes detected in `${{ matrix.application.name }}`
@@ -522,30 +522,30 @@ jobs:
 
             ---
             <sub>Preview generated for application: `${{ matrix.application.name }}`</sub>
-          comment-tag: application-${{ matrix.application.name }}
+          header: application-${{ matrix.application.name }}
 
       # Replace an earlier diff comment so it does not go stale.
       - name: Comment on PR (no changes)
         if: inputs.enable-pr-comments && steps.argocd-diff.outputs.has_changes == 'false'
-        uses: thollander/actions-comment-pull-request@v3
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           message: |
             ## No changes in `${{ matrix.application.name }}`
 
             The ArgoCD Application **${{ matrix.application.content }}** has no changes at ${{ needs.configure.outputs.commit-sha }}.
-          comment-tag: application-${{ matrix.application.name }}
-          create-if-not-exists: false
+          header: application-${{ matrix.application.name }}
+          only_update: true
 
       - name: Comment on PR (failure)
         if: failure() && inputs.enable-pr-comments
-        uses: thollander/actions-comment-pull-request@v3
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           message: |
             ## Preview failed for `${{ matrix.application.name }}`
 
             The diff of the ArgoCD Application **${{ matrix.application.content }}** at ${{ needs.configure.outputs.commit-sha }} failed, see the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
-          comment-tag: application-${{ matrix.application.name }}
-          create-if-not-exists: false
+          header: application-${{ matrix.application.name }}
+          only_update: true
 
   # Sync every application matching `deploy-applications` on the default branch.
   deploy:
