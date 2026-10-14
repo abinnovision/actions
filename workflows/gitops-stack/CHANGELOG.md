@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.4](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.1.3...gitops-stack-source-v2.1.4) (2026-10-14)
+
+
+### Bug Fixes
+
+* **gitops-stack:** replace node20 PR comment action ([#667](https://github.com/abinnovision/actions/issues/667)) ([dd258aa](https://github.com/abinnovision/actions/commit/dd258aaa6cb6933529b5787ab69d69b43481b091))
+
 ## [2.1.3](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.1.2...gitops-stack-source-v2.1.3) (2026-10-14)
 
 
