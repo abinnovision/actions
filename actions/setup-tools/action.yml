@@ -3,58 +3,24 @@ author: "abi group GmbH"
 description: |
   Setup development tools from .tool-versions using mise.
   Installs every tool listed in the file, and in mise.toml if present.
-  Adds extras for Node.js (corepack, yarn and Turbo caches, GitHub Packages scope),
-  Go (local toolchain only, module and build caches) and uv (cache).
+  Adds extras for Node.js (corepack when packageManager is set, yarn and Turbo caches,
+  GitHub Packages scope), Go (local toolchain only, module and build caches) and uv (cache).
   Python implies uv.
 
 inputs:
   tool-versions-file:
     description: "Path to .tool-versions file"
-    required: true
+    required: false
     default: ".tool-versions"
-
-  # Node.js specific (used when Node.js is installed)
   node-token:
-    description: "Token for GitHub Packages registry"
+    description: "Token for the GitHub Packages registry (used when Node.js is installed)"
     required: false
     default: ${{ github.token }}
-  node-enable-corepack:
-    description: "Enable corepack for Node.js"
-    required: false
-    default: "true"
-  node-enable-turbo-cache:
-    description: "Enable Turbo cache (auto, true, false)"
-    required: false
-    default: "auto"
 
 outputs:
-  node-version:
-    description: "Installed Node.js version (if installed)"
-    value: ${{ steps.mise.outputs.node }}
-  uv-version:
-    description: "Installed uv version (if installed)"
-    value: ${{ steps.mise.outputs.uv }}
-  python-version:
-    description: "Installed Python version (if installed)"
-    value: ${{ steps.mise.outputs.python }}
-  go-version:
-    description: "Installed Go version (if installed)"
-    value: ${{ steps.mise.outputs.go }}
-  opentofu-version:
-    description: "Installed OpenTofu version (if installed)"
-    value: ${{ steps.mise.outputs.opentofu }}
-  kustomize-version:
-    description: "Installed kustomize version (if installed)"
-    value: ${{ steps.mise.outputs.kustomize }}
-  kubeconform-version:
-    description: "Installed kubeconform version (if installed)"
-    value: ${{ steps.mise.outputs.kubeconform }}
-  kube-score-version:
-    description: "Installed kube-score version (if installed)"
-    value: ${{ steps.mise.outputs.kube-score }}
-  argocd-version:
-    description: "Installed Argo CD version (if installed)"
-    value: ${{ steps.mise.outputs.argocd }}
+  versions:
+    description: 'JSON object of installed tool versions keyed by mise tool name (e.g. {"node":"24.1.0"})'
+    value: ${{ steps.mise.outputs.versions }}
 
 runs:
   using: composite
@@ -109,10 +75,9 @@ runs:
       if: steps.mise.outputs.node != ''
       shell: bash
       env:
-        ENABLE_COREPACK: ${{ inputs.node-enable-corepack }}
         NODE_TOKEN: ${{ inputs.node-token }}
       run: |
-        if [ "$ENABLE_COREPACK" = "true" ]; then
+        if [ -f package.json ] && jq -e '.packageManager' package.json > /dev/null; then
           # Node.js 25+ no longer bundles corepack.
           command -v corepack > /dev/null || npm install --global corepack
           corepack enable
@@ -131,9 +96,7 @@ runs:
         key: setup-tools-yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock') }}
 
     - name: "Setup Turbo cache"
-      if: >-
-        steps.mise.outputs.node != '' && (inputs.node-enable-turbo-cache == 'true' ||
-        (inputs.node-enable-turbo-cache == 'auto' && hashFiles('turbo.json') != ''))
+      if: steps.mise.outputs.node != '' && hashFiles('turbo.json') != ''
       uses: rharkor/caching-for-turbo@v2.3.13
 
     # Go and uv

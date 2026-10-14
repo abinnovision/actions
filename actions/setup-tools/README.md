@@ -2,8 +2,8 @@
 
 Setup development tools from .tool-versions using mise.
 Installs every tool listed in the file, and in mise.toml if present.
-Adds extras for Node.js (corepack, yarn and Turbo caches, GitHub Packages scope),
-Go (local toolchain only, module and build caches) and uv (cache).
+Adds extras for Node.js (corepack when packageManager is set, yarn and Turbo caches,
+GitHub Packages scope), Go (local toolchain only, module and build caches) and uv (cache).
 Python implies uv.
 
 ## Usage
@@ -15,8 +15,6 @@ jobs:
   <job>:
     steps:
       - uses: abinnovision/actions@setup-tools-v1
-        with:
-          tool-versions-file: .tool-versions
 ```
 
 [//]: # "x-release-please-end"
@@ -30,9 +28,7 @@ This action can be used with different version ranges. The following ranges are 
 
 ## Inputs
 
-| Input                     | Description                            | Required | Default               |
-| :------------------------ | :------------------------------------- | :------- | :-------------------- |
-| `tool-versions-file`      | Path to .tool-versions file            | Yes      | `.tool-versions`      |
-| `node-token`              | Token for GitHub Packages registry     | No       | `${{ github.token }}` |
-| `node-enable-corepack`    | Enable corepack for Node.js            | No       | `true`                |
-| `node-enable-turbo-cache` | Enable Turbo cache (auto, true, false) | No       | `auto`                |
+| Input                | Description                                                             | Required | Default               |
+| :------------------- | :---------------------------------------------------------------------- | :------- | :-------------------- |
+| `tool-versions-file` | Path to .tool-versions file                                             | No       | `.tool-versions`      |
+| `node-token`         | Token for the GitHub Packages registry (used when Node.js is installed) | No       | `${{ github.token }}` |
