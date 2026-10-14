@@ -1,0 +1,137 @@
+name: Setup Tools
+author: "abi group GmbH"
+description: |
+  Setup development tools from .tool-versions using mise.
+  Installs every tool listed in the file, and in mise.toml if present.
+  Adds extras for Node.js (corepack when packageManager is set, yarn and Turbo caches,
+  GitHub Packages scope), Go (local toolchain only, module and build caches) and uv (cache).
+  Python implies uv.
+
+inputs:
+  tool-versions-file:
+    description: "Path to .tool-versions file"
+    required: false
+    default: ".tool-versions"
+  node-token:
+    description: "Token for the GitHub Packages registry (used when Node.js is installed)"
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  versions:
+    description: 'JSON object of installed tool versions keyed by mise tool name (e.g. {"node":"24.1.0"})'
+    value: ${{ steps.mise.outputs.versions }}
+
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      name: "Prepare"
+      shell: bash
+      env:
+        TOOL_VERSIONS_FILE: ${{ inputs.tool-versions-file }}
+      run: |
+        if [ ! -f "$TOOL_VERSIONS_FILE" ]; then
+          echo "::error::File '$TOOL_VERSIONS_FILE' not found"
+          exit 1
+        fi
+        {
+          echo "working-directory=$(dirname "$TOOL_VERSIONS_FILE")"
+          echo "filename=$(basename "$TOOL_VERSIONS_FILE")"
+        } >> "$GITHUB_OUTPUT"
+
+        # Python implies uv. Global config has the lowest precedence, so a project pin wins.
+        if grep -qE '^python[[:space:]]' "$TOOL_VERSIONS_FILE" && ! grep -qE '^uv[[:space:]]' "$TOOL_VERSIONS_FILE"; then
+          config="$RUNNER_TEMP/setup-tools/mise.toml"
+          mkdir -p "$(dirname "$config")"
+          printf '[tools]\nuv = "latest"\n' > "$config"
+          echo "MISE_GLOBAL_CONFIG_FILE=$config" >> "$GITHUB_ENV"
+        fi
+
+    - id: mise
+      name: "Install tools with mise"
+      uses: jdx/mise-action@v5
+      env:
+        MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: ${{ steps.prepare.outputs.filename }}
+      with:
+        # Bump manually; the version is part of the cache key.
+        version: 2026.10.9
+        working_directory: ${{ steps.prepare.outputs.working-directory }}
+        add_shims_to_path: "false"
+
+    - name: "Verify installed tools"
+      shell: bash
+      env:
+        VERSIONS: ${{ steps.mise.outputs.versions }}
+      run: |
+        if [ -z "$VERSIONS" ] || [ "$VERSIONS" = "{}" ]; then
+          echo "::error::mise reported no installed tools"
+          exit 1
+        fi
+
+    # Node.js
+    - id: node
+      name: "Setup Node.js extras"
+      if: steps.mise.outputs.node != ''
+      shell: bash
+      env:
+        NODE_TOKEN: ${{ inputs.node-token }}
+      run: |
+        if [ -f package.json ] && jq -e '.packageManager' package.json > /dev/null; then
+          # Node.js 25+ no longer bundles corepack.
+          command -v corepack > /dev/null || npm install --global corepack
+          corepack enable
+        fi
+        if [ -f yarn.lock ]; then
+          scopes="$(jq -cn --arg token "$NODE_TOKEN" '{abinnovision: {npmPublishRegistry: "https://npm.pkg.github.com", npmRegistryServer: "https://npm.pkg.github.com", npmAlwaysAuth: false, npmAuthToken: $token}}')"
+          yarn config set -H --json npmScopes "$scopes"
+          echo "yarn-cache=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: "Cache yarn"
+      if: steps.node.outputs.yarn-cache != ''
+      uses: actions/cache@v6
+      with:
+        path: ${{ steps.node.outputs.yarn-cache }}
+        key: setup-tools-yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock') }}
+
+    - name: "Setup Turbo cache"
+      if: steps.mise.outputs.node != '' && hashFiles('turbo.json') != ''
+      uses: rharkor/caching-for-turbo@v2.3.13
+
+    # Go and uv
+    - id: paths
+      name: "Resolve cache paths"
+      if: steps.mise.outputs.go != '' || steps.mise.outputs.uv != ''
+      shell: bash
+      env:
+        GO_VERSION: ${{ steps.mise.outputs.go }}
+        UV_VERSION: ${{ steps.mise.outputs.uv }}
+      run: |
+        if [ -n "$GO_VERSION" ]; then
+          # Keep the pinned Go version, as actions/setup-go does.
+          [ -n "${GOTOOLCHAIN:-}" ] || echo "GOTOOLCHAIN=local" >> "$GITHUB_ENV"
+          {
+            echo "go-mod-cache=$(go env GOMODCACHE)"
+            echo "go-build-cache=$(go env GOCACHE)"
+          } >> "$GITHUB_OUTPUT"
+        fi
+        if [ -n "$UV_VERSION" ]; then
+          echo "uv-cache=$(uv cache dir)" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: "Cache Go modules and build"
+      if: steps.paths.outputs.go-mod-cache != ''
+      uses: actions/cache@v6
+      with:
+        path: |
+          ${{ steps.paths.outputs.go-mod-cache }}
+          ${{ steps.paths.outputs.go-build-cache }}
+        key: setup-tools-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise.outputs.go }}-${{ hashFiles('**/go.sum') }}
+
+    - name: "Cache uv"
+      if: steps.paths.outputs.uv-cache != ''
+      uses: actions/cache@v6
+      with:
+        path: ${{ steps.paths.outputs.uv-cache }}
+        key: setup-tools-uv-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise.outputs.python }}-${{ hashFiles('**/uv.lock') }}
