@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.3](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.1.2...gitops-stack-source-v2.1.3) (2026-10-14)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 2.0.0
+
 ## [2.1.2](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.1.1...gitops-stack-source-v2.1.2) (2026-10-13)
 
 

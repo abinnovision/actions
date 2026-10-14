@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.0](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.2.1...setup-tools-source-v2.0.0) (2026-10-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **setup-tools:** reduce inputs and unify version outputs ([#666](https://github.com/abinnovision/actions/issues/666))
+* **setup-tools:** install tools with mise ([#664](https://github.com/abinnovision/actions/issues/664))
+
+### Features
+
+* **setup-tools:** install tools with mise ([#664](https://github.com/abinnovision/actions/issues/664)) ([3146007](https://github.com/abinnovision/actions/commit/31460073c2b4c9210b11777fce9bff2e4c046823))
+* **setup-tools:** reduce inputs and unify version outputs ([#666](https://github.com/abinnovision/actions/issues/666)) ([a9f2b10](https://github.com/abinnovision/actions/commit/a9f2b108553122fe32cda28bd76822b1c84efb51))
+
 ## [1.2.1](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.2.0...setup-tools-source-v1.2.1) (2026-10-13)
 
 

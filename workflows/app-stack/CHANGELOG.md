@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.6](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.5...app-stack-source-v1.0.6) (2026-10-14)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 2.0.0
+
 ## [1.0.5](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.4...app-stack-source-v1.0.5) (2026-10-13)
 
 
