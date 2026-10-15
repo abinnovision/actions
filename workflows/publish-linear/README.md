@@ -54,7 +54,7 @@ release list.
 ```yaml
 jobs:
   publish-linear:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v0
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v1
     secrets:
       LINEAR_ACCESS_KEYS: ${{ secrets.LINEAR_ACCESS_KEYS }}
     # Or to inherit the secrets from the caller:
@@ -69,8 +69,8 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v0`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v0.0.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v1`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v1.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ### Example Workflow File
 
@@ -84,7 +84,7 @@ jobs:
   publish-linear:
     name: Publish Linear
     needs: ci
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v0
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v1
     permissions:
       contents: read
     secrets:
