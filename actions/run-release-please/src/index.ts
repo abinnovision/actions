@@ -13,6 +13,7 @@ interface VersionEntry {
 	packageVersion: string;
 	type: "release" | "prerelease";
 	sha: string;
+	url?: string;
 }
 
 type VersionsMap = Record<string, VersionEntry>;
@@ -128,6 +129,7 @@ const extractStableVersions = (
 			packageVersion,
 			type: "release",
 			sha: shortSha,
+			url: release.url,
 		};
 	}
 
@@ -386,12 +388,14 @@ const syncLinkedReleaseVersions = async (options: {
 		}
 
 		// Fill missing siblings only — never overwrite an existing entry.
+		// Siblings have no GitHub release of their own, so the URL is not copied.
+		const { url: _url, ...siblingEntry } = templateEntry;
 		for (const path of groupPaths) {
 			if (!(path in versions)) {
 				core.info(
 					`  ${path}: synced release from linked group "${groupLabel}" -> ${templateEntry.version}`,
 				);
-				versions[path] = { ...templateEntry };
+				versions[path] = { ...siblingEntry };
 			}
 		}
 	}
