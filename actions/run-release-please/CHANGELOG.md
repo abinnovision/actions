@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.2.0...run-release-please-source-v1.3.0) (2026-10-15)
+
+
+### Features
+
+* **run-release-please:** expose release url in release list ([#669](https://github.com/abinnovision/actions/issues/669)) ([1fcaef4](https://github.com/abinnovision/actions/commit/1fcaef46c62cad7197a07fe76b30eb3de4ce9b80))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.1.4...run-release-please-source-v1.2.0) (2026-10-03)
 
 
