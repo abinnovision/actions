@@ -35,7 +35,7 @@
 	"prettier": "@abinnovision/prettier-config",
 	"dependencies": {
 		"@actions/core": "^3.0.1",
-		"@tallyrelease/cli": "0.1.0-beta.3"
+		"@tallyrelease/cli": "0.1.0"
 	},
 	"devDependencies": {
 		"@abinnovision/eslint-config-base": "^3.4.2",
