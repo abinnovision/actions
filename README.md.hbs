@@ -1,0 +1,25 @@
+# {{name}}
+
+{{description}}
+
+This action is in beta. It bundles a fixed version of `@tallyrelease/cli`, so a CLI update is
+shipped as a new release of the action.
+
+`affected --github-output` needs the full history (`fetch-depth: 0`, optionally with
+`filter: blob:none`) and the `actions: read` permission to find the last successful run as the base.
+
+## Usage
+
+{{{usage-example type="action" name=name inputs=inputs version=version}}}
+
+## Latest versions
+
+{{{version-examples type="action" name=name version=version}}}
+
+## Inputs
+
+{{> inputs-table inputs}}
+
+## Outputs
+
+{{> outputs-table outputs}}
