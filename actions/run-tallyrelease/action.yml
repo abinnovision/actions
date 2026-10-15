@@ -4,23 +4,19 @@ description: |
   (Beta) Runs the bundled tallyrelease CLI. The repository needs a tallyrelease.yaml.
 inputs:
   args:
-    description: "CLI arguments, for example `affected --github-output`. Global flags such as `--cwd` and `--config` go here too."
+    description: "CLI arguments, for example `affected --github-output`. Split on whitespace, or one argument per line when the value has several lines. Global flags such as `--cwd` and `--config` go here too. `shadow` gets `--pin <cli-version>` unless `--pin` is given."
     required: true
   token:
     description: "Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run."
     required: false
     default: ${{ github.token }}
 outputs:
-  affected:
-    description: "JSON array of affected units, each with `id`, `path` and `reason`. Only set by `affected --github-output`."
-  affected-paths:
-    description: "Newline separated paths of the affected units. Only set by `affected --github-output`."
-  all:
-    description: "`true` when every unit is affected. Only set by `affected --github-output`."
-  base:
-    description: "The git ref the diff was computed against. Only set by `affected --github-output`."
-  base-source:
-    description: "How the base was resolved. Only set by `affected --github-output`."
+  result:
+    description: "The JSON document of `affected`, `plan` or `shadow`, as written by `--out`. Not set for other commands."
+  result-file:
+    description: "Path of the JSON document. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands."
+  cli-version:
+    description: "Version of the bundled `@tallyrelease/cli`."
 runs:
   using: node24
   main: dist/index.js
