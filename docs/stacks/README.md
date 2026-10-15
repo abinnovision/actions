@@ -184,6 +184,19 @@ only prunes, packs and prereleases the units tallyrelease reports as affected si
 units that depend on a changed unit. A push that changes `.release-please-manifest.json` selects all units, so stable
 releases always build. The repository needs a `tallyrelease.yaml`, and the caller needs the `actions: read` permission.
 
+### Shadow mode (beta)
+
+With `tallyrelease: shadow` on [app-stack](../../workflows/app-stack/README.md#tallyrelease-beta), the `Release plan`
+job runs tallyrelease next to release-please without changing anything: `plan` on every run and, on push to the default
+branch, `shadow`, which compares tallyrelease with each release merge. Results land in step summaries, the
+`tallyrelease-plan` and `tallyrelease-shadow` artifacts and, with `shadow-issue`, one comment per compared release merge.
+The job never fails the pipeline, the release list (schema 1) is unchanged, and the caller grants no permissions beyond
+the usual set. The repository needs a `tallyrelease.yaml`; the issue comment needs the token broker to allow
+`issues:write`.
+
+Rollout: enable it per repository with `tallyrelease: shadow`, first on `app-stack-dev`, then on the released major tag.
+The bundled CLI version changes only with a `run-tallyrelease` release and is recorded as `pin` in every shadow report.
+
 ## Publishing
 
 Stacks do generic work only (prune, build, pack) and know no publish target. They upload payload artifacts and expose
