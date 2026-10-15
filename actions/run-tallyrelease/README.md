@@ -5,8 +5,58 @@
 This action is in beta. It bundles a fixed version of `@tallyrelease/cli`, so a CLI update is
 shipped as a new release of the action.
 
-`affected --github-output` needs the full history (`fetch-depth: 0`, optionally with
-`filter: blob:none`) and the `actions: read` permission to find the last successful run as the base.
+`affected`, `plan` and `shadow` need the full history (`fetch-depth: 0`, optionally with
+`filter: blob:none`). `affected` and `plan` on push also need the `actions: read` permission to find
+the last successful run as the base.
+
+`args` is split on whitespace. When it has several lines, every non-empty line is one argument, so
+values may contain spaces. `shadow` gets `--pin <cli-version>` appended unless `--pin` is given, so
+every report records the bundled version.
+
+`affected`, `plan` and `shadow` always write their JSON document: unless `args` has `--out`, the action
+adds `--out $RUNNER_TEMP/tallyrelease-<command>.json`. The `result` output holds the document and
+`result-file` its path, also when the command fails after writing it (for example `shadow --strict`).
+Other commands set neither. The documents follow the published schemas
+[`affected.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/affected.schema.json) and
+[`plan.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/plan.schema.json).
+
+[//]: # "x-release-please-start-major"
+
+```yaml
+jobs:
+  affected:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      units: ${{ toJSON(fromJSON(steps.tr.outputs.result).units) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - id: tr
+        uses: abinnovision/actions@run-tallyrelease-v0
+        with:
+          args: affected
+
+  build:
+    needs: affected
+    if: needs.affected.outputs.units != '[]'
+    strategy:
+      matrix:
+        unit: ${{ fromJSON(needs.affected.outputs.units) }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "build ${{ matrix.unit.id }} from ${{ matrix.unit.path }}"
+```
+
+[//]: # "x-release-please-end"
+
+A step output is limited to about 1 MB. For large repositories read `result-file` instead, or upload
+it with `actions/upload-artifact`. Keys written by the CLI's own `--github-output` still appear as
+step outputs, but they are not part of this action's contract.
 
 ## Usage
 
@@ -32,17 +82,15 @@ This action can be used with different version ranges. The following ranges are 
 
 ## Inputs
 
-| Input   | Description                                                                                                     | Required | Default               |
-| :------ | :-------------------------------------------------------------------------------------------------------------- | :------- | :-------------------- |
-| `args`  | CLI arguments, for example `affected --github-output`. Global flags such as `--cwd` and `--config` go here too. | Yes      |                       |
-| `token` | Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run.                   | No       | `${{ github.token }}` |
+| Input   | Description                                                                                                                                                                                                                                                  | Required | Default               |
+| :------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :-------------------- |
+| `args`  | CLI arguments, for example `affected --github-output`. Split on whitespace, or one argument per line when the value has several lines. Global flags such as `--cwd` and `--config` go here too. `shadow` gets `--pin <cli-version>` unless `--pin` is given. | Yes      |                       |
+| `token` | Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run.                                                                                                                                                                | No       | `${{ github.token }}` |
 
 ## Outputs
 
-| Output           | Description                                                                                                |
-| :--------------- | :--------------------------------------------------------------------------------------------------------- |
-| `affected`       | JSON array of affected units, each with `id`, `path` and `reason`. Only set by `affected --github-output`. |
-| `affected-paths` | Newline separated paths of the affected units. Only set by `affected --github-output`.                     |
-| `all`            | `true` when every unit is affected. Only set by `affected --github-output`.                                |
-| `base`           | The git ref the diff was computed against. Only set by `affected --github-output`.                         |
-| `base-source`    | How the base was resolved. Only set by `affected --github-output`.                                         |
+| Output        | Description                                                                                               |
+| :------------ | :-------------------------------------------------------------------------------------------------------- |
+| `result`      | The JSON document of `affected`, `plan` or `shadow`, as written by `--out`. Not set for other commands.   |
+| `result-file` | Path of the JSON document. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands. |
+| `cli-version` | Version of the bundled `@tallyrelease/cli`.                                                               |
