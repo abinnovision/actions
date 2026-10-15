@@ -52,7 +52,7 @@ jobs:
 This workflow can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1.2.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1.3.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ### Example Workflow File
 

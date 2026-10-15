@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.2.0...app-stack-source-v1.3.0) (2026-10-15)
+
+
+### Features
+
+* **app-stack:** add beta tallyrelease shadow mode and release plan ([#677](https://github.com/abinnovision/actions/issues/677)) ([2a62502](https://github.com/abinnovision/actions/commit/2a62502590798b7dda3568d9212729f105144fc6))
+
+
+### Bug Fixes
+
+* limit release-please major markers to the own ref in usage examples ([#680](https://github.com/abinnovision/actions/issues/680)) ([a0d28c0](https://github.com/abinnovision/actions/commit/a0d28c0469da5f79c68ef8775f0e8002d078836b))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.3.0
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.1.0...app-stack-source-v1.2.0) (2026-10-15)
 
 
