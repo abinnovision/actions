@@ -60,8 +60,6 @@ Complete, copyable caller workflow `.github/workflows/ci.yaml`. Both publish job
 `releases` list and select their entries with their `include` input. The list is empty on pull
 requests and on pushes that release nothing, and the publish jobs then skip all work.
 
-[//]: # "x-release-please-start-major"
-
 ```yaml
 name: CI
 
@@ -76,7 +74,7 @@ permissions: {}
 jobs:
   ci:
     name: CI
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1 # x-release-please-major
     permissions:
       contents: read
       packages: read
@@ -113,8 +111,6 @@ jobs:
       gitops-config: |
         backend,<gitops-repo>,staging,production
 ```
-
-[//]: # "x-release-please-end"
 
 The resulting check contexts are `CI / Configure`, `CI / Check`, `CI / Test: <type>`,
 `CI / Release`, `CI / Status` and, with `tallyrelease: shadow`, `CI / Release plan`. Require `CI / Status` and

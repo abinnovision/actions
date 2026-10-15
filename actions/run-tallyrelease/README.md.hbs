@@ -20,8 +20,6 @@ Other commands set neither. The documents follow the published schemas
 [`affected.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/affected.schema.json) and
 [`plan.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/plan.schema.json).
 
-[//]: # "x-release-please-start-major"
-
 ```yaml
 jobs:
   affected:
@@ -37,7 +35,7 @@ jobs:
           fetch-depth: 0
           filter: blob:none
       - id: tr
-        uses: abinnovision/actions@{{name}}-v{{version.major}}
+        uses: abinnovision/actions@{{name}}-v{{version.major}} # x-release-please-major
         with:
           args: affected
 
@@ -51,8 +49,6 @@ jobs:
     steps:
       - run: echo "build $\{{ matrix.unit.id }} from $\{{ matrix.unit.path }}"
 ```
-
-[//]: # "x-release-please-end"
 
 A step output is limited to about 1 MB. For large repositories read `result-file` instead, or upload
 it with `actions/upload-artifact`. Keys written by the CLI's own `--github-output` still appear as
