@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.6...app-stack-source-v1.1.0) (2026-10-15)
+
+
+### Features
+
+* **run-release-please:** expose release url in release list ([#669](https://github.com/abinnovision/actions/issues/669)) ([1fcaef4](https://github.com/abinnovision/actions/commit/1fcaef46c62cad7197a07fe76b30eb3de4ce9b80))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-release-please bumped to 1.3.0
+
 ## [1.0.6](https://github.com/abinnovision/actions/compare/app-stack-source-v1.0.5...app-stack-source-v1.0.6) (2026-10-14)
 
 
