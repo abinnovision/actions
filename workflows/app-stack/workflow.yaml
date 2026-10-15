@@ -101,6 +101,24 @@ on:
           `affected` uses tallyrelease to select the units changed since the last successful run, plus the units depending on them.
           A push that changes `.release-please-manifest.json` selects all units, so stable releases always build.
           **Requires:** `tallyrelease.yaml` in the repository and the `actions: read` permission on the caller for the base lookup
+      tallyrelease:
+        type: string
+        required: false
+        default: "off"
+        description: |-
+          (Beta) Runs tallyrelease next to release-please in the `Release plan` job, which never fails the pipeline.
+          **Valid values:** `off`, `shadow`
+          **Default:** `off`
+          `shadow` runs `tallyrelease plan` on every run (artifact `tallyrelease-plan`) and, on push to the default branch, `tallyrelease shadow`, which compares tallyrelease with release-please on release merges (artifact `tallyrelease-shadow`). Both write a step summary.
+          **Requires:** `tallyrelease.yaml` in the repository. No permissions beyond the ones listed in the README.
+      shadow-issue:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          (Beta) Issue number that receives one comment per compared release merge. Only with `tallyrelease: shadow`.
+          **Default:** _empty_ (no comment)
+          **Requires:** the token broker allows `issues:write` on this repository
 
     outputs:
       releases:
@@ -148,13 +166,26 @@ jobs:
       test-types: ${{ steps.evaluate.outputs.test_types }}
       test-types-for-matrix: ${{ steps.evaluate.outputs.test_types_for_matrix }}
     steps:
-      - name: Validate build selection
+      - name: Validate inputs
         env:
           INPUT_BUILD_SELECTION: ${{ inputs.build-selection }}
+          INPUT_TALLYRELEASE: ${{ inputs.tallyrelease }}
+          INPUT_SHADOW_ISSUE: ${{ inputs.shadow-issue }}
         run: |
           if [[ "$INPUT_BUILD_SELECTION" != "all" && "$INPUT_BUILD_SELECTION" != "affected" ]]; then
             echo "::error::Invalid build-selection '$INPUT_BUILD_SELECTION'. Valid values: all, affected"
             exit 1
+          fi
+          if [[ "$INPUT_TALLYRELEASE" != "off" && "$INPUT_TALLYRELEASE" != "shadow" ]]; then
+            echo "::error::Invalid tallyrelease '$INPUT_TALLYRELEASE'. Valid values: off, shadow"
+            exit 1
+          fi
+          if [[ -n "$INPUT_SHADOW_ISSUE" && ! "$INPUT_SHADOW_ISSUE" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Invalid shadow-issue '$INPUT_SHADOW_ISSUE'. Expected an issue number"
+            exit 1
+          fi
+          if [[ -n "$INPUT_SHADOW_ISSUE" && "$INPUT_TALLYRELEASE" == "off" ]]; then
+            echo "::warning::shadow-issue has no effect while tallyrelease is off"
           fi
 
       # Resolve the commit SHA and mode for this event.
@@ -225,20 +256,21 @@ jobs:
         if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
         uses: abinnovision/actions@run-tallyrelease-dev
         with:
-          args: affected --github-output
+          args: affected
 
       # A push that changes the release-please manifest releases units, which must all be built.
       - name: Select units
         id: select
         if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
         env:
-          AFFECTED: ${{ steps.affected.outputs.affected }}
-          ALL: ${{ steps.affected.outputs.all }}
-          BASE: ${{ steps.affected.outputs.base }}
+          RESULT: ${{ steps.affected.outputs.result }}
           SOURCE_UNITS: ${{ steps.source-units.outputs.items }}
           DIST_UNITS: ${{ steps.dist-units.outputs.items }}
         run: |
           set -euo pipefail
+
+          ALL=$(jq -r '.build.all' <<< "$RESULT")
+          BASE=$(jq -r '.build.base // empty' <<< "$RESULT")
 
           select_all=false
           if [[ "$ALL" == "true" || -z "$BASE" ]]; then
@@ -251,7 +283,7 @@ jobs:
             echo "Selecting all units"
             affected_paths=null
           else
-            affected_paths=$(jq -c '[.[].path]' <<< "$AFFECTED")
+            affected_paths=$(jq -c '[.units[].path]' <<< "$RESULT")
             SOURCE_UNITS=$(jq -c --argjson paths "$affected_paths" '[.[] | select(.path | IN($paths[]))]' <<< "$SOURCE_UNITS")
             DIST_UNITS=$(jq -c --argjson paths "$affected_paths" '[.[] | select(.path | IN($paths[]))]' <<< "$DIST_UNITS")
             echo "Selecting affected units: $affected_paths"
@@ -556,6 +588,127 @@ jobs:
 
           echo "releases=$releases" >> "$GITHUB_OUTPUT"
           echo "Releases: $releases"
+
+  # Plans releases with tallyrelease and, on push to the default branch, compares them with release-please.
+  # Observe only: every step may fail without failing the job, and `Status` does not need it.
+  release-plan:
+    name: Release plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - configure
+    if: inputs.tallyrelease == 'shadow' && needs.configure.outputs.mode != 'none'
+    permissions:
+      contents: read
+      # Base lookup (last successful run) for plan on push.
+      actions: read
+      # Token exchange for the shadow issue comment.
+      id-token: write
+    steps:
+      # Full history for tags, HEAD^1 and the base; blobs are fetched on demand, which needs the persisted
+      # credentials on private repositories. No repository code runs in this job.
+      - name: Checkout
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: false
+          fetch-depth: 0
+          filter: blob:none
+
+      # Plans for the default branch on pull requests too, so reviewers see what merging would release.
+      - name: Plan
+        id: plan
+        continue-on-error: true
+        uses: abinnovision/actions@run-tallyrelease-dev
+        with:
+          args: |
+            plan
+            --branch
+            ${{ inputs.default-branch }}
+            --all
+            --summary
+
+      - name: Upload plan
+        if: steps.plan.outputs.result-file != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: tallyrelease-plan
+          path: ${{ steps.plan.outputs.result-file }}
+          retention-days: 7
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+      # Skipped with W_SHADOW_SKIPPED unless the push changed the release-please manifest.
+      - name: Shadow
+        id: shadow
+        if: needs.configure.outputs.mode == 'main'
+        continue-on-error: true
+        uses: abinnovision/actions@run-tallyrelease-dev
+        with:
+          args: |
+            shadow
+            --branch
+            ${{ inputs.default-branch }}
+            --summary
+
+      - name: Upload shadow report
+        if: steps.shadow.outputs.result-file != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: tallyrelease-shadow
+          path: ${{ steps.shadow.outputs.result-file }}
+          retention-days: 90
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+      # Skipped reports get no comment.
+      - name: Render shadow comment
+        id: comment
+        if: steps.shadow.outputs.result-file != '' && inputs.shadow-issue != ''
+        continue-on-error: true
+        env:
+          REPORT: ${{ steps.shadow.outputs.result-file }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          if ! jq -e '.skipped == null' "$REPORT" > /dev/null; then
+            echo "Shadow report skipped, no comment"
+            exit 0
+          fi
+
+          jq -r --arg run "$RUN_URL" '
+            "### tallyrelease shadow `\(.head[0:7])`",
+            "",
+            "Planned `\(.planned[0:7])` on `\(.branch)`, pin `\(.pin)`. [Run](\($run))",
+            "",
+            "| Path | Unit | Status | Before | release-please | tallyrelease | Labels |",
+            "| :-- | :-- | :-- | :-- | :-- | :-- | :-- |",
+            (.rows[] | "| `\(.path)` | \(.unit // "-") | \(.status) | \(.before // "-") | \(.after // "-") | \(.next // "-") | \(.labels | join(", ") | if . == "" then "-" else . end) |")
+          ' "$REPORT" > "$RUNNER_TEMP/shadow-comment.md"
+          echo "body=$RUNNER_TEMP/shadow-comment.md" >> "$GITHUB_OUTPUT"
+
+      - id: issue-token
+        name: Exchange token for the shadow issue
+        if: steps.comment.outputs.body != ''
+        continue-on-error: true
+        uses: abinnovision/actions@exchange-github-token-dev
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          scope: issues:write
+
+      - name: Comment on the shadow issue
+        if: steps.issue-token.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.issue-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          SHADOW_ISSUE: ${{ inputs.shadow-issue }}
+          BODY: ${{ steps.comment.outputs.body }}
+        run: gh issue comment "$SHADOW_ISSUE" --body-file "$BODY"
 
   # Single required status check for rulesets.
   status:
