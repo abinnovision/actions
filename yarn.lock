@@ -4383,6 +4383,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"publish-linear@workspace:workflows/publish-linear":
+  version: 0.0.0-use.local
+  resolution: "publish-linear@workspace:workflows/publish-linear"
+  dependencies:
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    prettier: "npm:^3.9.9"
+  languageName: unknown
+  linkType: soft
+
 "publish-npm@workspace:workflows/publish-npm":
   version: 0.0.0-use.local
   resolution: "publish-npm@workspace:workflows/publish-npm"

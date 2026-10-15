@@ -1,0 +1,215 @@
+name: Publish Linear
+
+on:
+  workflow_call:
+    secrets:
+      LINEAR_ACCESS_KEYS:
+        required: true
+        description: |-
+          Linear release pipeline access keys in **CSV format** (one per line).
+          **Format:** `pattern,access-key`
+          `pattern` is a directory pattern matched against the entry `path`: `*` matches one path segment and skips dot
+          directories, `.` is the repository root. An entry uses the first matching line; entries without a match are
+          skipped. Entries whose lines hold the same key are synced as one Linear release and must share the version.
+          **Example:**
+          ```
+          apps/*,lin_api_abc123
+          ```
+
+    inputs:
+      releases:
+        type: string
+        required: true
+        description: |-
+          Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.
+          Stable entries (empty `channel`) are synced to Linear; prereleases are ignored.
+          An empty string or `[]` skips all work.
+          **Example:** `needs.ci.outputs.releases`
+
+      scope-paths:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Only scan commits that touch the paths of the released entries (`<path>/**`), for repositories with one
+          pipeline per unit. When `false`, all commits are scanned, unless the pipeline in Linear has a path filter.
+          **Default:** `false`
+
+      dry-run:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Scan commits and log the changes without creating or updating releases in Linear.
+          **Default:** `false`
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Assigns the stable entries to access keys and groups them into one Linear release per key. Keys never leave this
+  # job; each group carries the index of its key line instead.
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: inputs.releases != '' && inputs.releases != '[]'
+    permissions: {}
+    outputs:
+      groups: ${{ steps.group.outputs.groups }}
+    steps:
+      - name: Group releases
+        id: group
+        env:
+          RELEASES: ${{ inputs.releases }}
+          LINEAR_ACCESS_KEYS: ${{ secrets.LINEAR_ACCESS_KEYS }}
+        run: |
+          set -euo pipefail
+
+          # Errors name the line number only, never its content.
+          errors=$(
+            jq -rn '
+              $ENV.LINEAR_ACCESS_KEYS | split("\n") | map(gsub("^\\s+|\\s+$"; ""))
+              | to_entries[] | select(.value != "" and (.value | test("^[^,]+,.+$") | not))
+              | "Invalid LINEAR_ACCESS_KEYS line \(.key + 1): expected \u0027pattern,access-key\u0027"
+            '
+            jq -r '
+              .[] | select(.schema != 1)
+              | "Entry \(.path) has schema \(.schema // "none"), this workflow supports schema 1"
+            ' <<< "$RELEASES"
+          )
+
+          if [[ -n "$errors" ]]; then
+            while IFS= read -r error; do
+              echo "::error::$error"
+            done <<< "$errors"
+            exit 1
+          fi
+
+          # Converts a directory pattern into an anchored regex: `*` matches one segment that does not start with a dot.
+          groups=$(jq -c '
+            def pattern_regex:
+              if . == "." then "^\\.$"
+              else "^" + (split("*") | map(gsub("(?<c>[.+?^$()\\[\\]{}|\\\\])"; "\\\(.c)")) | join("[^/.][^/]*")) + "$"
+              end;
+
+            ($ENV.LINEAR_ACCESS_KEYS | split("\n") | map(gsub("^\\s+|\\s+$"; ""))
+              | to_entries
+              | map(select(.value != ""))
+              | map((.value | capture("^(?<pattern>[^,]+),(?<key>.+)$")) as $c | {
+                  line: .key,
+                  regex: ($c.pattern | gsub("\\s+$"; "") | pattern_regex),
+                  key: ($c.key | gsub("^\\s+"; ""))
+                })
+            ) as $lines
+
+            # Lines holding the same key share the index of its first line.
+            | ($lines | map({(.key): .line}) | reverse | add // {}) as $first
+
+            | [.[] | select(.channel == "") | . as $entry
+                | ($lines | map(select(. as $line | $entry.path | test($line.regex))) | first) as $match
+                | select($match != null)
+                | $entry + {line: $first[$match.key]}]
+            | group_by(.line)
+            | map({
+                line: .[0].line,
+                name: (map(.name) | join(", ")),
+                version: .[0].version,
+                versions: (map(.version) | unique),
+                "include-paths": (if any(.path == ".") then "" else map("\(.path)/**") | join(",") end),
+                links: (map(select(.url) | "\(.name) v\(.version)=\(.url)") | join("\n"))
+              })
+          ' <<< "$RELEASES")
+
+          errors=$(jq -r '
+            .[] | select(.versions | length > 1)
+            | "Entries \(.name) share an access key but have different versions: \(.versions | join(", "))"
+          ' <<< "$groups")
+
+          if [[ -n "$errors" ]]; then
+            while IFS= read -r error; do
+              echo "::error::$error"
+            done <<< "$errors"
+            exit 1
+          fi
+
+          echo "groups=$groups" >> "$GITHUB_OUTPUT"
+
+          if [[ "$groups" == "[]" ]]; then
+            echo "No stable entries match a LINEAR_ACCESS_KEYS line, nothing to sync"
+          else
+            jq -r '.[] | "Group \(.name): \(.version)"' <<< "$groups"
+          fi
+
+  # Creates one Linear release per group from the commits since the previous release of its pipeline.
+  sync:
+    name: "Sync: ${{ matrix.group.name }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: prepare
+    if: needs.prepare.outputs.groups != '[]' && needs.prepare.outputs.groups != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.prepare.outputs.groups) }}
+    permissions:
+      contents: read
+    steps:
+      # The CLI scans the history between the previous release of the pipeline and HEAD.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve settings
+        id: key
+        env:
+          LINE: ${{ matrix.group.line }}
+          LINKS: ${{ matrix.group.links }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LINEAR_ACCESS_KEYS: ${{ secrets.LINEAR_ACCESS_KEYS }}
+        run: |
+          set -euo pipefail
+
+          key=$(jq -rn --argjson line "$LINE" '
+            $ENV.LINEAR_ACCESS_KEYS | split("\n") | map(gsub("^\\s+|\\s+$"; ""))
+            | .[$line] | capture("^[^,]+,(?<key>.+)$").key | gsub("^\\s+"; "")
+          ')
+
+          echo "::add-mask::$key"
+
+          # One link per GitHub release of the group, then the workflow run.
+          links="${LINKS:+$LINKS$'\n'}Workflow run=$RUN_URL"
+          delimiter="EOF_$(openssl rand -hex 8)"
+          {
+            echo "key=$key"
+            printf 'links<<%s\n%s\n%s\n' "$delimiter" "$links" "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sync release
+        id: sync
+        uses: linear/linear-release-action@v0
+        with:
+          access_key: ${{ steps.key.outputs.key }}
+          version: ${{ matrix.group.version }}
+          include_paths: ${{ inputs.scope-paths && matrix.group.include-paths || '' }}
+          links: ${{ steps.key.outputs.links }}
+          dry_run: ${{ inputs.dry-run }}
+
+      - name: Write summary
+        env:
+          NAME: ${{ matrix.group.name }}
+          VERSION: ${{ matrix.group.version }}
+          RELEASE_URL: ${{ steps.sync.outputs.release-url }}
+        run: |
+          {
+            echo "### Linear release"
+            echo ""
+            echo "| Entries | Version | Release |"
+            echo "| :------ | :------ | :------ |"
+            echo "| $NAME | \`$VERSION\` | ${RELEASE_URL:-none} |"
+          } >> "$GITHUB_STEP_SUMMARY"

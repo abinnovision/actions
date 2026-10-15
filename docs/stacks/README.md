@@ -92,7 +92,7 @@ fixed. The workflow `name:` never appears in check contexts.
 | Job            | id                 | `name:`            | Check contexts                                                                                                                                                                       |
 | :------------- | :----------------- | :----------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Stack call     | `ci`               | `CI`               | `CI / Configure`, `CI / Check`, `CI / Status` and the lanes, for example `CI / Test: <type>`, `CI / Preview: <app>`, `CI / Deploy: <app>`, `CI / Plan: <root>`, `CI / Apply: <root>` |
-| Publisher call | `publish-<target>` | `Publish <Target>` | `Publish OCI / Prepare`, `Publish OCI / Build: <name>`, `Publish OCI / GitOps`, `Publish npm / Publish`                                                                              |
+| Publisher call | `publish-<target>` | `Publish <Target>` | `Publish OCI / Prepare`, `Publish OCI / Build: <name>`, `Publish OCI / GitOps`, `Publish npm / Publish`, `Publish Linear / Sync: <names>`                                            |
 | Commit lint    | `lint-commits`     | `Lint commits`     | `Lint commits`                                                                                                                                                                       |
 
 - The job id is the kebab form of the job name. For publishers it equals the name of the called workflow: job
@@ -245,10 +245,11 @@ dist unit.
 
 ### Publish workflows
 
-| Workflow                                             | Publishes                                 | Default `include` | Consumes          |
-| :--------------------------------------------------- | :---------------------------------------- | :---------------- | :---------------- |
-| [publish-oci](../../workflows/publish-oci/README.md) | Container images, then GitOps tag updates | `apps/*`          | `payloads.source` |
-| [publish-npm](../../workflows/publish-npm/README.md) | Packages to npmjs and GitHub Packages     | `packages/*`      | `payloads.dist`   |
+| Workflow                                                   | Publishes                                 | Default `include`             | Consumes          |
+| :--------------------------------------------------------- | :---------------------------------------- | :---------------------------- | :---------------- |
+| [publish-oci](../../workflows/publish-oci/README.md)       | Container images, then GitOps tag updates | `apps/*`                      | `payloads.source` |
+| [publish-npm](../../workflows/publish-npm/README.md)       | Packages to npmjs and GitHub Packages     | `packages/*`                  | `payloads.dist`   |
+| [publish-linear](../../workflows/publish-linear/README.md) | Stable releases to Linear Releases        | `LINEAR_ACCESS_KEYS` patterns | none              |
 
 - An empty string or `[]` means nothing to do; the workflow skips without failing.
 - Entries whose `path` matches `include` are selected; all other entries are ignored silently.
