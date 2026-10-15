@@ -90,6 +90,17 @@ on:
           `.` selects the repository root.
           **Default:** `packages/*`
           **Example:** `packages/*` and `libs/*` on separate lines
+      build-selection:
+        type: string
+        required: false
+        default: "all"
+        description: |-
+          (Beta) Which units are pruned, packed and prereleased on push to the default branch.
+          **Valid values:** `all`, `affected`
+          **Default:** `all`
+          `affected` uses tallyrelease to select the units changed since the last successful run, plus the units depending on them.
+          A push that changes `.release-please-manifest.json` selects all units, so stable releases always build.
+          **Requires:** `tallyrelease.yaml` in the repository and the `actions: read` permission on the caller for the base lookup
 
     outputs:
       releases:
@@ -117,6 +128,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
     outputs:
       # Commit SHA to check out.
       commit-sha: ${{ steps.event.outputs.commit-sha }}
@@ -125,13 +137,26 @@ jobs:
       mode: ${{ steps.event.outputs.mode }}
 
       # Units as compact JSON arrays of {path, name}, path `.` for the repository root.
-      source-units: ${{ steps.source-units.outputs.items }}
-      dist-units: ${{ steps.dist-units.outputs.items }}
+      # With build-selection `affected` on the default branch they only hold the affected units.
+      source-units: ${{ steps.select.outputs.source-units || steps.source-units.outputs.items }}
+      dist-units: ${{ steps.select.outputs.dist-units || steps.dist-units.outputs.items }}
+
+      # Paths of the affected units as a JSON array, `null` when all units are selected.
+      affected-paths: ${{ steps.select.outputs.affected-paths }}
 
       # Test types to run.
       test-types: ${{ steps.evaluate.outputs.test_types }}
       test-types-for-matrix: ${{ steps.evaluate.outputs.test_types_for_matrix }}
     steps:
+      - name: Validate build selection
+        env:
+          INPUT_BUILD_SELECTION: ${{ inputs.build-selection }}
+        run: |
+          if [[ "$INPUT_BUILD_SELECTION" != "all" && "$INPUT_BUILD_SELECTION" != "affected" ]]; then
+            echo "::error::Invalid build-selection '$INPUT_BUILD_SELECTION'. Valid values: all, affected"
+            exit 1
+          fi
+
       # Resolve the commit SHA and mode for this event.
       - name: Evaluate event
         id: event
@@ -180,6 +205,65 @@ jobs:
           marker: package.json
           patterns: ${{ inputs.dist-units }}
           unique: name
+
+      # tallyrelease reads every unit's package.json, so the sparse tree is replaced by the full history.
+      - name: Checkout full history
+        if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.event.outputs.commit-sha }}
+          submodules: false
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Disable sparse checkout
+        if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
+        run: git sparse-checkout disable
+
+      - name: Find affected units
+        id: affected
+        if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
+        uses: abinnovision/actions@run-tallyrelease-dev
+        with:
+          args: affected --github-output
+
+      # A push that changes the release-please manifest releases units, which must all be built.
+      - name: Select units
+        id: select
+        if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
+        env:
+          AFFECTED: ${{ steps.affected.outputs.affected }}
+          ALL: ${{ steps.affected.outputs.all }}
+          BASE: ${{ steps.affected.outputs.base }}
+          SOURCE_UNITS: ${{ steps.source-units.outputs.items }}
+          DIST_UNITS: ${{ steps.dist-units.outputs.items }}
+        run: |
+          set -euo pipefail
+
+          select_all=false
+          if [[ "$ALL" == "true" || -z "$BASE" ]]; then
+            select_all=true
+          elif ! manifest_diff=$(git diff --name-only "$BASE" HEAD -- .release-please-manifest.json) || [[ -n "$manifest_diff" ]]; then
+            select_all=true
+          fi
+
+          if [[ "$select_all" == "true" ]]; then
+            echo "Selecting all units"
+            affected_paths=null
+          else
+            affected_paths=$(jq -c '[.[].path]' <<< "$AFFECTED")
+            SOURCE_UNITS=$(jq -c --argjson paths "$affected_paths" '[.[] | select(.path | IN($paths[]))]' <<< "$SOURCE_UNITS")
+            DIST_UNITS=$(jq -c --argjson paths "$affected_paths" '[.[] | select(.path | IN($paths[]))]' <<< "$DIST_UNITS")
+            echo "Selecting affected units: $affected_paths"
+          fi
+
+          echo "Source units: $SOURCE_UNITS"
+          echo "Dist units: $DIST_UNITS"
+          {
+            echo "source-units=$SOURCE_UNITS"
+            echo "dist-units=$DIST_UNITS"
+            echo "affected-paths=$affected_paths"
+          } >> "$GITHUB_OUTPUT"
 
       # Parse test types.
       - name: Evaluate
@@ -436,13 +520,14 @@ jobs:
           target-branch: ${{ inputs.default-branch }}
           prerelease-channel: ${{ inputs.prerelease-channel }}
 
-      # `[]` when release-please released nothing.
+      # `[]` when release-please released nothing. With build-selection `affected`, prereleases of unaffected units are dropped.
       - id: releases
         name: Write release list
         env:
           VERSIONS: ${{ steps.release.outputs.versions }}
           SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
           DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+          AFFECTED_PATHS: ${{ needs.configure.outputs.affected-paths || 'null' }}
           REPOSITORY_NAME: ${{ github.event.repository.name }}
           INPUT_PRERELEASE_CHANNEL: ${{ inputs.prerelease-channel }}
         run: |
@@ -451,6 +536,7 @@ jobs:
           releases=$(jq -c \
             --argjson source "$SOURCE_UNITS" \
             --argjson dist "$DIST_UNITS" \
+            --argjson affected "$AFFECTED_PATHS" \
             --arg root "$REPOSITORY_NAME" \
             --arg channel "$INPUT_PRERELEASE_CHANNEL" \
             '[to_entries[] | .key as $path | (if $path == "." then $root else $path | split("/") | last end) as $name | {
@@ -465,7 +551,8 @@ jobs:
                 (if $path | IN($source[].path) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
                 + (if $path | IN($dist[].path) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
               )
-            } | if .url == null then del(.url) else . end]' <<< "$VERSIONS")
+            } | if .url == null then del(.url) else . end
+              | select(.channel == "" or $affected == null or (.path | IN($affected[])))]' <<< "$VERSIONS")
 
           echo "releases=$releases" >> "$GITHUB_OUTPUT"
           echo "Releases: $releases"

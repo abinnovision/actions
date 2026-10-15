@@ -1,0 +1,26 @@
+name: Run tallyrelease
+author: "abi group GmbH"
+description: |
+  (Beta) Runs the bundled tallyrelease CLI. The repository needs a tallyrelease.yaml.
+inputs:
+  args:
+    description: "CLI arguments, for example `affected --github-output`. Global flags such as `--cwd` and `--config` go here too."
+    required: true
+  token:
+    description: "Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run."
+    required: false
+    default: ${{ github.token }}
+outputs:
+  affected:
+    description: "JSON array of affected units, each with `id`, `path` and `reason`. Only set by `affected --github-output`."
+  affected-paths:
+    description: "Newline separated paths of the affected units. Only set by `affected --github-output`."
+  all:
+    description: "`true` when every unit is affected. Only set by `affected --github-output`."
+  base:
+    description: "The git ref the diff was computed against. Only set by `affected --github-output`."
+  base-source:
+    description: "How the base was resolved. Only set by `affected --github-output`."
+runs:
+  using: node24
+  main: dist/index.js

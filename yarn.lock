@@ -1173,6 +1173,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@octokit/plugin-request-log@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "@octokit/plugin-request-log@npm:6.0.0"
+  peerDependencies:
+    "@octokit/core": ">=6"
+  checksum: 10/8a79973b1429bfead9113c4117f418aaef5ff368795daded3415ba14623d97d5fc08d1e822dbd566ecc9f041119e1a48a11853a9c48d9eb1caa62baa79c17f83
+  languageName: node
+  linkType: hard
+
 "@octokit/plugin-rest-endpoint-methods@npm:13.3.2-cjs.1":
   version: 13.3.2-cjs.1
   resolution: "@octokit/plugin-rest-endpoint-methods@npm:13.3.2-cjs.1"
@@ -1249,6 +1258,18 @@ __metadata:
     "@octokit/plugin-request-log": "npm:^4.0.0"
     "@octokit/plugin-rest-endpoint-methods": "npm:13.3.2-cjs.1"
   checksum: 10/e0759fdbf18bc96f68299b4ca04d7102ce861e8508f01e9e580ed9c1e19d4cc20d150635161e360375f1c52c95e54bf6b56aaae16f943a93d6dcb38a51d8a23e
+  languageName: node
+  linkType: hard
+
+"@octokit/rest@npm:^22.0.1":
+  version: 22.0.1
+  resolution: "@octokit/rest@npm:22.0.1"
+  dependencies:
+    "@octokit/core": "npm:^7.0.6"
+    "@octokit/plugin-paginate-rest": "npm:^14.0.0"
+    "@octokit/plugin-request-log": "npm:^6.0.0"
+    "@octokit/plugin-rest-endpoint-methods": "npm:^17.0.0"
+  checksum: 10/ec2e94cfa8766716faeb3ca18527d9af746482d35aaa6e4265a30cb669ae3f31f4ebb6235edebe5ae62bc2cec2b8e88902584f698df2e7cabac3a15fd27da665
   languageName: node
   linkType: hard
 
@@ -1421,6 +1442,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@standard-schema/spec@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "@standard-schema/spec@npm:1.1.0"
+  checksum: 10/a209615c9e8b2ea535d7db0a5f6aa0f962fd4ab73ee86a46c100fb78116964af1f55a27c1794d4801e534a196794223daa25ff5135021e03c7828aa3d95e1763
+  languageName: node
+  linkType: hard
+
 "@stylistic/eslint-plugin@npm:^5.10.0":
   version: 5.10.0
   resolution: "@stylistic/eslint-plugin@npm:5.10.0"
@@ -1434,6 +1462,37 @@ __metadata:
   peerDependencies:
     eslint: ^9.0.0 || ^10.0.0
   checksum: 10/d55706b09a55defbc5afbfc251c4ecc0acfcbc3e741c34bec461365b399d2c9d89a6cafac069356ea03e231f3b12d5cc9550e66603ac343c29e07f2b2cd30464
+  languageName: node
+  linkType: hard
+
+"@tallyrelease/cli@npm:0.1.0-beta.3":
+  version: 0.1.0-beta.3
+  resolution: "@tallyrelease/cli@npm:0.1.0-beta.3"
+  dependencies:
+    "@octokit/rest": "npm:^22.0.1"
+    "@tallyrelease/core": "npm:^0.1.0-beta.2"
+    commander: "npm:^15.0.0"
+    tinyglobby: "npm:^0.2.17"
+    yaml: "npm:^2.9.1"
+    zod: "npm:^4.6.6"
+  bin:
+    tallyrelease: dist/bin.js
+  checksum: 10/a365032518bebfdcbd294af4ee7c9893cf39fcb83022a55f14a51dff7949a2d58561adba6f8019aff584b7b404137c5dd9481b24b0b6cb996e83fdce7a2d81c2
+  languageName: node
+  linkType: hard
+
+"@tallyrelease/core@npm:^0.1.0-beta.2":
+  version: 0.1.0-beta.3
+  resolution: "@tallyrelease/core@npm:0.1.0-beta.3"
+  dependencies:
+    "@standard-schema/spec": "npm:^1.1.0"
+    picomatch: "npm:^4.0.7"
+  peerDependencies:
+    vitest: ^5.0.3
+  peerDependenciesMeta:
+    vitest:
+      optional: true
+  checksum: 10/e382b5321cf07bad44c291d0671f11ec9a79e299151bd16959d7fa765b0e4fafbdd1f84e4673b3ce92bf6448c89aa1965e2439e8f7281cc75693f0405479b912
   languageName: node
   linkType: hard
 
@@ -2097,6 +2156,7 @@ __metadata:
     match-paths: "workspace:^"
     prettier: "npm:^3.9.9"
     run-release-please: "workspace:^"
+    run-tallyrelease: "workspace:^"
     setup-tools: "workspace:^"
   languageName: unknown
   linkType: soft
@@ -2374,6 +2434,13 @@ __metadata:
   version: 1.1.4
   resolution: "color-name@npm:1.1.4"
   checksum: 10/b0445859521eb4021cd0fb0cc1a75cecf67fceecae89b63f62b201cca8d345baf8b952c966862a9d9a2632987d4f6581f0ec8d957dfacece86f0a7919316f610
+  languageName: node
+  linkType: hard
+
+"commander@npm:^15.0.0":
+  version: 15.0.0
+  resolution: "commander@npm:15.0.0"
+  checksum: 10/a5dab1f5c3f1bf2ea19e8089f650f7fb65c3ed88e13ddde62e490d34b20057bcb2cd3de5b6ddc8aae93286083f8256ca0b812df842f574cbebe0e40f5b2f98f7
   languageName: node
   linkType: hard
 
@@ -4720,6 +4787,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"run-tallyrelease@workspace:^, run-tallyrelease@workspace:actions/run-tallyrelease":
+  version: 0.0.0-use.local
+  resolution: "run-tallyrelease@workspace:actions/run-tallyrelease"
+  dependencies:
+    "@abinnovision/eslint-config-base": "npm:^3.4.2"
+    "@abinnovision/prettier-config": "npm:^2.2.0"
+    "@actions/core": "npm:^3.0.1"
+    "@tallyrelease/cli": "npm:0.1.0-beta.3"
+    "@types/node": "npm:^26.6.5"
+    "@vercel/ncc": "npm:^0.45.0"
+    eslint: "npm:^10.12.0"
+    prettier: "npm:^3.9.9"
+    typescript: "npm:^6.0.3"
+  languageName: unknown
+  linkType: soft
+
 "semver@npm:2 || 3 || 4 || 5":
   version: 5.7.2
   resolution: "semver@npm:5.7.2"
@@ -5719,5 +5802,12 @@ __metadata:
   version: 0.1.0
   resolution: "yocto-queue@npm:0.1.0"
   checksum: 10/f77b3d8d00310def622123df93d4ee654fc6a0096182af8bd60679ddcdfb3474c56c6c7190817c84a2785648cdee9d721c0154eb45698c62176c322fb46fc700
+  languageName: node
+  linkType: hard
+
+"zod@npm:^4.6.6":
+  version: 4.6.7
+  resolution: "zod@npm:4.6.7"
+  checksum: 10/3ca8b8d6bb401538e59504c543db629ea7beaa775e504c3f22269b406fdffbf1431c856d59a597bf66d8487e4d2be12b03a55d76fc2c63d9f046eae1ca173bca
   languageName: node
   linkType: hard
