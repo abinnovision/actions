@@ -20,6 +20,9 @@
 		"actions/run-release-please": {
 			"extra-files": ["README.md"]
 		},
+		"actions/run-tallyrelease": {
+			"extra-files": ["README.md"]
+		},
 		"actions/setup-gcp": {
 			"extra-files": ["README.md"]
 		},

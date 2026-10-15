@@ -179,6 +179,11 @@ merging its release PR:
 `{commit-count}` counts the commits since the last release of the unit. Stable releases have `channel: ""`. `publish-npm`
 uses the channel as the dist-tag.
 
+With `build-selection: affected` (beta) on [app-stack](../../workflows/app-stack/README.md), a push to the default branch
+only prunes, packs and prereleases the units tallyrelease reports as affected since the last successful run, including
+units that depend on a changed unit. A push that changes `.release-please-manifest.json` selects all units, so stable
+releases always build. The repository needs a `tallyrelease.yaml`, and the caller needs the `actions: read` permission.
+
 ## Publishing
 
 Stacks do generic work only (prune, build, pack) and know no publish target. They upload payload artifacts and expose
