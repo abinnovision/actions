@@ -237,6 +237,7 @@ and the publish jobs must run in the same caller workflow.
 | `version`  | Released version without build metadata                                                             |
 | `channel`  | Prerelease channel, `""` for a stable release                                                       |
 | `sha`      | Short commit SHA                                                                                    |
+| `url`      | Optional. GitHub release URL, only for stable releases of units with their own GitHub release       |
 | `payloads` | Payloads that exist for the unit, may be `{}`: `source` and `dist`, each with `artifact` and `file` |
 
 Every released unit is listed. A unit gets `payloads.source` when it is a source unit and `payloads.dist` when it is a

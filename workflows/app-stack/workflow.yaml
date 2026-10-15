@@ -96,7 +96,7 @@ on:
         value: ${{ jobs.release.outputs.releases || '[]' }}
         description: |-
           Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.
-          Each entry: {schema: 1, name, path, version, channel, sha, payloads}. `name` is the directory basename, the repository name for the root unit `.`.
+          Each entry: {schema: 1, name, path, version, channel, sha, url?, payloads}. `url` is the GitHub release URL when the unit has its own release. `name` is the directory basename, the repository name for the root unit `.`.
           `payloads.source` is set for source units, `payloads.dist` for dist units.
           `[]` when nothing was released.
 
@@ -460,11 +460,12 @@ jobs:
               version: .value.packageVersion,
               channel: (if .value.type == "prerelease" then $channel else "" end),
               sha: .value.sha,
+              url: .value.url,
               payloads: (
                 (if $path | IN($source[].path) then {source: {artifact: "payload-source", file: "source.tar"}} else {} end)
                 + (if $path | IN($dist[].path) then {dist: {artifact: "payload-dist", file: "\($name).tgz"}} else {} end)
               )
-            }]' <<< "$VERSIONS")
+            } | if .url == null then del(.url) else . end]' <<< "$VERSIONS")
 
           echo "releases=$releases" >> "$GITHUB_OUTPUT"
           echo "Releases: $releases"

@@ -20,7 +20,8 @@ outputs:
   versions:
     description: |
       JSON object mapping released package paths to version info.
-      Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease", sha: "short sha"}.
+      Each entry: {version: "semver+sha", packageVersion: "clean semver", type: "release"|"prerelease", sha: "short sha", url?: "GitHub release URL"}.
+      `url` is set for packages with their own GitHub release, never for prereleases or linked siblings without one.
       Empty object {} when nothing was released or computed.
 runs:
   using: node24
