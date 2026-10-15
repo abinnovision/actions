@@ -37,6 +37,7 @@ release list. The shared contract (calling, naming, jobs, releases and the publi
 | Stack     | [iac-stack](./workflows/iac-stack/README.md)                   | OpenTofu root modules                                    |
 | Publisher | [publish-oci](./workflows/publish-oci/README.md)               | Container images and GitOps tag updates                  |
 | Publisher | [publish-npm](./workflows/publish-npm/README.md)               | npm packages                                             |
+| Publisher | [publish-linear](./workflows/publish-linear/README.md)         | Linear releases                                          |
 | Helper    | [gitops-update-tags](./workflows/gitops-update-tags/README.md) | Image tag updates in gitops repositories                 |
 
 ### Usage

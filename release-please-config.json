@@ -53,6 +53,9 @@
 		"workflows/polyglot-monorepo-stack": {
 			"extra-files": ["README.md"]
 		},
+		"workflows/publish-linear": {
+			"extra-files": ["README.md"]
+		},
 		"workflows/publish-npm": {
 			"extra-files": ["README.md"]
 		},
