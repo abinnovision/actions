@@ -405,8 +405,11 @@ jobs:
           GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
         run: tofu -chdir="$WORKING_DIR" plan -lock=false -no-color -input=false -out=tfplan
 
+      # Rendering can reject valid plans; the failure comment below covers it.
       - name: Comment plan on pull request
+        id: comment
         if: ${{ steps.plan.outcome == 'success' }}
+        continue-on-error: true
         uses: borchero/terraform-plan-comment@v3
         with:
           token: ${{ github.token }}
@@ -417,8 +420,9 @@ jobs:
 
       # Replaces the sticky plan comment so a stale plan is never shown as current.
       - name: Comment plan failure on pull request
-        if: ${{ !cancelled() && steps.plan.outcome == 'failure' }}
+        if: ${{ !cancelled() && (steps.plan.outcome == 'failure' || steps.comment.outcome == 'failure') }}
         env:
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -428,10 +432,17 @@ jobs:
           HEADER="## OpenTofu plan: \`$WORKING_DIR\`"
           export HEADER
 
+          if [[ "$PLAN_OUTCOME" == "failure" ]]; then
+            MESSAGE="**Plan failed**"
+          else
+            echo "::warning::The plan succeeded but could not be rendered as a comment"
+            MESSAGE="**Plan could not be rendered**"
+          fi
+
           {
             echo "$HEADER"
             echo
-            echo "**Plan failed** at \`${HEAD_SHA:0:7}\`, see the [workflow run]($RUN_URL)."
+            echo "$MESSAGE at \`${HEAD_SHA:0:7}\`, see the [workflow run]($RUN_URL)."
           } > body.md
 
           cat body.md >> "$GITHUB_STEP_SUMMARY"
