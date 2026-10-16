@@ -69,9 +69,35 @@ changing the repository or the forge. It reads release PRs, tags, merged pull re
       --summary
 ```
 
+`run --github-output` is the release entry point: it tags merged release PRs, creates the forge
+releases, updates the release PRs and sets the `plan` and `releases` outputs. The token needs
+`contents: write`, `pull-requests: write`, `issues: read` and `actions: read`. Tags and PRs created
+with `github.token` trigger no workflows, so pass an app token when release PRs need checks:
+
+```yaml
+- uses: actions/checkout@v6
+  with:
+    fetch-depth: 0
+    persist-credentials: false
+- id: tr
+  uses: abinnovision/actions@run-tallyrelease-v0 # x-release-please-major
+  with:
+    token: ${{ steps.app-token.outputs.token }}
+    args: |
+      run
+      --branch
+      main
+      --github-output
+      --summary
+- run: echo "$RELEASES" | jq .
+  env:
+    RELEASES: ${{ steps.tr.outputs.releases }}
+```
+
 A step output is limited to about 1 MB. For large repositories read `result-file` instead, or upload
-it with `actions/upload-artifact`. Keys written by the CLI's own `--github-output` still appear as
-step outputs, but they are not part of this action's contract.
+it with `actions/upload-artifact`. `plan` and `releases` are the outputs of `--github-output` this
+action declares; other keys the CLI writes (for example those of `affected --github-output`) still
+appear as step outputs, but they are not part of this action's contract.
 
 ## Usage
 
@@ -108,4 +134,6 @@ This action can be used with different version ranges. The following ranges are 
 | :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `result`      | The JSON document of `affected`, `plan`, `shadow` or `run`, as written by `--out`. Not set for other commands.                                     |
 | `result-file` | Path of the JSON document of `affected`, `plan`, `shadow` or `run`. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands. |
+| `plan`        | Path of the plan document. Written by `plan --github-output` and `run --github-output`.                                                            |
+| `releases`    | Compact JSON array of the releases and prereleases to publish. Written by `run --github-output`; see the CLI README for the entry fields.          |
 | `cli-version` | Version of the bundled `@tallyrelease/cli`.                                                                                                        |
