@@ -106,10 +106,12 @@ on:
         required: false
         default: "off"
         description: |-
-          (Beta) Runs tallyrelease next to release-please in the `Release plan` job, which never fails the pipeline.
-          **Valid values:** `off`, `shadow`
+          (Beta) Release tool mode.
+          **Valid values:** `off`, `shadow`, `release`
           **Default:** `off`
-          `shadow` runs `tallyrelease plan` on every run (artifact `tallyrelease-plan`) and, on push to the default branch, `tallyrelease shadow`, which compares tallyrelease with release-please on release merges (artifact `tallyrelease-shadow`), and a read-only release dry run, `tallyrelease run --dry-run` with a token broker read token (artifact `tallyrelease-run`). All write a step summary.
+          `off` releases with release-please.
+          `shadow` releases with release-please and runs tallyrelease next to it in the `Release plan` job, which never fails the pipeline: it runs `tallyrelease plan` on every run (artifact `tallyrelease-plan`) and, on push to the default branch, `tallyrelease shadow`, which compares tallyrelease with release-please on release merges (artifact `tallyrelease-shadow`), and a read-only release dry run, `tallyrelease run --dry-run` with a token broker read token (artifact `tallyrelease-run`). All write a step summary.
+          `release` releases with tallyrelease instead of release-please: the `Release` job runs `tallyrelease run` (release PRs, tags, GitHub releases) with a token broker token, a `Release build` job builds the payloads of releases whose commit is not the built commit, and the `Release plan` job only runs `tallyrelease plan`. `prerelease-channel` is ignored; channels come from `tallyrelease.yaml`.
           **Requires:** `tallyrelease.yaml` in the repository. No permissions beyond the ones listed in the README.
       shadow-issue:
         type: string
@@ -127,6 +129,7 @@ on:
           Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.
           Each entry: {schema: 1, name, path, version, channel, sha, url?, payloads}. `url` is the GitHub release URL when the unit has its own release. `name` is the directory basename, the repository name for the root unit `.`.
           `payloads.source` is set for source units, `payloads.dist` for dist units.
+          With `tallyrelease: release` entries also carry `catchUp`, `releaseSha` (full sha), `tag` and `tagPrefix`, and a release whose commit is not the built commit uses the payloads `payload-source-<sha>`/`payload-dist-<sha>` built by the `Release build` job.
           `[]` when nothing was released.
 
 permissions: {}
@@ -159,6 +162,10 @@ jobs:
       source-units: ${{ steps.select.outputs.source-units || steps.source-units.outputs.items }}
       dist-units: ${{ steps.select.outputs.dist-units || steps.dist-units.outputs.items }}
 
+      # All units, also with build-selection `affected`.
+      source-units-all: ${{ steps.source-units.outputs.items }}
+      dist-units-all: ${{ steps.dist-units.outputs.items }}
+
       # Paths of the affected units as a JSON array, `null` when all units are selected.
       affected-paths: ${{ steps.select.outputs.affected-paths }}
 
@@ -176,16 +183,16 @@ jobs:
             echo "::error::Invalid build-selection '$INPUT_BUILD_SELECTION'. Valid values: all, affected"
             exit 1
           fi
-          if [[ "$INPUT_TALLYRELEASE" != "off" && "$INPUT_TALLYRELEASE" != "shadow" ]]; then
-            echo "::error::Invalid tallyrelease '$INPUT_TALLYRELEASE'. Valid values: off, shadow"
+          if [[ "$INPUT_TALLYRELEASE" != "off" && "$INPUT_TALLYRELEASE" != "shadow" && "$INPUT_TALLYRELEASE" != "release" ]]; then
+            echo "::error::Invalid tallyrelease '$INPUT_TALLYRELEASE'. Valid values: off, shadow, release"
             exit 1
           fi
           if [[ -n "$INPUT_SHADOW_ISSUE" && ! "$INPUT_SHADOW_ISSUE" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Invalid shadow-issue '$INPUT_SHADOW_ISSUE'. Expected an issue number"
             exit 1
           fi
-          if [[ -n "$INPUT_SHADOW_ISSUE" && "$INPUT_TALLYRELEASE" == "off" ]]; then
-            echo "::warning::shadow-issue has no effect while tallyrelease is off"
+          if [[ -n "$INPUT_SHADOW_ISSUE" && "$INPUT_TALLYRELEASE" != "shadow" ]]; then
+            echo "::warning::shadow-issue has no effect unless tallyrelease is shadow"
           fi
 
       # Resolve the commit SHA and mode for this event.
@@ -356,6 +363,11 @@ jobs:
       packages: read
       actions: write
       id-token: write
+    # Read by the payload steps, which `Release build` shares.
+    env:
+      PAYLOAD_SOURCE_UNITS: ${{ needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units || '[]' }}
+      PAYLOAD_DIST_UNITS: ${{ needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units || '[]' }}
+      PAYLOAD_SUFFIX: ""
     steps:
       - &checkout-token
         id: checkout-token
@@ -378,19 +390,19 @@ jobs:
           submodules: ${{ inputs.checkout-submodules }}
           token: ${{ steps.checkout-token.outputs.token || github.token }}
           persist-credentials: false
-      - name: Setup Tools
+      - &setup-tools
+        name: Setup Tools
         uses: abinnovision/actions@setup-tools-dev
 
       # Runs before install and build so the pruned trees only contain tracked sources.
-      - name: Prune source units
-        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
-        env:
-          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
+      - &prune
+        name: Prune source units
+        if: env.PAYLOAD_SOURCE_UNITS != '[]'
         run: |
           set -euo pipefail
 
           # The root unit is not pruned, the payload already holds the whole tree.
-          units=$(jq -c '[.[] | select(.path != ".")]' <<< "$SOURCE_UNITS")
+          units=$(jq -c '[.[] | select(.path != ".")]' <<< "$PAYLOAD_SOURCE_UNITS")
 
           if [[ $(jq 'length' <<< "$units") -gt 0 ]]; then
             # Get turbo version from package.json (required to prune)
@@ -424,11 +436,12 @@ jobs:
           fi
           ls -lh "$RUNNER_TEMP/source.tar"
 
-      - name: Upload source payload
-        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.source-units != '[]'
+      - &upload-source
+        name: Upload source payload
+        if: env.PAYLOAD_SOURCE_UNITS != '[]'
         uses: actions/upload-artifact@v7
         with:
-          name: payload-source
+          name: payload-source${{ env.PAYLOAD_SUFFIX }}
           path: ${{ runner.temp }}/source.tar
           retention-days: 7
           if-no-files-found: error
@@ -449,7 +462,8 @@ jobs:
           if jq -e '.devDependencies.turbo // .dependencies.turbo' package.json > /dev/null; then
             yarn turbo boundaries || (echo "turbo boundaries failed" && exit 1)
           fi
-      - name: Build
+      - &build
+        name: Build
         run: yarn run build
       - name: Check
         run: yarn run check
@@ -458,23 +472,23 @@ jobs:
         run: yarn run test-unit
 
       # One version-free tarball per dist unit, named after the directory basename or, for the root, the repository.
-      - name: Pack dist units
-        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
-        env:
-          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+      - &pack
+        name: Pack dist units
+        if: env.PAYLOAD_DIST_UNITS != '[]'
         run: |
           set -euo pipefail
 
           mkdir -p "$RUNNER_TEMP/dist"
           while IFS=$'\t' read -r unit name; do
             (cd "$unit" && yarn pack --out "$RUNNER_TEMP/dist/$name.tgz")
-          done < <(jq -r '.[] | [.path, .name] | @tsv' <<< "$DIST_UNITS")
+          done < <(jq -r '.[] | [.path, .name] | @tsv' <<< "$PAYLOAD_DIST_UNITS")
 
-      - name: Upload dist payload
-        if: needs.configure.outputs.mode == 'main' && needs.configure.outputs.dist-units != '[]'
+      - &upload-dist
+        name: Upload dist payload
+        if: env.PAYLOAD_DIST_UNITS != '[]'
         uses: actions/upload-artifact@v7
         with:
-          name: payload-dist
+          name: payload-dist${{ env.PAYLOAD_SUFFIX }}
           path: ${{ runner.temp }}/dist
           retention-days: 7
           if-no-files-found: error
@@ -502,11 +516,9 @@ jobs:
     steps:
       - *checkout-token
       - *checkout
-      - name: Setup Tools
-        uses: abinnovision/actions@setup-tools-dev
+      - *setup-tools
       - *install
-      - name: Build
-        run: yarn run build
+      - *build
 
       # Requires test-* scripts in root package.json.
       - name: Run ${{ matrix.test-type }} tests
@@ -514,11 +526,12 @@ jobs:
           TEST_TYPE: ${{ matrix.test-type }}
         run: yarn run "test-$TEST_TYPE"
 
-  # Create releases with release-please and emit the release list (schema 1) with one entry per released unit.
+  # Create releases with release-please, or tallyrelease in `release` mode, and emit the release list (schema 1)
+  # with one entry per released unit.
   release:
     name: Release
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     needs:
       - configure
       - check
@@ -534,11 +547,14 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      releases: ${{ steps.releases.outputs.releases }}
-    # No checkout: release-please reads the repository through the GitHub API.
+      releases: ${{ steps.releases.outputs.releases || steps.tallyrelease-releases.outputs.releases }}
+      # Payloads to build at release commits other than the built commit, grouped by commit.
+      release-builds: ${{ steps.tallyrelease-releases.outputs.release-builds || '[]' }}
+    # release-please reads the repository through the GitHub API; tallyrelease needs the full history.
     steps:
       - id: token
         name: Exchange token for release
+        if: inputs.tallyrelease != 'release'
         uses: abinnovision/actions@exchange-github-token-dev
         with:
           broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
@@ -546,6 +562,7 @@ jobs:
 
       - id: release
         name: Run release-please
+        if: inputs.tallyrelease != 'release'
         uses: abinnovision/actions@run-release-please-dev
         with:
           token: ${{ steps.token.outputs.token }}
@@ -555,6 +572,7 @@ jobs:
       # `[]` when release-please released nothing. With build-selection `affected`, prereleases of unaffected units are dropped.
       - id: releases
         name: Write release list
+        if: inputs.tallyrelease != 'release'
         env:
           VERSIONS: ${{ steps.release.outputs.versions }}
           SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
@@ -589,7 +607,162 @@ jobs:
           echo "releases=$releases" >> "$GITHUB_OUTPUT"
           echo "Releases: $releases"
 
-  # Plans releases with tallyrelease and, on push to the default branch, compares them with release-please.
+      # Tags and history are read locally; the CLI pushes with the broker token.
+      - name: Checkout
+        if: inputs.tallyrelease == 'release'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: false
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: tallyrelease-token
+        name: Exchange token for tallyrelease
+        if: inputs.tallyrelease == 'release'
+        uses: abinnovision/actions@exchange-github-token-dev
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          scope: contents:write pull_requests:write issues:read actions:read
+
+      # Tags merged release PRs, creates the GitHub releases and updates the release PRs.
+      - id: tallyrelease
+        name: Run tallyrelease
+        if: inputs.tallyrelease == 'release'
+        uses: abinnovision/actions@run-tallyrelease-dev
+        with:
+          token: ${{ steps.tallyrelease-token.outputs.token }}
+          args: |
+            run
+            --branch
+            ${{ inputs.default-branch }}
+            --github-output
+            --summary
+
+      - name: Upload tallyrelease run
+        if: inputs.tallyrelease == 'release' && steps.tallyrelease.outputs.result-file != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: tallyrelease-run
+          path: ${{ steps.tallyrelease.outputs.result-file }}
+          retention-days: 7
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+      # Entries released at the built commit use the payloads of `check`, all others the payloads of `Release build`.
+      - id: tallyrelease-releases
+        name: Write release list (tallyrelease)
+        if: inputs.tallyrelease == 'release'
+        env:
+          RELEASES: ${{ steps.tallyrelease.outputs.releases }}
+          HEAD_SHA: ${{ needs.configure.outputs.commit-sha }}
+          SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
+          DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+          SOURCE_UNITS_ALL: ${{ needs.configure.outputs.source-units-all }}
+          DIST_UNITS_ALL: ${{ needs.configure.outputs.dist-units-all }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          releases=$(jq -c \
+            --arg head "$HEAD_SHA" \
+            --argjson source "$SOURCE_UNITS" \
+            --argjson dist "$DIST_UNITS" \
+            --argjson source_all "$SOURCE_UNITS_ALL" \
+            --argjson dist_all "$DIST_UNITS_ALL" \
+            --arg root "$REPOSITORY_NAME" \
+            --arg repo_url "$REPOSITORY_URL" \
+            '[.[] | .path as $path | (if $path == "." then $root else $path | split("/") | last end) as $name
+              | .releaseSha[0:7] as $sha | (.releaseSha == $head) as $at_head | {
+              schema: 1,
+              name: $name,
+              path: $path,
+              version: .version,
+              channel: (if .kind == "prerelease" then .channel // "" else "" end),
+              sha: $sha,
+              url: (if .kind == "release" then "\($repo_url)/releases/tag/\(.tag | split("/") | map(@uri) | join("/"))" else null end),
+              payloads: (
+                (if $path | IN($source_all[].path) then {source: {
+                  artifact: (if $at_head and ($path | IN($source[].path)) then "payload-source" else "payload-source-\($sha)" end),
+                  file: "source.tar"
+                }} else {} end)
+                + (if $path | IN($dist_all[].path) then {dist: {
+                  artifact: (if $at_head and ($path | IN($dist[].path)) then "payload-dist" else "payload-dist-\($sha)" end),
+                  file: "\($name).tgz"
+                }} else {} end)
+              ),
+              catchUp: .catchUp,
+              releaseSha: .releaseSha,
+              tag: .tag,
+              tagPrefix: .tagPrefix
+            } | if .url == null then del(.url) else . end]' <<< "${RELEASES:-[]}")
+
+          # Units whose payloads are not built at HEAD, grouped by release commit, in the shape of the unit lists.
+          release_builds=$(jq -c '
+            [.[] | select((.payloads.source.artifact // "payload-source") != "payload-source"
+              or (.payloads.dist.artifact // "payload-dist") != "payload-dist")]
+            | group_by(.releaseSha)
+            | map({
+              sha: .[0].releaseSha,
+              sha7: .[0].sha,
+              source: [.[] | select((.payloads.source.artifact // "payload-source") != "payload-source") | {path, name}] | unique_by(.path),
+              dist: [.[] | select((.payloads.dist.artifact // "payload-dist") != "payload-dist") | {path, name}] | unique_by(.path)
+            })' <<< "$releases")
+
+          {
+            echo "releases=$releases"
+            echo "release-builds=$release_builds"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releases: $releases"
+          echo "Release builds: $release_builds"
+
+  # Builds the payloads of releases at commits other than the built commit, for example a release whose run was
+  # cancelled or failed. Shares the payload steps with `check`; checks and tests do not run.
+  release-build:
+    name: "Release build: ${{ matrix.build.sha7 }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - configure
+      - release
+    # !cancelled() keeps the job from being skipped along with a skipped `Test`.
+    if: >-
+      !cancelled()
+      && needs.release.outputs.release-builds != ''
+      && needs.release.outputs.release-builds != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        build: ${{ fromJSON(needs.release.outputs.release-builds) }}
+    permissions:
+      contents: read
+      packages: read
+      actions: write
+      id-token: write
+    env:
+      PAYLOAD_SOURCE_UNITS: ${{ toJSON(matrix.build.source) }}
+      PAYLOAD_DIST_UNITS: ${{ toJSON(matrix.build.dist) }}
+      PAYLOAD_SUFFIX: -${{ matrix.build.sha7 }}
+    steps:
+      - *checkout-token
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.build.sha }}
+          submodules: ${{ inputs.checkout-submodules }}
+          token: ${{ steps.checkout-token.outputs.token || github.token }}
+          persist-credentials: false
+      - *setup-tools
+      - *prune
+      - *upload-source
+      - *install
+      - *build
+      - *pack
+      - *upload-dist
+
+  # Plans releases with tallyrelease; in shadow mode it also compares them with release-please on pushes to the default branch.
   # Observe only: every step may fail without failing the job, and `Status` does not need it.
   release-plan:
     name: Release plan
@@ -597,7 +770,7 @@ jobs:
     timeout-minutes: 10
     needs:
       - configure
-    if: inputs.tallyrelease == 'shadow' && needs.configure.outputs.mode != 'none'
+    if: inputs.tallyrelease != 'off' && needs.configure.outputs.mode != 'none'
     permissions:
       contents: read
       # Base lookup (last successful run) for plan on push.
@@ -643,7 +816,7 @@ jobs:
       # Skipped with W_SHADOW_SKIPPED unless the push changed the release-please manifest.
       - name: Shadow
         id: shadow
-        if: needs.configure.outputs.mode == 'main'
+        if: inputs.tallyrelease == 'shadow' && needs.configure.outputs.mode == 'main'
         continue-on-error: true
         uses: abinnovision/actions@run-tallyrelease-dev
         with:
@@ -713,7 +886,7 @@ jobs:
       # The job token cannot read issues and pull requests, so the dry run uses a read-only broker token.
       - id: dry-run-token
         name: Exchange token for the release dry run
-        if: needs.configure.outputs.mode == 'main'
+        if: inputs.tallyrelease == 'shadow' && needs.configure.outputs.mode == 'main'
         continue-on-error: true
         uses: abinnovision/actions@exchange-github-token-dev
         with:
@@ -751,7 +924,7 @@ jobs:
     name: Status
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [configure, check, test, release]
+    needs: [configure, check, test, release, release-build]
     if: always()
     permissions: {}
     steps:
