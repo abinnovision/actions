@@ -109,12 +109,12 @@ fixed. The workflow `name:` never appears in check contexts.
 
 ## Jobs
 
-| Job         | Runs                              | Does                                                                                                                                                                                                                                       |
-| :---------- | :-------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Configure` | Always                            | Resolves the event into `mode` and, for stacks with credentialed lanes, `trusted`; validates the inputs                                                                                                                                    |
+| Job         | Runs                              | Does                                                                                                                                                                                                                                                        |
+| :---------- | :-------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure` | Always                            | Resolves the event into `mode` and, for stacks with credentialed lanes, `trusted`; validates the inputs                                                                                                                                                     |
 | `Check`     | Always                            | Repository checks plus the static checks of the kind that need no credentials: `tofu fmt`, `validate` and optional `test` per root (iac), `kustomize build` with kubeconform and kube-score per application (gitops), `build`, `check` and unit tests (app) |
-| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, preview, deploy, plan, apply                                                                                                                                                                          |
-| `Status`    | Always                            | Fails when any other job failed or was cancelled                                                                                                                                                                                           |
+| Lanes       | Depending on `mode` and `trusted` | Stack specific: test, release, pack, preview, deploy, plan, apply                                                                                                                                                                                           |
+| `Status`    | Always                            | Fails when any other job failed or was cancelled                                                                                                                                                                                                            |
 
 - `mode` is `pr` for pull requests, `main` for pushes to the default branch and `none` otherwise.
 - `trusted` is `false` for pull requests from forks and from Dependabot. Lanes that need credentials are skipped for
@@ -198,6 +198,16 @@ the usual set. The repository needs a `tallyrelease.yaml`; the issue comment nee
 Rollout: enable it per repository with `tallyrelease: shadow`, first on `app-stack-dev`, then on the released major tag.
 The bundled CLI version changes only with a `run-tallyrelease` release and is recorded as `pin` in every shadow report.
 
+### Release mode (beta)
+
+With `tallyrelease: release` on [app-stack](../../workflows/app-stack/README.md#release-mode), tallyrelease replaces
+release-please: `Release` runs `tallyrelease run` with a token broker token
+(`contents:write pull_requests:write issues:read actions:read`), which tags merged release PRs, creates the GitHub
+releases and updates the release PRs. The release list carries the optional fields below. Releases whose commit is not
+the commit of the run (catch-ups after a cancelled or failed run) are built by one `Release build` job per commit into
+`payload-source-<sha>` and `payload-dist-<sha>`. The caller grants no new permissions; it must declare the
+workflow-level concurrency group, and the `tallyrelease: pending|released|stale` labels must exist.
+
 ## Publishing
 
 Stacks do generic work only (prune, build, pack) and know no publish target. They upload payload artifacts and expose
@@ -224,6 +234,10 @@ semantics.
 | :----- | :--------------- | :----------- | :------------------------------------------------------------------------------------------------------------------------------- |
 | source | `payload-source` | `source.tar` | Tracked source tree (including submodules) plus `out/<name>/` (`turbo prune --docker`) for every source unit except the root `.` |
 | dist   | `payload-dist`   | `<name>.tgz` | One `yarn pack` tarball per dist unit; yarn has replaced `workspace:` ranges                                                     |
+
+With `tallyrelease: release`, payloads of releases at another commit than the commit of the run are named
+`payload-source-<sha>` and `payload-dist-<sha>`, with the short SHA of that commit. Publishers read the artifact name from
+each entry.
 
 `<name>` is the directory basename; the stack rejects duplicate basenames within the source units or within the dist
 units. Payloads are version-free and kept for 7 days. Artifacts are only shared within one workflow run, so the stack
