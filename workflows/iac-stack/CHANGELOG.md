@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.3.2...iac-stack-source-v1.3.3) (2026-10-16)
+
+
+### Bug Fixes
+
+* **iac-stack:** keep plan job green when the plan comment cannot be rendered ([#700](https://github.com/abinnovision/actions/issues/700)) ([06fb123](https://github.com/abinnovision/actions/commit/06fb12320981a8ab585c30687dfbf7f1109981f9))
+
 ## [1.3.2](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.3.1...iac-stack-source-v1.3.2) (2026-10-14)
 
 
