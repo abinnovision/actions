@@ -3354,6 +3354,7 @@ __metadata:
     evaluate-event: "workspace:^"
     match-paths: "workspace:^"
     prettier: "npm:^3.9.9"
+    run-tallyrelease: "workspace:^"
     setup-oidc-token-cli: "workspace:^"
     setup-tools: "workspace:^"
   languageName: unknown

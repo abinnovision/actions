@@ -26,6 +26,7 @@
 	"dependencies": {
 		"evaluate-event": "workspace:^",
 		"match-paths": "workspace:^",
+		"run-tallyrelease": "workspace:^",
 		"setup-oidc-token-cli": "workspace:^",
 		"setup-tools": "workspace:^"
 	},

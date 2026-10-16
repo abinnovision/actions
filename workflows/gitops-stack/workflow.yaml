@@ -177,9 +177,9 @@ jobs:
       # Whether credentialed jobs may run: false for fork and Dependabot pull requests.
       trusted: ${{ steps.event.outputs.trusted }}
 
-      # Applications with an `.argocd-app` file as a compact JSON array of {path, name, content, prune}, where
-      # `content` is the ArgoCD application name.
-      applications: ${{ steps.prune.outputs.items }}
+      # Applications that get a `Preview` job as a compact JSON array of {path, name, content, prune}, where
+      # `content` is the ArgoCD application name. On trusted pull requests only the affected applications.
+      previews: ${{ steps.preview.outputs.items }}
 
       # Applications matching `deploy-applications`, in the same format.
       deployments: ${{ steps.deploy.outputs.items }}
@@ -193,11 +193,13 @@ jobs:
           default-branch: ${{ inputs.default-branch }}
 
       # Check out the root files of the resolved commit only; blobs are fetched on demand, so the
-      # credentials stay for reading the `.argocd-app` files.
+      # credentials stay for reading the `.argocd-app` files. Trusted pull requests fetch the full history
+      # for `tallyrelease affected`.
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: ${{ steps.event.outputs.commit-sha }}
+          fetch-depth: ${{ steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true' && '0' || '1' }}
           filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
@@ -242,13 +244,73 @@ jobs:
         if: steps.deploy.outputs.items == '[]' && steps.prune.outputs.items != '[]'
         run: echo "::warning::No application matches deploy-applications, nothing is deployed"
 
+      # `tallyrelease affected` reads the kustomizations from the working tree.
+      - name: Disable sparse checkout
+        if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
+        run: git sparse-checkout disable
+
+      # The repository's `tallyrelease.yaml`, else a config with the kustomize plugin only.
+      - name: Resolve tallyrelease config
+        id: tallyrelease-config
+        if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
+        run: |
+          if [[ -f tallyrelease.yaml ]]; then
+            echo "file=tallyrelease.yaml" >> "$GITHUB_OUTPUT"
+          else
+            printf 'plugins:\n  kustomize: {}\n' > "$RUNNER_TEMP/tallyrelease.yaml"
+            echo "file=$RUNNER_TEMP/tallyrelease.yaml" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Units changed by the pull request, including those that reference a changed unit.
+      - name: Find affected units
+        id: affected
+        if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
+        uses: abinnovision/actions@run-tallyrelease-dev
+        with:
+          args: |
+            affected
+            --config
+            ${{ steps.tallyrelease-config.outputs.file }}
+
+      # Applications containing an affected unit. Applications without a kustomization are not units, so they are
+      # always previewed.
+      - name: Select previewed applications
+        id: preview
+        env:
+          APPLICATIONS: ${{ steps.prune.outputs.items }}
+          RESULT: ${{ steps.affected.outputs.result }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$RESULT" || "$(jq -r '.build.all' <<< "$RESULT")" == "true" ]]; then
+            echo "items=$APPLICATIONS" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          unresolved=$(jq -r '.[].path' <<< "$APPLICATIONS" | while IFS= read -r path; do
+            [[ -f "$path/kustomization.yaml" || -f "$path/kustomization.yml" || -f "$path/Kustomization" ]] || echo "$path"
+          done | jq -Rsc 'split("\n") | map(select(. != ""))')
+
+          items=$(jq -c \
+            --argjson units "$(jq -c '[.units[].path]' <<< "$RESULT")" \
+            --argjson unresolved "$unresolved" \
+            '[.[] | select(.path as $p | ($p | IN($unresolved[])) or any($units[]; . == $p or startswith($p + "/")))]' \
+            <<< "$APPLICATIONS")
+
+          skipped=$(jq -r --argjson items "$items" '[.[] | select(.path | IN($items[].path) | not) | .name] | join(", ")' <<< "$APPLICATIONS")
+          if [[ -n "$skipped" ]]; then
+            echo "::notice::Not affected, no preview: $skipped"
+          fi
+
+          echo "items=$items" >> "$GITHUB_OUTPUT"
+
       # The ArgoCD and DEX settings are only needed when a credentialed lane has applications to run.
       - name: Validate config
         env:
           MODE: ${{ steps.event.outputs.mode }}
           TRUSTED: ${{ steps.event.outputs.trusted }}
-          # Preview runs every application, Deploy only those matching `deploy-applications`.
-          APPLICATIONS: ${{ steps.event.outputs.mode == 'main' && steps.deploy.outputs.items || steps.prune.outputs.items }}
+          # Preview runs the affected applications, Deploy only those matching `deploy-applications`.
+          APPLICATIONS: ${{ steps.event.outputs.mode == 'main' && steps.deploy.outputs.items || steps.preview.outputs.items }}
           ARGOCD_SERVER: ${{ inputs.argocd-server || vars.ARGOCD_CORE_SERVER }}
           DEX_ENDPOINT: ${{ inputs.dex-endpoint || vars.DEX_CORE_ENDPOINT }}
           DEX_CLIENT_ID: ${{ inputs.dex-client-id || vars.DEX_CORE_GITHUB_ACTIONS_CLIENT }}
@@ -398,11 +460,11 @@ jobs:
     needs:
       - configure
       - check
-    if: needs.configure.outputs.mode == 'pr' && needs.configure.outputs.trusted == 'true' && needs.configure.outputs.applications != '[]'
+    if: needs.configure.outputs.mode == 'pr' && needs.configure.outputs.trusted == 'true' && needs.configure.outputs.previews != '[]'
     strategy:
       fail-fast: false
       matrix:
-        application: ${{ fromJSON(needs.configure.outputs.applications) }}
+        application: ${{ fromJSON(needs.configure.outputs.previews) }}
     permissions:
       contents: read
       id-token: write
