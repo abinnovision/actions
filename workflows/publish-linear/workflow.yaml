@@ -35,6 +35,14 @@ on:
           pipeline per unit. When `false`, all commits are scanned, unless the pipeline in Linear has a path filter.
           **Default:** `false`
 
+      maintenance:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Also sync entries of maintenance lines (`line: maintenance`). Entries without `line` are always synced.
+          **Default:** `false`
+
       dry-run:
         type: boolean
         required: false
@@ -66,6 +74,7 @@ jobs:
         env:
           RELEASES: ${{ inputs.releases }}
           LINEAR_ACCESS_KEYS: ${{ secrets.LINEAR_ACCESS_KEYS }}
+          INPUT_MAINTENANCE: ${{ inputs.maintenance }}
         run: |
           set -euo pipefail
 
@@ -90,7 +99,7 @@ jobs:
           fi
 
           # Converts a directory pattern into an anchored regex: `*` matches one segment that does not start with a dot.
-          groups=$(jq -c '
+          groups=$(jq -c --argjson maintenance "$INPUT_MAINTENANCE" '
             def pattern_regex:
               if . == "." then "^\\.$"
               else "^" + (split("*") | map(gsub("(?<c>[.+?^$()\\[\\]{}|\\\\])"; "\\\(.c)")) | join("[^/.][^/]*")) + "$"
@@ -110,16 +119,16 @@ jobs:
             | ($lines | map({(.key): .line}) | reverse | add // {}) as $first
 
             # Entries with `releaseSha` (tallyrelease) may list several releases of a unit; the highest version wins.
-            | [.[] | select(.channel == "")]
+            | [.[] | select(.channel == "" and ($maintenance or .line != "maintenance"))]
             | (map(select(.releaseSha)) | group_by(.path) | map(max_by(.version | split(".") | map(tonumber? // .))))
               as $newest
             | [.[] | select(.releaseSha == null or IN($newest[]; .)) | . as $entry
                 | ($lines | map(select(. as $line | $entry.path | test($line.regex))) | first) as $match
                 | select($match != null)
-                | $entry + {line: $first[$match.key]}]
-            | group_by(.line)
+                | $entry + {keyLine: $first[$match.key]}]
+            | group_by(.keyLine)
             | map({
-                line: .[0].line,
+                keyLine: .[0].keyLine,
                 name: (map(.name) | join(", ")),
                 version: .[0].version,
                 versions: (map(.version) | unique),
@@ -179,14 +188,14 @@ jobs:
       - name: Resolve settings
         id: key
         env:
-          LINE: ${{ matrix.group.line }}
+          KEY_LINE: ${{ matrix.group.keyLine }}
           LINKS: ${{ matrix.group.links }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LINEAR_ACCESS_KEYS: ${{ secrets.LINEAR_ACCESS_KEYS }}
         run: |
           set -euo pipefail
 
-          key=$(jq -rn --argjson line "$LINE" '
+          key=$(jq -rn --argjson line "$KEY_LINE" '
             $ENV.LINEAR_ACCESS_KEYS | split("\n") | map(gsub("^\\s+|\\s+$"; ""))
             | .[$line] | capture("^[^,]+,(?<key>.+)$").key | gsub("^\\s+"; "")
           ')

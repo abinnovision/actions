@@ -11,6 +11,7 @@ The release list is the `releases` output of a stack, see the
 
 - Skips all work when `releases` is empty, `[]` or no stable entry matches a `LINEAR_ACCESS_KEYS` line
 - Ignores prereleases (entries with a non-empty `channel`)
+- Ignores maintenance releases (`line: maintenance`) unless `maintenance: true`; entries without `line` are synced
 - Keeps only the highest version per `path` among entries with `releaseSha` (lists from tallyrelease, which can hold
   several releases of a unit); entries without `releaseSha` are used as listed
 - Assigns each entry the first `LINEAR_ACCESS_KEYS` line whose pattern matches its `path`
@@ -108,6 +109,7 @@ jobs:
 | :------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :------ |
 | `releases`    | Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.<br>Stable entries (empty `channel`) are synced to Linear; prereleases are ignored.<br>An empty string or `[]` skips all work.<br>**Example:** `needs.ci.outputs.releases` | Yes      |         |
 | `scope-paths` | Only scan commits that touch the paths of the released entries (`<path>/**`), for repositories with one<br>pipeline per unit. When `false`, all commits are scanned, unless the pipeline in Linear has a path filter.<br>**Default:** `false`                   | No       | _empty_ |
+| `maintenance` | Also sync entries of maintenance lines (`line: maintenance`). Entries without `line` are always synced.<br>**Default:** `false`                                                                                                                                 | No       | _empty_ |
 | `dry-run`     | Scan commits and log the changes without creating or updating releases in Linear.<br>**Default:** `false`                                                                                                                                                       | No       | _empty_ |
 
 ## Secrets
