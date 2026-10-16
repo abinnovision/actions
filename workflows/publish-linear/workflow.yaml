@@ -109,7 +109,11 @@ jobs:
             # Lines holding the same key share the index of its first line.
             | ($lines | map({(.key): .line}) | reverse | add // {}) as $first
 
-            | [.[] | select(.channel == "") | . as $entry
+            # Entries with `releaseSha` (tallyrelease) may list several releases of a unit; the highest version wins.
+            | [.[] | select(.channel == "")]
+            | (map(select(.releaseSha)) | group_by(.path) | map(max_by(.version | split(".") | map(tonumber? // .))))
+              as $newest
+            | [.[] | select(.releaseSha == null or IN($newest[]; .)) | . as $entry
                 | ($lines | map(select(. as $line | $entry.path | test($line.regex))) | first) as $match
                 | select($match != null)
                 | $entry + {line: $first[$match.key]}]
@@ -121,8 +125,13 @@ jobs:
                 versions: (map(.version) | unique),
                 "include-paths": (if any(.path == ".") then "" else map("\(.path)/**") | join(",") end),
                 links: (map(select(.url) | "\(.name) v\(.version)=\(.url)") | join("\n"))
-              })
+              } + (map(.name) as $names | map(.releaseSha) | unique
+                | if length == 1 and .[0] != null then {ref: .[0]}
+                  elif any(. != null) then {warning: "Entries \($names | join(", ")) have different release commits, scanning up to the commit of the run"}
+                  else {} end))
           ' <<< "$RELEASES")
+
+          jq -r '.[] | select(.warning) | "::warning::\(.warning)"' <<< "$groups"
 
           errors=$(jq -r '
             .[] | select(.versions | length > 1)
@@ -158,10 +167,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      # The CLI scans the history between the previous release of the pipeline and HEAD.
+      # The CLI scans the history between the previous release of the pipeline and HEAD. HEAD is the shared release
+      # commit of the group when its entries carry one, else the commit of the run.
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ matrix.group.ref }}
           fetch-depth: 0
           persist-credentials: false
 
