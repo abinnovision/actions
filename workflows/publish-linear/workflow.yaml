@@ -125,8 +125,13 @@ jobs:
                 versions: (map(.version) | unique),
                 "include-paths": (if any(.path == ".") then "" else map("\(.path)/**") | join(",") end),
                 links: (map(select(.url) | "\(.name) v\(.version)=\(.url)") | join("\n"))
-              } + (map(.releaseSha) | unique | if length == 1 and .[0] != null then {ref: .[0]} else {} end))
+              } + (map(.name) as $names | map(.releaseSha) | unique
+                | if length == 1 and .[0] != null then {ref: .[0]}
+                  elif any(. != null) then {warning: "Entries \($names | join(", ")) have different release commits, scanning up to the commit of the run"}
+                  else {} end))
           ' <<< "$RELEASES")
+
+          jq -r '.[] | select(.warning) | "::warning::\(.warning)"' <<< "$groups"
 
           errors=$(jq -r '
             .[] | select(.versions | length > 1)

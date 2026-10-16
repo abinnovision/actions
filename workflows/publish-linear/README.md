@@ -21,9 +21,9 @@ The release list is the `releases` output of a stack, see the
   versions
 - Links the GitHub release of every entry that has a `url`, plus the workflow run
 - Scans up to the `releaseSha` shared by all entries of a group, so a catch-up release does not collect later commits;
-  otherwise up to the commit of the run
-- Re-running a synced list ends green: at the release commit of an existing version the scan range is empty and the
-  Linear CLI skips the sync
+  otherwise up to the commit of the run, with a warning when the entries have different release commits
+- Re-running a synced list is expected to end green: at the release commit of an existing version the scan range is
+  empty and the Linear CLI skips the sync (not yet verified against Linear)
 
 ## Pipelines
 
