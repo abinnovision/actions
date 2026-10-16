@@ -112,6 +112,7 @@ on:
           `off` releases with release-please.
           `shadow` releases with release-please and runs tallyrelease next to it in the `Release plan` job, which never fails the pipeline: it runs `tallyrelease plan` on every run (artifact `tallyrelease-plan`) and, on push to the default branch, `tallyrelease shadow`, which compares tallyrelease with release-please on release merges (artifact `tallyrelease-shadow`), and a read-only release dry run, `tallyrelease run --dry-run` with a token broker read token (artifact `tallyrelease-run`). All write a step summary.
           `release` releases with tallyrelease instead of release-please: the `Release` job runs `tallyrelease run` (release PRs, tags, GitHub releases) with a token broker token, a `Release build` job builds the payloads of releases whose commit is not the built commit, and the `Release plan` job only runs `tallyrelease plan`. `prerelease-channel` is ignored; channels come from `tallyrelease.yaml`.
+          Every branch push releases like a push to the default branch, for the branch pushed: a branch with a line rule in `tallyrelease.yaml`, such as a maintenance line, releases on it, any other branch releases nothing. Pull requests plan for their base branch.
           **Requires:** `tallyrelease.yaml` in the repository. No permissions beyond the ones listed in the README.
       shadow-issue:
         type: string
@@ -129,7 +130,7 @@ on:
           Release list (schema 1), a compact JSON array with one entry per released unit, for publish workflows such as `publish-oci` and `publish-npm`.
           Each entry: {schema: 1, name, path, version, channel, sha, url?, payloads}. `url` is the GitHub release URL when the unit has its own release. `name` is the directory basename, the repository name for the root unit `.`.
           `payloads.source` is set for source units, `payloads.dist` for dist units.
-          With `tallyrelease: release` entries also carry `catchUp`, `releaseSha` (full sha), `tag` and `tagPrefix`, and a release whose commit is not the built commit uses the payloads `payload-source-<sha>`/`payload-dist-<sha>` built by the `Release build` job.
+          With `tallyrelease: release` entries also carry `catchUp`, `line` (`default` or `maintenance`), `releaseSha` (full sha), `tag` and `tagPrefix`, and a release whose commit is not the built commit uses the payloads `payload-source-<sha>`/`payload-dist-<sha>` built by the `Release build` job.
           `[]` when nothing was released.
 
 permissions: {}
@@ -154,8 +155,11 @@ jobs:
       # Commit SHA to check out.
       commit-sha: ${{ steps.event.outputs.commit-sha }}
 
-      # Pipeline mode (pr, main or none).
-      mode: ${{ steps.event.outputs.mode }}
+      # Pipeline mode (pr, main or none). With tallyrelease `release` every branch push is `main`.
+      mode: ${{ steps.mode.outputs.mode }}
+
+      # Branch tallyrelease plans and releases for.
+      branch: ${{ steps.mode.outputs.branch }}
 
       # Units as compact JSON arrays of {path, name}, path `.` for the repository root.
       # With build-selection `affected` on the default branch they only hold the affected units.
@@ -202,6 +206,34 @@ jobs:
         with:
           default-branch: ${{ inputs.default-branch }}
 
+      # tallyrelease `release` releases every branch with a line rule in tallyrelease.yaml; pull requests plan for their base.
+      - name: Resolve mode
+        id: mode
+        env:
+          MODE: ${{ steps.event.outputs.mode }}
+          INPUT_TALLYRELEASE: ${{ inputs.tallyrelease }}
+          INPUT_DEFAULT_BRANCH: ${{ inputs.default-branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          branch="$INPUT_DEFAULT_BRANCH"
+          if [[ "$INPUT_TALLYRELEASE" == "release" ]]; then
+            if [[ "$EVENT_NAME" == "push" && "$GITHUB_REF" == refs/heads/* ]]; then
+              MODE=main
+              branch="$GITHUB_REF_NAME"
+            elif [[ "$EVENT_NAME" == "pull_request" && -n "$BASE_REF" ]]; then
+              branch="$BASE_REF"
+            fi
+          fi
+
+          echo "Mode: $MODE, branch: $branch"
+          {
+            echo "mode=$MODE"
+            echo "branch=$branch"
+          } >> "$GITHUB_OUTPUT"
+
       # Check out the root files of the resolved commit only; unit discovery reads the git tree.
       - name: Checkout
         uses: actions/checkout@v7
@@ -246,7 +278,7 @@ jobs:
 
       # tallyrelease reads every unit's package.json, so the sparse tree is replaced by the full history.
       - name: Checkout full history
-        if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
+        if: inputs.build-selection == 'affected' && steps.mode.outputs.mode == 'main'
         uses: actions/checkout@v7
         with:
           ref: ${{ steps.event.outputs.commit-sha }}
@@ -255,12 +287,12 @@ jobs:
           filter: blob:none
 
       - name: Disable sparse checkout
-        if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
+        if: inputs.build-selection == 'affected' && steps.mode.outputs.mode == 'main'
         run: git sparse-checkout disable
 
       - name: Find affected units
         id: affected
-        if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
+        if: inputs.build-selection == 'affected' && steps.mode.outputs.mode == 'main'
         uses: abinnovision/actions@run-tallyrelease-dev
         with:
           args: affected
@@ -268,7 +300,7 @@ jobs:
       # A push that changes the release-please manifest releases units, which must all be built.
       - name: Select units
         id: select
-        if: inputs.build-selection == 'affected' && steps.event.outputs.mode == 'main'
+        if: inputs.build-selection == 'affected' && steps.mode.outputs.mode == 'main'
         env:
           RESULT: ${{ steps.affected.outputs.result }}
           SOURCE_UNITS: ${{ steps.source-units.outputs.items }}
@@ -536,7 +568,7 @@ jobs:
       - configure
       - check
       - test
-    # Only on push to the default branch, after a successful check and a successful or skipped test job.
+    # Only on push to the default branch (any branch with tallyrelease `release`), after a successful check and a successful or skipped test job.
     # always() prevents skipping when the test job is skipped.
     if: >-
       always()
@@ -635,7 +667,7 @@ jobs:
           args: |
             run
             --branch
-            ${{ inputs.default-branch }}
+            ${{ needs.configure.outputs.branch }}
             --github-output
             --summary
 
@@ -694,6 +726,7 @@ jobs:
                 }} else {} end)
               ),
               catchUp: .catchUp,
+              line: .line,
               releaseSha: .releaseSha,
               tag: .tag,
               tagPrefix: .tagPrefix
@@ -789,7 +822,7 @@ jobs:
           fetch-depth: 0
           filter: blob:none
 
-      # Plans for the default branch on pull requests too, so reviewers see what merging would release.
+      # Plans for the target branch on pull requests too, so reviewers see what merging would release.
       - name: Plan
         id: plan
         continue-on-error: true
@@ -798,7 +831,7 @@ jobs:
           args: |
             plan
             --branch
-            ${{ inputs.default-branch }}
+            ${{ needs.configure.outputs.branch }}
             --all
             --summary
 

@@ -14,9 +14,9 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 | Job         | Runs                                                       | Does                                                                                                                            |
 | :---------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
 | `Configure` | Always                                                     | Resolves the commit and mode,             validates the Makefile if present, resolves the units, discovers test types          |
-| `Check`     | Always                                                     | Install, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also prunes the source units and packs the dist units |
+| `Check`     | Always                                                     | Install, dependency checks, `build`, `check` and unit tests; on push to `default-branch` (or any branch with `tallyrelease: release`) also prunes the source units and packs the dist units |
 | `Test`      | One job per test type not already covered by `Check`       | Install, `build` and `test-<type>`                                                                                              |
-| `Release`   | Push to `default-branch`, after `Check` and `Test` | Runs release-please (or tallyrelease with `tallyrelease: release`), which creates or lands release PRs and creates the releases, then writes the `releases` list |
+| `Release`   | Push to `default-branch` (any branch with `tallyrelease: release`), after `Check` and `Test` | Runs release-please (or tallyrelease with `tallyrelease: release`), which creates or lands release PRs and creates the releases, then writes the `releases` list |
 | `Release build` | With `tallyrelease: release`, one job per release commit other than the built commit | Builds the payloads of those releases, see [Release mode](#release-mode) |
 | `Release plan` | With `tallyrelease: shadow` or `release` | Runs `tallyrelease plan` and, with `shadow` on push to `default-branch`, `tallyrelease shadow` and a release dry run, see [tallyrelease](#tallyrelease-beta). Never fails |
 | `Status`    | Always | Single required status check, fails when any other job failed or was cancelled |
@@ -176,9 +176,10 @@ needs a matching `test-<type>` script, so enabling `test-types: unit,integration
 | `pull_request`               | `Configure`, `Check`, `Test`               | Read/write in the PR scope, restores from the default branch       |
 | `merge_group`                | `Configure`, `Check`, `Test`               | Read/write in the queue scope, restores from the default branch    |
 | `push` to the default branch | everything, including `Release` | Read/write in the default branch scope, the cache PRs restore from |
+| `push` to another branch     | `Configure`, `Check`, `Test`; with `tallyrelease: release` everything, see [Maintenance lines](#maintenance-lines) | Read/write in the branch scope |
 | `pull_request_target`        | Nothing, `Configure` fails                 |                                                                    |
 
-Releasing and packing are gated inside the workflow on `push` to `default-branch`, so a pull request
+Releasing and packing are gated inside the workflow on `push` to `default-branch` (or any branch with `tallyrelease: release`), so a pull request
 can never reach them.
 
 `merge_group` is optional and only fires when a merge queue is enabled on the branch. If you use
@@ -388,7 +389,7 @@ CLI's `releases` output (artifact `tallyrelease-run`). The token comes from the 
 repository. The caller grants no new permissions. tallyrelease creates the labels `tallyrelease: pending`,
 `tallyrelease: released` and `tallyrelease: stale` when they are missing; creating them up front is recommended.
 
-- Releases happen on the default branch only. Maintenance lines need a caller that runs `tallyrelease run` itself
+- Every branch push releases for the branch pushed, see [Maintenance lines](#maintenance-lines)
 - The caller must declare the workflow-level concurrency group shown in [Concurrency](#concurrency). The stack adds no
   job-level concurrency
 - `prerelease-channel` is ignored; channels come from the branches in `tallyrelease.yaml`. The
@@ -412,6 +413,36 @@ a run is stuck on a tallyrelease error (`E_BASE_REQUIRED`, `E_TAG_EXISTS`, `E_PU
 with:
   tallyrelease: release
 ```
+
+### Maintenance lines
+
+In release mode every branch push packs the payloads and runs `tallyrelease run --branch <branch>`, and `Release plan`
+plans pull requests for their base branch. Branch rules live in `tallyrelease.yaml`: a branch with `line: maintenance`
+releases on its line, `unit:` or `group:` names what the line releases for the absolute version check. A branch without a
+line rule releases nothing: tallyrelease warns `W_EFFECT_SKIPPED`, the `releases` list is `[]` and the run stays green.
+
+```yaml
+# tallyrelease.yaml
+branches:
+  - { name: main, line: default }
+  - { name: "release/{major}.x", line: maintenance, unit: lib }
+```
+
+Add the maintenance patterns to both triggers of the caller:
+
+```yaml
+on:
+  pull_request:
+    branches: [main, "release/**"]
+  push:
+    branches: [main, "release/**"]
+```
+
+- A maintenance release gets a GitHub release that is not marked latest. `publish-npm` publishes it with the dist-tag
+  `backport` and `publish-oci` pushes `<version>` without `latest` and does not dispatch GitOps, since a higher version
+  is tagged. `publish-linear` skips it unless `maintenance: true`
+- Rulesets on `release/**` must allow merging the release PRs, like on the default branch
+- Keep `push.branches` limited to the default branch and the maintenance patterns, since every push in release mode is a release run
 
 ## Inputs
 
