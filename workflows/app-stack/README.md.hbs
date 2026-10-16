@@ -386,7 +386,7 @@ With `tallyrelease: release`, tallyrelease owns versions and release-please does
 it tags merged release PRs, creates the GitHub releases, updates the release PRs and writes the `releases` list from the
 CLI's `releases` output (artifact `tallyrelease-run`). The token comes from the token broker with
 `contents:write pull_requests:write issues:read actions:read`, so the broker's GitHub App needs these permissions on the
-repository. The caller grants no new permissions. tallyrelease creates the labels `tallyrelease: pending`,
+repository. Release PR commits are authored by that App (`<app>[bot]`). The caller grants no new permissions. tallyrelease creates the labels `tallyrelease: pending`,
 `tallyrelease: released` and `tallyrelease: stale` when they are missing; creating them up front is recommended.
 
 - Every branch push releases for the branch pushed, see [Maintenance lines](#maintenance-lines)
