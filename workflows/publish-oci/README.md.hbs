@@ -13,8 +13,8 @@ the entries whose `path` matches `include`.
 
 | Job              | Runs                                                  | Does                                                                            |
 | :--------------- | :---------------------------------------------------- | :------------------------------------------------------------------------------ |
-| `Prepare`        | Once, unless `releases` is empty or `[]`              | Selects the entries matching `include`, validates them and the configuration    |
-| `<name>`         | Once per selected entry                               | Extracts the payload, builds and pushes the image, writes an image summary      |
+| `Prepare`        | Once, unless `releases` is empty or `[]`              | Selects the entries matching `include`, validates them and the configuration, decides `latest` and dispatch |
+| `<name>`         | Once per selected entry                               | Extracts the payload, builds and pushes the image unless it exists, writes an image summary |
 | `GitOps Updates` | When `gitops-routes` or `gitops-config` is set and no image build failed | Dispatches one `gitops-workflow-file` run per target repository and application |
 
 - `include` holds directory patterns, one per line; `*` matches exactly one path segment and
@@ -57,7 +57,31 @@ the entries whose `path` matches `include`.
 | GitHub Container Registry | `ghcr.io/<owner>/<image>` |
 
 Tags: `sha-<sha>`, `<version>` (semver) and `release-<version>` for a stable release (empty
-`channel`) or `prerelease-<version>` otherwise. Images get SBOM attestations.
+`channel`) or `prerelease-<version>` otherwise, plus `latest` as described in
+[Releases from tallyrelease](#releases-from-tallyrelease). Images get SBOM attestations.
+
+## Releases from tallyrelease
+
+Entries with `releaseSha` come from tallyrelease. `Prepare` reads the repository's git tags with the
+workflow `GITHUB_TOKEN` (`contents: read`) and decides per entry:
+
+| Entry                           | `latest`                                   | GitOps dispatch                                                     |
+| :------------------------------ | :----------------------------------------- | :------------------------------------------------------------------ |
+| Without `releaseSha`            | Every stable semver version                | Always                                                              |
+| Stable, with `tagPrefix`        | When no higher `<tagPrefix>X.Y.Z` is tagged | When no higher `<tagPrefix>X.Y.Z` is tagged                         |
+| Stable, `tagPrefix` is `null`   | Yes                                        | Always                                                              |
+| Prerelease (`channel` set)      | No                                         | On the first run attempt, or when `releaseSha` is the branch tip |
+
+- The git rule applies to every string `tagPrefix`, also `""`. Tags with a prerelease, floating tags such as
+  `web-v1` and other names starting with the prefix are ignored. When no tag matches, the entry is treated as the
+  newest with a warning
+- A catch-up list with an older and a newer version of one unit pushes both images, and only the newer one gets
+  `latest` and is dispatched
+- Before building, each entry with `releaseSha` checks `<image>:<version>` in every configured registry. When all
+  have it, build and push are skipped (`skipped (exists)` in the summary) and the leg succeeds; when only some have
+  it, the image is built and pushed to all. A re-run therefore dispatches again under the rules above
+- `GitOps Updates` decides dispatch again with the same rules, so "Re-run failed jobs" also applies them to the current
+  tags, branch tip and run attempt
 
 ## Caches
 
@@ -105,7 +129,7 @@ This is a `workflow_call` workflow. Call it after the stack job that produced th
 ### Example Workflow File
 
 The calling job needs `id-token: write` (GCP and token broker), `packages: write` (GHCR),
-`actions: write` (turbo cache) and `contents: read`.
+`actions: write` (turbo cache) and `contents: read` (git tags for tallyrelease entries).
 
 [//]: # "x-release-please-start-major"
 
