@@ -4,7 +4,7 @@ import pkg from "../package.json";
 const GLOBAL_VALUE_FLAGS = new Set(["--cwd", "--config", "--token"]);
 
 /** Commands that write their JSON document with `--out`. */
-const OUT_COMMANDS = new Set(["affected", "plan", "shadow"]);
+const OUT_COMMANDS = new Set(["affected", "plan", "shadow", "run"]);
 
 /**
  * The command: the first argument that is neither a flag nor the value of a global flag.

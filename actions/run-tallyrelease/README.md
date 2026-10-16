@@ -5,7 +5,7 @@
 This action is in beta. It bundles a fixed version of `@tallyrelease/cli`, so a CLI update is
 shipped as a new release of the action.
 
-`affected`, `plan` and `shadow` need the full history (`fetch-depth: 0`, optionally with
+`affected`, `plan`, `shadow` and `run` need the full history (`fetch-depth: 0`, optionally with
 `filter: blob:none`). `affected` and `plan` on push also need the `actions: read` permission to find
 the last successful run as the base.
 
@@ -13,9 +13,9 @@ the last successful run as the base.
 values may contain spaces. `shadow` gets `--pin <cli-version>` appended unless `--pin` is given, so
 every report records the bundled version.
 
-`affected`, `plan` and `shadow` always write their JSON document: unless `args` has `--out`, the action
-adds `--out $RUNNER_TEMP/tallyrelease-<command>.json`. The `result` output holds the document and
-`result-file` its path, also when the command fails after writing it (for example `shadow --strict`).
+`affected`, `plan`, `shadow` and `run` always write their JSON document: unless `args` has `--out`,
+the action adds `--out $RUNNER_TEMP/tallyrelease-<command>.json`. The `result` output holds the
+document and `result-file` its path, also when the command fails after writing it (for example `shadow --strict`).
 Other commands set neither. The documents follow the published schemas
 [`affected.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/affected.schema.json) and
 [`plan.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/plan.schema.json).
@@ -50,6 +50,25 @@ jobs:
       - run: echo "build ${{ matrix.unit.id }} from ${{ matrix.unit.path }}"
 ```
 
+`run --dry-run` computes the release PRs, tags and forge releases a release would create without
+changing the repository or the forge. It reads release PRs, tags, merged pull requests and the last successful run through
+`token`, which needs read access to `contents`, `issues`, `pull_requests` and `actions`:
+
+```yaml
+- uses: actions/checkout@v6
+  with:
+    fetch-depth: 0
+    filter: blob:none
+- uses: abinnovision/actions@run-tallyrelease-v0 # x-release-please-major
+  with:
+    args: |
+      run
+      --branch
+      main
+      --dry-run
+      --summary
+```
+
 A step output is limited to about 1 MB. For large repositories read `result-file` instead, or upload
 it with `actions/upload-artifact`. Keys written by the CLI's own `--github-output` still appear as
 step outputs, but they are not part of this action's contract.
@@ -81,12 +100,12 @@ This action can be used with different version ranges. The following ranges are 
 | Input   | Description                                                                                                                                                                                                                                                  | Required | Default               |
 | :------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :-------------------- |
 | `args`  | CLI arguments, for example `affected --github-output`. Split on whitespace, or one argument per line when the value has several lines. Global flags such as `--cwd` and `--config` go here too. `shadow` gets `--pin <cli-version>` unless `--pin` is given. | Yes      |                       |
-| `token` | Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run.                                                                                                                                                                | No       | `${{ github.token }}` |
+| `token` | Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run, and by `run` for release PRs and tags. `run --dry-run` needs read access to contents, issues, pull requests and actions.                                       | No       | `${{ github.token }}` |
 
 ## Outputs
 
-| Output        | Description                                                                                               |
-| :------------ | :-------------------------------------------------------------------------------------------------------- |
-| `result`      | The JSON document of `affected`, `plan` or `shadow`, as written by `--out`. Not set for other commands.   |
-| `result-file` | Path of the JSON document. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands. |
-| `cli-version` | Version of the bundled `@tallyrelease/cli`.                                                               |
+| Output        | Description                                                                                                                                        |
+| :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `result`      | The JSON document of `affected`, `plan`, `shadow` or `run`, as written by `--out`. Not set for other commands.                                     |
+| `result-file` | Path of the JSON document of `affected`, `plan`, `shadow` or `run`. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands. |
+| `cli-version` | Version of the bundled `@tallyrelease/cli`.                                                                                                        |
