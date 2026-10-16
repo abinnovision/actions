@@ -125,10 +125,10 @@ jobs:
             | [.[] | select(.releaseSha == null or IN($newest[]; .)) | . as $entry
                 | ($lines | map(select(. as $line | $entry.path | test($line.regex))) | first) as $match
                 | select($match != null)
-                | $entry + {line: $first[$match.key]}]
-            | group_by(.line)
+                | $entry + {keyLine: $first[$match.key]}]
+            | group_by(.keyLine)
             | map({
-                line: .[0].line,
+                keyLine: .[0].keyLine,
                 name: (map(.name) | join(", ")),
                 version: .[0].version,
                 versions: (map(.version) | unique),
@@ -188,14 +188,14 @@ jobs:
       - name: Resolve settings
         id: key
         env:
-          LINE: ${{ matrix.group.line }}
+          KEY_LINE: ${{ matrix.group.keyLine }}
           LINKS: ${{ matrix.group.links }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LINEAR_ACCESS_KEYS: ${{ secrets.LINEAR_ACCESS_KEYS }}
         run: |
           set -euo pipefail
 
-          key=$(jq -rn --argjson line "$LINE" '
+          key=$(jq -rn --argjson line "$KEY_LINE" '
             $ENV.LINEAR_ACCESS_KEYS | split("\n") | map(gsub("^\\s+|\\s+$"; ""))
             | .[$line] | capture("^[^,]+,(?<key>.+)$").key | gsub("^\\s+"; "")
           ')
