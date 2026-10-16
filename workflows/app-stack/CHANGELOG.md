@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.3.0...app-stack-source-v1.4.0) (2026-10-16)
+
+
+### Features
+
+* **app-stack:** add a tallyrelease release dry run to shadow mode ([#682](https://github.com/abinnovision/actions/issues/682)) ([6a9b95f](https://github.com/abinnovision/actions/commit/6a9b95f40dcf4cd9560fe9b71c0f7bede078c665))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.4.0
+
 ## [1.3.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.2.0...app-stack-source-v1.3.0) (2026-10-15)
 
 
