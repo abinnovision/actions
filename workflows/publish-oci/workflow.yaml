@@ -151,9 +151,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     if: inputs.releases != '' && inputs.releases != '[]'
-    permissions: {}
+    permissions:
+      contents: read
     outputs:
-      units: ${{ steps.match.outputs.items }}
+      units: ${{ steps.decide.outputs.units }}
       # gitops-routes, or the routes converted from gitops-config.
       gitops-routes: ${{ steps.select.outputs.gitops-routes }}
     steps:
@@ -249,6 +250,81 @@ jobs:
             printf 'gitops-routes<<%s\n%s\n%s\n' "$delimiter" "$gitops_routes" "$delimiter" >> "$GITHUB_OUTPUT"
           fi
           echo "Units: $(jq -r 'map(.name) | join(", ")' <<< "$UNITS")"
+          printf '%s' "$UNITS" > "$RUNNER_TEMP/units.json"
+
+      # Adds "latest" and "dispatch" to every entry of $RUNNER_TEMP/units.json with a releaseSha (tallyrelease). Other
+      # entries are left as they are. GitOps Updates runs it again, so a re-run of failed jobs decides anew.
+      - &decide
+        name: Decide latest and dispatch
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Prints the highest stable version tagged "<prefix>X.Y.Z" on the remote, empty when there is none.
+          highest_tagged() {
+            local prefix="$1" path
+            path=$(jq -rn --arg prefix "$prefix" '$prefix | split("/") | map(@uri) | join("/")')
+            gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$path" \
+              | jq -r --arg ref "refs/tags/$prefix" '
+                  .[].ref | select(startswith($ref)) | ltrimstr($ref)
+                  | select(test("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"))
+                ' \
+              | sort -V | tail -n 1
+          }
+
+          declare -A highest_by_prefix
+          tip=""
+          units="[]"
+          while IFS= read -r entry; do
+            if [[ "$(jq -r '.releaseSha | type == "string"' <<< "$entry")" == "true" ]]; then
+              name=$(jq -r '.name' <<< "$entry")
+              version=$(jq -r '.version' <<< "$entry")
+              channel=$(jq -r '.channel // ""' <<< "$entry")
+              release_sha=$(jq -r '.releaseSha' <<< "$entry")
+              has_prefix=$(jq -r '.tagPrefix | type == "string"' <<< "$entry")
+              tag_prefix=$(jq -r '.tagPrefix // ""' <<< "$entry")
+              latest="false"
+              dispatch="true"
+
+              if [[ -n "$channel" ]]; then
+                # A re-run dispatches a prerelease only while its commit is the tip of the branch.
+                if [[ "$GITHUB_RUN_ATTEMPT" != "1" ]]; then
+                  if [[ -z "$tip" ]] && ! tip=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha); then
+                    echo "::warning::Reading the tip of $GITHUB_REF_NAME failed"
+                    tip=""
+                  fi
+                  if [[ "$release_sha" != "$tip" ]]; then
+                    dispatch="false"
+                  fi
+                fi
+              else
+                latest="true"
+                # A stable entry with a tag prefix, also "", is latest and dispatched only when no higher version is tagged.
+                if [[ "$has_prefix" == "true" ]]; then
+                  # One tag listing per prefix; the key is never empty, as bash requires.
+                  if [[ -z "${highest_by_prefix["prefix:$tag_prefix"]+set}" ]]; then
+                    highest_by_prefix["prefix:$tag_prefix"]=$(highest_tagged "$tag_prefix")
+                  fi
+                  highest="${highest_by_prefix["prefix:$tag_prefix"]}"
+                  if [[ -z "$highest" ]]; then
+                    echo "::warning::No tag matches $tag_prefix<version>, treating $name $version as the newest"
+                  elif [[ "$(printf '%s\n' "$version" "$highest" | sort -V | tail -n 1)" != "$version" ]]; then
+                    latest="false"
+                    dispatch="false"
+                  fi
+                fi
+              fi
+
+              echo "$name $version: latest $latest, dispatch $dispatch"
+              entry=$(jq -c --argjson latest "$latest" --argjson dispatch "$dispatch" \
+                '. + {latest: $latest, dispatch: $dispatch}' <<< "$entry")
+            fi
+            units=$(jq -c --argjson entry "$entry" '. + [$entry]' <<< "$units")
+          done < <(jq -c '.[]' "$RUNNER_TEMP/units.json")
+
+          echo "units=$units" >> "$GITHUB_OUTPUT"
 
   # Build and push one image per unit that has a Dockerfile.
   build:
@@ -395,6 +471,31 @@ jobs:
           echo "CACHE_TO=$cache_to" >> $GITHUB_OUTPUT
           echo "Configured registries: ${#images[@]}"
 
+      # An entry with a releaseSha skips build and push when every registry has its version tag; otherwise the image is
+      # built and pushed to all registries.
+      - name: Check existing image
+        id: probe
+        if: steps.unit.outputs.skip != 'true' && matrix.entry.releaseSha
+        env:
+          APP: ${{ matrix.entry.name }}
+          APP_VERSION: ${{ matrix.entry.version }}
+          IMAGES: ${{ steps.image-names.outputs.IMAGES }}
+        run: |
+          while IFS= read -r image; do
+            if ! error=$(docker buildx imagetools inspect "$image:$APP_VERSION" 2>&1 > /dev/null); then
+              echo "$image:$APP_VERSION not found, building: $error"
+              exit 0
+            fi
+          done <<< "$IMAGES"
+
+          echo "::notice::$APP $APP_VERSION exists in every registry, skipping build and push"
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "### 📦 \`$APP\` \`v$APP_VERSION\`"
+            echo ""
+            echo "skipped (exists)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Wait for Turbo cache
         wait: [turbo-cache]
 
@@ -402,7 +503,7 @@ jobs:
       # when enabled.
       - name: Prepare build args
         id: build-args
-        if: steps.unit.outputs.skip != 'true'
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
         env:
           APP: ${{ matrix.entry.name }}
           APP_VERSION: ${{ matrix.entry.version }}
@@ -450,19 +551,22 @@ jobs:
 
       - name: Extract Docker metadata
         id: meta
-        if: steps.unit.outputs.skip != 'true'
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
         uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image-names.outputs.IMAGES }}
+          # Entries with a releaseSha get "latest" only when Prepare decided so; others keep the default.
+          flavor: latest=${{ matrix.entry.releaseSha && 'false' || 'auto' }}
           tags: |
             type=raw,value=sha-${{ matrix.entry.sha }}
             type=semver,pattern={{version}},value=v${{ matrix.entry.version }}
             type=raw,value=${{ matrix.entry.channel == '' && 'release' || 'prerelease' }}-${{ matrix.entry.version }}
+            type=raw,value=latest,enable=${{ matrix.entry.latest == true }}
 
       # One secret file per matching APP_IMAGE_SECRETS line; an empty mount string mounts no secrets.
       - name: Prepare app-specific secrets
         id: app-secrets
-        if: steps.unit.outputs.skip != 'true'
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
         env:
           APP: ${{ matrix.entry.name }}
           # CSV format: app-name,secret-name,secret-value (one per line)
@@ -488,7 +592,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build
-        if: steps.unit.outputs.skip != 'true'
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
         uses: docker/build-push-action@v7
         env:
           # Replaced by the "Write image summary" step.
@@ -507,13 +611,13 @@ jobs:
           allow: network.host
 
       - name: Write image summary
-        if: steps.unit.outputs.skip != 'true'
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
         env:
           APP: ${{ matrix.entry.name }}
           APP_VERSION: ${{ matrix.entry.version }}
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build.outputs.digest }}
-          BUILD_REF: ${{ fromJSON(steps.build.outputs.metadata)['buildx.build.ref'] }}
+          BUILD_REF: ${{ steps.build.outputs.metadata && fromJSON(steps.build.outputs.metadata)['buildx.build.ref'] || '' }}
           CACHE_FROM: ${{ steps.image-names.outputs.CACHE_FROM }}
         run: |
           echo "Successfully built and pushed the following images for $APP:"
@@ -581,19 +685,31 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Read units
+        env:
+          UNITS: ${{ needs.prepare.outputs.units }}
+        run: printf '%s' "$UNITS" > "$RUNNER_TEMP/units.json"
+
+      - *decide
+
       - name: Group GitOps deployments by target
         id: routes
         env:
           # CSV format: name,type,target-repo,application[,image-name]
           GITOPS_ROUTES: ${{ needs.prepare.outputs.gitops-routes }}
-          UNITS: ${{ needs.prepare.outputs.units }}
+          UNITS: ${{ steps.decide.outputs.units }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
 
           resolved_file=$(mktemp)
 
-          while IFS=$'\t' read -r app image deployment_tag channel; do
+          while IFS=$'\t' read -r app image deployment_tag dispatch channel; do
+            if [[ "$dispatch" == "false" ]]; then
+              echo "Skipping GitOps deployment of '$app' $deployment_tag, not dispatched by the release rules"
+              continue
+            fi
+
             type="release"
             if [[ -n "$channel" ]]; then
               type="prerelease"
@@ -621,7 +737,7 @@ jobs:
                 '{targetRepo: $repo, application: $application, update: $update}' >> "$resolved_file"
               echo "Collected $app -> $target_repo ($deploy_app): $image_name:$deployment_tag"
             done <<< "$unit_routes"
-          done < <(jq -r '.[] | [.name, .value, .version, .channel // ""] | @tsv' <<< "$UNITS")
+          done < <(jq -r '.[] | [.name, .value, .version, (.dispatch != false | tostring), .channel // ""] | @tsv' <<< "$UNITS")
 
           # Batch all updates targeting the same repository and application into one entry
           groups=$(jq -s -c 'group_by(.targetRepo + "|" + .application)
