@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.1](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.2.0...gitops-stack-source-v2.2.1) (2026-10-16)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.6.0
+
 ## [2.2.0](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.1.4...gitops-stack-source-v2.2.0) (2026-10-16)
 
 

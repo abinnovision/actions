@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/abinnovision/actions/compare/run-tallyrelease-source-v0.5.1...run-tallyrelease-source-v0.6.0) (2026-10-16)
+
+
+### Features
+
+* **app-stack:** commit tallyrelease releases as the token's bot ([#698](https://github.com/abinnovision/actions/issues/698)) ([45987db](https://github.com/abinnovision/actions/commit/45987dbad773d32f9442c5b495c7aafed6f9f675))
+
 ## [0.5.1](https://github.com/abinnovision/actions/compare/run-tallyrelease-source-v0.5.0...run-tallyrelease-source-v0.5.1) (2026-10-16)
 
 
