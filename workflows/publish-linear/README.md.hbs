@@ -11,6 +11,8 @@ The release list is the `releases` output of a stack, see the
 
 - Skips all work when `releases` is empty, `[]` or no stable entry matches a `LINEAR_ACCESS_KEYS` line
 - Ignores prereleases (entries with a non-empty `channel`)
+- Keeps only the highest version per `path` among entries with `releaseSha` (lists from tallyrelease, which can hold
+  several releases of a unit); entries without `releaseSha` are used as listed
 - Assigns each entry the first `LINEAR_ACCESS_KEYS` line whose pattern matches its `path`
 - Syncs all entries with the same access key as one Linear release with the entry `version`; they must share the
   version, which [linked versions](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md#linked-versions)
@@ -18,6 +20,10 @@ The release list is the `releases` output of a stack, see the
 - Fails before syncing when a key line is malformed, an entry has an unsupported `schema` or a group has differing
   versions
 - Links the GitHub release of every entry that has a `url`, plus the workflow run
+- Scans up to the `releaseSha` shared by all entries of a group, so a catch-up release does not collect later commits;
+  otherwise up to the commit of the run
+- Re-running a synced list ends green: at the release commit of an existing version the scan range is empty and the
+  Linear CLI skips the sync
 
 ## Pipelines
 
