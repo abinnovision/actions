@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.1](https://github.com/abinnovision/actions/compare/app-stack-source-v1.5.0...app-stack-source-v1.5.1) (2026-10-16)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.5.1
+
 ## [1.5.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.4.0...app-stack-source-v1.5.0) (2026-10-16)
 
 
