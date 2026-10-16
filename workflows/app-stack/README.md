@@ -11,15 +11,15 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 ## Behavior
 
-| Job             | Runs                                                                                         | Does                                                                                                                                                                      |
-| :-------------- | :------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Configure`     | Always                                                                                       | Resolves the commit and mode, validates the Makefile if present, resolves the units, discovers test types                                                                 |
-| `Check`         | Always                                                                                       | Install, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also prunes the source units and packs the dist units                            |
-| `Test`          | One job per test type not already covered by `Check`                                         | Install, `build` and `test-<type>`                                                                                                                                        |
-| `Release`       | Push to `default-branch` (any branch with `tallyrelease: release`), after `Check` and `Test` | Runs release-please (or tallyrelease with `tallyrelease: release`), which creates or lands release PRs and creates the releases, then writes the `releases` list          |
-| `Release build` | With `tallyrelease: release`, one job per release commit other than the built commit         | Builds the payloads of those releases, see [Release mode](#release-mode)                                                                                                  |
-| `Release plan`  | With `tallyrelease: shadow` or `release`                                                     | Runs `tallyrelease plan` and, with `shadow` on push to `default-branch`, `tallyrelease shadow` and a release dry run, see [tallyrelease](#tallyrelease-beta). Never fails |
-| `Status`        | Always                                                                                       | Single required status check, fails when any other job failed or was cancelled                                                                                            |
+| Job             | Runs                                                                                         | Does                                                                                                                                                                                        |
+| :-------------- | :------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Configure`     | Always                                                                                       | Resolves the commit and mode, validates the Makefile if present, resolves the units, discovers test types                                                                                   |
+| `Check`         | Always                                                                                       | Install, dependency checks, `build`, `check` and unit tests; on push to `default-branch` (or any branch with `tallyrelease: release`) also prunes the source units and packs the dist units |
+| `Test`          | One job per test type not already covered by `Check`                                         | Install, `build` and `test-<type>`                                                                                                                                                          |
+| `Release`       | Push to `default-branch` (any branch with `tallyrelease: release`), after `Check` and `Test` | Runs release-please (or tallyrelease with `tallyrelease: release`), which creates or lands release PRs and creates the releases, then writes the `releases` list                            |
+| `Release build` | With `tallyrelease: release`, one job per release commit other than the built commit         | Builds the payloads of those releases, see [Release mode](#release-mode)                                                                                                                    |
+| `Release plan`  | With `tallyrelease: shadow` or `release`                                                     | Runs `tallyrelease plan` and, with `shadow` on push to `default-branch`, `tallyrelease shadow` and a release dry run, see [tallyrelease](#tallyrelease-beta). Never fails                   |
+| `Status`        | Always                                                                                       | Single required status check, fails when any other job failed or was cancelled                                                                                                              |
 
 - Unit tests run inside `Check` by default, which avoids a second install and build. Set
   `run-unit-tests-in-build: false` to move them into the `Test` matrix
@@ -190,7 +190,7 @@ needs a matching `test-<type>` script, so enabling `test-types: unit,integration
 | `push` to another branch     | `Configure`, `Check`, `Test`; with `tallyrelease: release` everything, see [Maintenance lines](#maintenance-lines) | Read/write in the branch scope                                     |
 | `pull_request_target`        | Nothing, `Configure` fails                                                                                         |                                                                    |
 
-Releasing and packing are gated inside the workflow on `push` to `default-branch`, so a pull request
+Releasing and packing are gated inside the workflow on `push` to `default-branch` (or any branch with `tallyrelease: release`), so a pull request
 can never reach them.
 
 `merge_group` is optional and only fires when a merge queue is enabled on the branch. If you use
@@ -453,6 +453,7 @@ on:
   `backport` and `publish-oci` pushes `<version>` without `latest` and does not dispatch GitOps, since a higher version
   is tagged. `publish-linear` skips it unless `maintenance: true`
 - Rulesets on `release/**` must allow merging the release PRs, like on the default branch
+- Keep `push.branches` limited to the default branch and the maintenance patterns, since every push in release mode is a release run
 
 ## Inputs
 

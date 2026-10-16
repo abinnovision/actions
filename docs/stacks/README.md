@@ -210,7 +210,7 @@ workflow-level concurrency group, and the `tallyrelease: pending|released|stale`
 
 Every branch push releases for that branch, so maintenance lines (`line: maintenance` rules in `tallyrelease.yaml`)
 release through the stack once the caller adds their patterns, such as `release/**`, to its `push` and `pull_request`
-triggers. Maintenance releases never get `latest` and are never dispatched to GitOps.
+triggers. Maintenance releases get no `latest` and no GitOps dispatch, since a higher version is tagged.
 
 ## Publishing
 
