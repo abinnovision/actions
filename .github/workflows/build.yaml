@@ -81,7 +81,7 @@ jobs:
           yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
           yarn turbo boundaries || (echo "turbo boundaries failed" && exit 1)
 
-  # Will check if the release is needed and create a release PR if so.
+  # Tags merged release PRs and creates or updates the release PRs.
   release:
     name: Release
     needs:
@@ -94,19 +94,38 @@ jobs:
     # Only run on push to "main" branch.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     outputs:
-      versions: ${{ steps.release.outputs.versions }}
+      releases: ${{ steps.tallyrelease.outputs.releases }}
     steps:
+      # Tags and history are read locally; the CLI pushes with the broker token.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - id: token
         name: Exchange token for release
         uses: abinnovision/actions@exchange-github-token-dev
         with:
           broker-url: ${{ vars.TOKEN_BROKER_URL }}
-          scope: contents:write pull_requests:write
-      - id: release
-        name: Run release-please
-        uses: abinnovision/actions@run-release-please-dev
+          scope: contents:write pull_requests:write issues:read actions:read
+      - id: tallyrelease
+        name: Run tallyrelease
+        uses: abinnovision/actions@run-tallyrelease-dev
+        env:
+          # Release commits are authored by the token's App.
+          GIT_AUTHOR_NAME: ${{ steps.token.outputs.committer-name }}
+          GIT_AUTHOR_EMAIL: ${{ steps.token.outputs.committer-email }}
+          GIT_COMMITTER_NAME: ${{ steps.token.outputs.committer-name }}
+          GIT_COMMITTER_EMAIL: ${{ steps.token.outputs.committer-email }}
         with:
           token: ${{ steps.token.outputs.token }}
+          args: |
+            run
+            --branch
+            main
+            --github-output
+            --summary
 
   publish:
     name: Publish
@@ -130,6 +149,8 @@ jobs:
         with:
           ref: ${{ needs.configure.outputs.commit-sha }}
           token: ${{ steps.token.outputs.token }}
+          # Catch-up releases are built from their release commits.
+          fetch-depth: 0
       - name: Setup Node
         uses: abinnovision/actions@setup-node-dev
       - name: Install dependencies
@@ -139,7 +160,8 @@ jobs:
       - name: Publish
         shell: bash
         env:
-          VERSIONS: ${{ needs.release.outputs.versions }}
+          RELEASES: ${{ needs.release.outputs.releases }}
+          HEAD_SHA: ${{ needs.configure.outputs.commit-sha }}
           COMMITTER_NAME: ${{ steps.token.outputs.committer-name }}
           COMMITTER_EMAIL: ${{ steps.token.outputs.committer-email }}
           PUSH_TOKEN: ${{ steps.token.outputs.token }}
@@ -172,10 +194,13 @@ jobs:
             --include 'actions/*' --include 'workflows/*' \
             pack --out "$PACK_DIR/%s.tgz"
 
-          # Unified function to stage both actions and workflows
+          # Unified function to stage both actions and workflows.
+          # Sources and packs default to the checked out workspace.
           stage_item() {
             local path=$1
             local mode=$2  # "dev" or "release"
+            local root=${3:-$WORKSPACE}
+            local packs=${4:-$PACK_DIR}
 
             echo "Staging '$path' ($mode mode)..."
 
@@ -188,11 +213,11 @@ jobs:
             # Define item type, name, and other variables based on path
             if [[ "$path" == *"actions/"* ]]; then
               item_type="action"
-              item_name=$(jq -r '.name' "$path/package.json")
+              item_name=$(jq -r '.name' "$root/$path/package.json")
               commit_prefix=""
             else
               item_type="workflow"
-              item_name=$(jq -r '.name' "$path/package.json")
+              item_name=$(jq -r '.name' "$root/$path/package.json")
               commit_prefix="workflow "
             fi
 
@@ -204,7 +229,7 @@ jobs:
 
             staging_dir="/opt/temporary/$item_type-$item_name-$mode"
 
-            local item_version=$(jq -r '.version' "$path/package.json")
+            local item_version=$(jq -r '.version' "$root/$path/package.json")
 
             # Validate item version
             if [[ -z "$item_version" || "$item_version" == "null" ]]; then
@@ -215,7 +240,7 @@ jobs:
             # Unpack the pre-packed archive into a staging environment
             rm -rf "$staging_dir"
             mkdir -p "$staging_dir"
-            tar -C "$staging_dir" --strip-components=1 -xzf "$PACK_DIR/$item_name.tgz"
+            tar -C "$staging_dir" --strip-components=1 -xzf "$packs/$item_name.tgz"
 
             # Workflow-specific: restructure files and move the workflow file
             if [[ "$item_type" == "workflow" ]]; then
@@ -226,7 +251,7 @@ jobs:
             # Resolve internal action references (replace -dev with exact versions)
             if [[ "$mode" == "release" ]]; then
               echo "Resolving internal action references..."
-              yarn tsx scripts/resolve-action-refs.ts --staging-dir "$staging_dir" --workspace-root "$WORKSPACE"
+              yarn tsx scripts/resolve-action-refs.ts --staging-dir "$staging_dir" --workspace-root "$root"
             fi
 
             # Determine branch name and version based on mode
@@ -279,18 +304,39 @@ jobs:
             rm -rf "$staging_dir"
           }
 
-          # Phase 1: Stage releases (if any were created)
-          if [[ -n "$VERSIONS" && "$VERSIONS" != "{}" ]]; then
-            echo "==> Staging versioned releases..."
-            while read -r path; do
-              [[ -n "$path" ]] || continue
+          # Phase 1: Stage stable releases (if any were created)
+          stable=$(jq -c '[.[] | select(.kind == "release" and (.path | startswith("packages/") | not))]' <<< "${RELEASES:-[]}")
+          mapfile -t releases < <(jq -c '.[]' <<< "$stable")
 
-              if [[ "$path" == "packages/"* ]]; then
-                echo "Skipping non-publishable path: $path"
-                continue
+          if [[ ${#releases[@]} -gt 0 ]]; then
+            # Catch-up releases are built and packed from their release commit.
+            catch_up=$(jq -r --arg head "$HEAD_SHA" '[.[] | select(.releaseSha != $head) | .releaseSha] | unique[]' <<< "$stable")
+            for sha in $catch_up; do
+              echo "==> Building catch-up commit $sha..."
+              git worktree add --detach "/opt/temporary/worktrees/$sha" "$sha"
+              (
+                cd "/opt/temporary/worktrees/$sha"
+                yarn install --immutable
+                yarn build
+                mkdir -p "/opt/temporary/packs-$sha"
+                yarn workspaces foreach -A -p \
+                  --include 'actions/*' --include 'workflows/*' \
+                  pack --out "/opt/temporary/packs-$sha/%s.tgz"
+              )
+            done
+
+            # The list is ordered oldest first, so the newest version of a unit
+            # stages last and owns the floating tags.
+            echo "==> Staging versioned releases..."
+            for entry in "${releases[@]}"; do
+              path=$(jq -r '.path' <<< "$entry")
+              sha=$(jq -r '.releaseSha' <<< "$entry")
+              if [[ "$sha" == "$HEAD_SHA" ]]; then
+                stage_item "$path" "release"
+              else
+                stage_item "$path" "release" "/opt/temporary/worktrees/$sha" "/opt/temporary/packs-$sha"
               fi
-              stage_item "$path" "release"
-            done <<< "$(echo "$VERSIONS" | jq -r 'keys[]')"
+            done
           else
             echo "==> No releases created, skipping versioned publishing"
           fi
@@ -315,6 +361,9 @@ jobs:
           for path in "${all_locations[@]}"; do
             stage_item "$path" "dev"
           done
+
+          # Several releases of one unit queue the same floating tags; the atomic push rejects duplicate refspecs.
+          mapfile -t push_refs < <(printf '%s\n' "${push_refs[@]}" | awk '!seen[$0]++')
 
           # Publish everything in a single push
           echo "==> Publishing ${#push_refs[@]} refs..."

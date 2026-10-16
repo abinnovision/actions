@@ -1,0 +1,136 @@
+# yaml-language-server: $schema=./node_modules/@tallyrelease/cli/dist/tallyrelease.schema.json
+plugins:
+  node: {}
+defaults:
+  release: true
+  tagFormat: "{id}-source-v{version}"
+  propagate: patch
+bumps:
+  preMajor:
+    breaking: major
+branches:
+  - name: main
+    line: default
+units:
+  actions/evaluate-event:
+    versionFiles:
+      - file: actions/evaluate-event/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/evaluate-event/README.md
+        pattern: "@{id}-v{version}"
+  actions/exchange-github-token:
+    versionFiles:
+      - file: actions/exchange-github-token/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/exchange-github-token/README.md
+        pattern: "@{id}-v{version}"
+  actions/match-paths:
+    versionFiles:
+      - file: actions/match-paths/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/match-paths/README.md
+        pattern: "@{id}-v{version}"
+  actions/run-commitlint:
+    versionFiles:
+      - file: actions/run-commitlint/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/run-commitlint/README.md
+        pattern: "@{id}-v{version}"
+  actions/run-release-please:
+    versionFiles:
+      - file: actions/run-release-please/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/run-release-please/README.md
+        pattern: "@{id}-v{version}"
+  actions/run-tallyrelease:
+    versionFiles:
+      - file: actions/run-tallyrelease/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/run-tallyrelease/README.md
+        pattern: "@{id}-v{version}"
+  actions/setup-gcp:
+    versionFiles:
+      - file: actions/setup-gcp/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/setup-gcp/README.md
+        pattern: "@{id}-v{version}"
+  actions/setup-k8s-tools:
+    versionFiles:
+      - file: actions/setup-k8s-tools/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/setup-k8s-tools/README.md
+        pattern: "@{id}-v{version}"
+  actions/setup-node:
+    versionFiles:
+      - file: actions/setup-node/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/setup-node/README.md
+        pattern: "@{id}-v{version}"
+  actions/setup-oidc-token-cli:
+    versionFiles:
+      - file: actions/setup-oidc-token-cli/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/setup-oidc-token-cli/README.md
+        pattern: "@{id}-v{version}"
+  actions/setup-tools:
+    versionFiles:
+      - file: actions/setup-tools/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/setup-tools/README.md
+        pattern: "@{id}-v{version}"
+  actions/triage-dependabot-pr:
+    versionFiles:
+      - file: actions/triage-dependabot-pr/README.md
+        pattern: "@{id}-v{major}"
+      - file: actions/triage-dependabot-pr/README.md
+        pattern: "@{id}-v{version}"
+  workflows/app-stack:
+    versionFiles:
+      - file: workflows/app-stack/README.md
+        pattern: "@{id}-v{major}"
+      - file: workflows/app-stack/README.md
+        pattern: "@{id}-v{version}"
+  workflows/gitops-stack:
+    versionFiles:
+      - file: workflows/gitops-stack/README.md
+        pattern: "@{id}-v{major}"
+      - file: workflows/gitops-stack/README.md
+        pattern: "@{id}-v{version}"
+  workflows/gitops-update-tags:
+    versionFiles:
+      - file: workflows/gitops-update-tags/README.md
+        pattern: "@{id}-v{major}"
+      - file: workflows/gitops-update-tags/README.md
+        pattern: "@{id}-v{version}"
+  workflows/iac-stack:
+    versionFiles:
+      - file: workflows/iac-stack/README.md
+        pattern: "@{id}-v{major}"
+      - file: workflows/iac-stack/README.md
+        pattern: "@{id}-v{version}"
+  workflows/polyglot-monorepo-stack:
+    versionFiles:
+      - file: workflows/polyglot-monorepo-stack/README.md
+        pattern: "@{id}-v{major}"
+      - file: workflows/polyglot-monorepo-stack/README.md
+        pattern: "@{id}-v{version}"
+  workflows/publish-linear:
+    versionFiles:
+      - file: workflows/publish-linear/README.md
+        pattern: "@{id}-v{major}"
+      - file: workflows/publish-linear/README.md
+        pattern: "@{id}-v{version}"
+  workflows/publish-npm:
+    versionFiles:
+      - file: workflows/publish-npm/README.md
+        pattern: "@{id}-v{major}"
+      - file: workflows/publish-npm/README.md
+        pattern: "@{id}-v{version}"
+  workflows/publish-oci:
+    versionFiles:
+      - file: workflows/publish-oci/README.md
+        pattern: "@{id}-v{major}"
+      - file: workflows/publish-oci/README.md
+        pattern: "@{id}-v{version}"
+  packages/action-tool-installer:
+    id: action-tool-installer
