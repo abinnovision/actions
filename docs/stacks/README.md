@@ -208,6 +208,10 @@ the commit of the run (catch-ups after a cancelled or failed run) are built by o
 `payload-source-<sha>` and `payload-dist-<sha>`. The caller grants no new permissions; it must declare the
 workflow-level concurrency group, and the `tallyrelease: pending|released|stale` labels must exist.
 
+Every branch push releases for that branch, so maintenance lines (`line: maintenance` rules in `tallyrelease.yaml`)
+release through the stack once the caller adds their patterns, such as `release/**`, to its `push` and `pull_request`
+triggers. Maintenance releases never get `latest` and are never dispatched to GitOps.
+
 ## Publishing
 
 Stacks do generic work only (prune, build, pack) and know no publish target. They upload payload artifacts and expose
@@ -273,6 +277,7 @@ and the publish jobs must run in the same caller workflow.
 | `url`        | Optional. GitHub release URL, only for stable releases of units with their own GitHub release                      |
 | `payloads`   | Payloads that exist for the unit, may be `{}`: `source` and `dist`, each with `artifact` and `file`                |
 | `catchUp`    | Optional. `true` when the release commit is not the commit of the run                                              |
+| `line`       | Optional. Release line of the entry, `default` or `maintenance`                                                    |
 | `releaseSha` | Optional. Full SHA of the release commit                                                                           |
 | `tag`        | Optional. Git tag of a stable release, `null` for a prerelease                                                     |
 | `tagPrefix`  | Optional. Text before the version in the unit's git tags, `null` for a prerelease or when text follows the version |
