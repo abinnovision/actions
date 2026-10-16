@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/abinnovision/actions/compare/run-tallyrelease-source-v0.3.0...run-tallyrelease-source-v0.4.0) (2026-10-16)
+
+
+### Features
+
+* **run-tallyrelease:** bundle tallyrelease 0.3 beta with run support ([#681](https://github.com/abinnovision/actions/issues/681)) ([19df592](https://github.com/abinnovision/actions/commit/19df5921a342a530fa25b755351bb248895eeb6b))
+
 ## [0.3.0](https://github.com/abinnovision/actions/compare/run-tallyrelease-source-v0.2.0...run-tallyrelease-source-v0.3.0) (2026-10-15)
 
 
