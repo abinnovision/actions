@@ -89,7 +89,7 @@ describe("command", () => {
 });
 
 describe("withOut", () => {
-	it("appends --out for affected, plan and shadow", () => {
+	it("appends --out for affected, plan, shadow and run", () => {
 		expect(withOut(["plan", "--all"], "/tmp")).toEqual({
 			args: ["plan", "--all", "--out", "/tmp/tallyrelease-plan.json"],
 			out: "/tmp/tallyrelease-plan.json",
@@ -100,6 +100,10 @@ describe("withOut", () => {
 		expect(withOut(["shadow"], "/tmp").out).toBe(
 			"/tmp/tallyrelease-shadow.json",
 		);
+		expect(withOut(["run", "--dry-run"], "/tmp")).toEqual({
+			args: ["run", "--dry-run", "--out", "/tmp/tallyrelease-run.json"],
+			out: "/tmp/tallyrelease-run.json",
+		});
 	});
 
 	it("keeps an explicit --out", () => {
@@ -109,6 +113,10 @@ describe("withOut", () => {
 		});
 		expect(withOut(["shadow", "--out=r.json"], "/tmp")).toEqual({
 			args: ["shadow", "--out=r.json"],
+			out: "r.json",
+		});
+		expect(withOut(["run", "--dry-run", "--out", "r.json"], "/tmp")).toEqual({
+			args: ["run", "--dry-run", "--out", "r.json"],
 			out: "r.json",
 		});
 	});

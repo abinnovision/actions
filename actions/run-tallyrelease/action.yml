@@ -7,14 +7,14 @@ inputs:
     description: "CLI arguments, for example `affected --github-output`. Split on whitespace, or one argument per line when the value has several lines. Global flags such as `--cwd` and `--config` go here too. `shadow` gets `--pin <cli-version>` unless `--pin` is given."
     required: true
   token:
-    description: "Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run."
+    description: "Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run, and by `run` for release PRs and tags. `run --dry-run` needs read access to contents, issues, pull requests and actions."
     required: false
     default: ${{ github.token }}
 outputs:
   result:
-    description: "The JSON document of `affected`, `plan` or `shadow`, as written by `--out`. Not set for other commands."
+    description: "The JSON document of `affected`, `plan`, `shadow` or `run`, as written by `--out`. Not set for other commands."
   result-file:
-    description: "Path of the JSON document. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands."
+    description: "Path of the JSON document of `affected`, `plan`, `shadow` or `run`. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands."
   cli-version:
     description: "Version of the bundled `@tallyrelease/cli`."
 runs:
