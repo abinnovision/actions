@@ -662,6 +662,12 @@ jobs:
         name: Run tallyrelease
         if: inputs.tallyrelease == 'release'
         uses: abinnovision/actions@run-tallyrelease-dev
+        env:
+          # Release commits are authored by the token's App.
+          GIT_AUTHOR_NAME: ${{ steps.tallyrelease-token.outputs.committer-name }}
+          GIT_AUTHOR_EMAIL: ${{ steps.tallyrelease-token.outputs.committer-email }}
+          GIT_COMMITTER_NAME: ${{ steps.tallyrelease-token.outputs.committer-name }}
+          GIT_COMMITTER_EMAIL: ${{ steps.tallyrelease-token.outputs.committer-email }}
         with:
           token: ${{ steps.tallyrelease-token.outputs.token }}
           args: |
