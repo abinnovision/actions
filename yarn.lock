@@ -1465,12 +1465,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tallyrelease/cli@npm:0.3.0":
-  version: 0.3.0
-  resolution: "@tallyrelease/cli@npm:0.3.0"
+"@tallyrelease/cli@npm:0.3.1":
+  version: 0.3.1
+  resolution: "@tallyrelease/cli@npm:0.3.1"
   dependencies:
     "@octokit/rest": "npm:^22.0.1"
-    "@tallyrelease/core": "npm:^0.3.0"
+    "@tallyrelease/core": "npm:^0.3.1"
     commander: "npm:^15.0.0"
     picomatch: "npm:^4.0.7"
     tinyglobby: "npm:^0.2.17"
@@ -1478,13 +1478,13 @@ __metadata:
     zod: "npm:^4.6.6"
   bin:
     tallyrelease: dist/bin.js
-  checksum: 10/3091a8131798947e355baed46ac6d41e788e1f7145f59bd85a4f951f30ba6d7164404a8408cfe622f68583bc0cd6b6d7053a86d51247621dab92bcc525dce72f
+  checksum: 10/951ced395cb3bb0314405f9b9b788d8be0fc580deabc51009dd347defd9fb761f449cade09f12ae1be88cf5cffea786f3cc7f4ec56baa3623b3015fa7b3f310b
   languageName: node
   linkType: hard
 
-"@tallyrelease/core@npm:^0.3.0":
-  version: 0.3.0
-  resolution: "@tallyrelease/core@npm:0.3.0"
+"@tallyrelease/core@npm:^0.3.1":
+  version: 0.3.1
+  resolution: "@tallyrelease/core@npm:0.3.1"
   dependencies:
     "@standard-schema/spec": "npm:^1.1.0"
     picomatch: "npm:^4.0.7"
@@ -1494,7 +1494,7 @@ __metadata:
   peerDependenciesMeta:
     vitest:
       optional: true
-  checksum: 10/180b822c81cdce95dd27e3c1af00c12e8a399a4024af4ab3d7e6a8f7a03ea5fda1aeaabc6b34ed848c66b42fb5cf2ee2149ee66b975bdda1e1ae21764351fead
+  checksum: 10/bf15bb7c8b8900b23eaf47101d965f393d02602364d6a66db4fcce003f150acba5092ed589e04ab6ba625a491f115dcda761df8ecbbf076835c6571780d8c268
   languageName: node
   linkType: hard
 
@@ -4796,7 +4796,7 @@ __metadata:
     "@abinnovision/eslint-config-base": "npm:^3.4.2"
     "@abinnovision/prettier-config": "npm:^2.2.0"
     "@actions/core": "npm:^3.0.1"
-    "@tallyrelease/cli": "npm:0.3.0"
+    "@tallyrelease/cli": "npm:0.3.1"
     "@types/node": "npm:^26.6.5"
     "@vercel/ncc": "npm:^0.45.0"
     eslint: "npm:^10.12.0"
