@@ -188,8 +188,9 @@ releases always build. The repository needs a `tallyrelease.yaml`, and the calle
 
 With `tallyrelease: shadow` on [app-stack](../../workflows/app-stack/README.md#tallyrelease-beta), the `Release plan`
 job runs tallyrelease next to release-please without changing anything: `plan` on every run and, on push to the default
-branch, `shadow`, which compares tallyrelease with each release merge. Results land in step summaries, the
-`tallyrelease-plan` and `tallyrelease-shadow` artifacts and, with `shadow-issue`, one comment per compared release merge.
+branch, `shadow`, which compares tallyrelease with each release merge, and a read-only release dry run
+(`run --dry-run`) with a read token from the token broker. Results land in step summaries, the `tallyrelease-plan`,
+`tallyrelease-shadow` and `tallyrelease-run` artifacts and, with `shadow-issue`, one comment per compared release merge.
 The job never fails the pipeline, the release list (schema 1) is unchanged, and the caller grants no permissions beyond
 the usual set. The repository needs a `tallyrelease.yaml`; the issue comment needs the token broker to allow
 `issues:write`.

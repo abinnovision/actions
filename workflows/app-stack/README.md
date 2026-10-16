@@ -11,14 +11,14 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 ## Behavior
 
-| Job            | Runs                                                 | Does                                                                                                                                           |
-| :------------- | :--------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Configure`    | Always                                               | Resolves the commit and mode, validates the Makefile if present, resolves the units, discovers test types                                      |
-| `Check`        | Always                                               | Install, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also prunes the source units and packs the dist units |
-| `Test`         | One job per test type not already covered by `Check` | Install, `build` and `test-<type>`                                                                                                             |
-| `Release`      | Push to `default-branch`, after `Check` and `Test`   | Runs release-please, which creates or lands release PRs and creates the releases, then writes the `releases` list                              |
-| `Release plan` | With `tallyrelease: shadow`                          | Runs `tallyrelease plan` and, on push to `default-branch`, `tallyrelease shadow`, see [tallyrelease](#tallyrelease-beta). Never fails          |
-| `Status`       | Always                                               | Single required status check, fails when any other job failed or was cancelled                                                                 |
+| Job            | Runs                                                 | Does                                                                                                                                                        |
+| :------------- | :--------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Configure`    | Always                                               | Resolves the commit and mode, validates the Makefile if present, resolves the units, discovers test types                                                   |
+| `Check`        | Always                                               | Install, dependency checks, `build`, `check` and unit tests; on push to `default-branch` also prunes the source units and packs the dist units              |
+| `Test`         | One job per test type not already covered by `Check` | Install, `build` and `test-<type>`                                                                                                                          |
+| `Release`      | Push to `default-branch`, after `Check` and `Test`   | Runs release-please, which creates or lands release PRs and creates the releases, then writes the `releases` list                                           |
+| `Release plan` | With `tallyrelease: shadow`                          | Runs `tallyrelease plan` and, on push to `default-branch`, `tallyrelease shadow` and a release dry run, see [tallyrelease](#tallyrelease-beta). Never fails |
+| `Status`       | Always                                               | Single required status check, fails when any other job failed or was cancelled                                                                              |
 
 - Unit tests run inside `Check` by default, which avoids a second install and build. Set
   `run-unit-tests-in-build: false` to move them into the `Test` matrix
@@ -324,10 +324,11 @@ next to release-please through [run-tallyrelease](../../actions/run-tallyrelease
 release-please still owns versions, the release list is unchanged, every step of the job may fail without failing it,
 and `Status` does not depend on it. The repository needs a `tallyrelease.yaml`.
 
-| Runs                                         | Command                                | Step summary | Artifact                                                    |
-| :------------------------------------------- | :------------------------------------- | :----------- | :---------------------------------------------------------- |
-| Pull requests and pushes to `default-branch` | `plan --branch <default-branch> --all` | Plan table   | `tallyrelease-plan` (`tallyrelease-plan.json`, 7 days)      |
-| Push to `default-branch`                     | `shadow --branch <default-branch>`     | Shadow rows  | `tallyrelease-shadow` (`tallyrelease-shadow.json`, 90 days) |
+| Runs                                         | Command                                   | Step summary                   | Artifact                                                    |
+| :------------------------------------------- | :---------------------------------------- | :----------------------------- | :---------------------------------------------------------- |
+| Pull requests and pushes to `default-branch` | `plan --branch <default-branch> --all`    | Plan table                     | `tallyrelease-plan` (`tallyrelease-plan.json`, 7 days)      |
+| Push to `default-branch`                     | `shadow --branch <default-branch>`        | Shadow rows                    | `tallyrelease-shadow` (`tallyrelease-shadow.json`, 90 days) |
+| Push to `default-branch`                     | `run --branch <default-branch> --dry-run` | Release actions and plan table | `tallyrelease-run` (`tallyrelease-run.json`, 7 days)        |
 
 `shadow` compares each unit's next version with the manifest change of a release merge and skips every other push
 (`W_SHADOW_SKIPPED`). Its report records the bundled CLI version as `pin`. With `shadow-issue` set, every compared
@@ -338,6 +339,11 @@ with:
   tallyrelease: shadow
   shadow-issue: "42"
 ```
+
+The release dry run shows the release PRs, tags and releases tallyrelease would create, without writing anything. The
+job token cannot read issues and pull requests, so it uses a token from the token broker with
+`contents:read issues:read pull_requests:read actions:read`; the caller grants no new permissions. If the exchange
+fails, the dry run is skipped.
 
 - On pull requests the plan uses the default-branch rules, so prerelease numbers are indicative. It is relative to the
   pull request head: tags created on the default branch after the branch point are not visible
@@ -387,7 +393,7 @@ shadow-comment:
 | `source-units`             | Units pruned into the source payload, one directory pattern per line.<br>`*` matches exactly one path segment and skips dot directories. Only directories with a `package.json` count.<br>`.` selects the repository root, which is not pruned: the source payload already holds the whole tree.<br>**Default:** `apps/*`<br>**Example:** `apps/*` and `services/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                             | No       | `apps/*`     |
 | `dist-units`               | Units packed into the dist payload, one directory pattern per line.<br>`*` matches exactly one path segment and skips dot directories. Only directories with a `package.json` count.<br>`.` selects the repository root.<br>**Default:** `packages/*`<br>**Example:** `packages/*` and `libs/*` on separate lines                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | No       | `packages/*` |
 | `build-selection`          | (Beta) Which units are pruned, packed and prereleased on push to the default branch.<br>**Valid values:** `all`, `affected`<br>**Default:** `all`<br>`affected` uses tallyrelease to select the units changed since the last successful run, plus the units depending on them.<br>A push that changes `.release-please-manifest.json` selects all units, so stable releases always build.<br>**Requires:** `tallyrelease.yaml` in the repository and the `actions: read` permission on the caller for the base lookup                                                                                                                                                                                                                                                             | No       | `all`        |
-| `tallyrelease`             | (Beta) Runs tallyrelease next to release-please in the `Release plan` job, which never fails the pipeline.<br>**Valid values:** `off`, `shadow`<br>**Default:** `off`<br>`shadow` runs `tallyrelease plan` on every run (artifact `tallyrelease-plan`) and, on push to the default branch, `tallyrelease shadow`, which compares tallyrelease with release-please on release merges (artifact `tallyrelease-shadow`). Both write a step summary.<br>**Requires:** `tallyrelease.yaml` in the repository. No permissions beyond the ones listed in the README.                                                                                                                                                                                                                     | No       | `off`        |
+| `tallyrelease`             | (Beta) Runs tallyrelease next to release-please in the `Release plan` job, which never fails the pipeline.<br>**Valid values:** `off`, `shadow`<br>**Default:** `off`<br>`shadow` runs `tallyrelease plan` on every run (artifact `tallyrelease-plan`) and, on push to the default branch, `tallyrelease shadow`, which compares tallyrelease with release-please on release merges (artifact `tallyrelease-shadow`), and a read-only release dry run, `tallyrelease run --dry-run` with a token broker read token (artifact `tallyrelease-run`). All write a step summary.<br>**Requires:** `tallyrelease.yaml` in the repository. No permissions beyond the ones listed in the README.                                                                                          | No       | `off`        |
 | `shadow-issue`             | (Beta) Issue number that receives one comment per compared release merge. Only with `tallyrelease: shadow`.<br>**Default:** _empty_ (no comment)<br>**Requires:** the token broker allows `issues:write` on this repository                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | No       | _empty_      |
 
 ## Outputs

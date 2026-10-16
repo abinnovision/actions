@@ -109,7 +109,7 @@ on:
           (Beta) Runs tallyrelease next to release-please in the `Release plan` job, which never fails the pipeline.
           **Valid values:** `off`, `shadow`
           **Default:** `off`
-          `shadow` runs `tallyrelease plan` on every run (artifact `tallyrelease-plan`) and, on push to the default branch, `tallyrelease shadow`, which compares tallyrelease with release-please on release merges (artifact `tallyrelease-shadow`). Both write a step summary.
+          `shadow` runs `tallyrelease plan` on every run (artifact `tallyrelease-plan`) and, on push to the default branch, `tallyrelease shadow`, which compares tallyrelease with release-please on release merges (artifact `tallyrelease-shadow`), and a read-only release dry run, `tallyrelease run --dry-run` with a token broker read token (artifact `tallyrelease-run`). All write a step summary.
           **Requires:** `tallyrelease.yaml` in the repository. No permissions beyond the ones listed in the README.
       shadow-issue:
         type: string
@@ -602,7 +602,7 @@ jobs:
       contents: read
       # Base lookup (last successful run) for plan on push.
       actions: read
-      # Token exchange for the shadow issue comment.
+      # Token exchange for the shadow issue comment and the release dry run.
       id-token: write
     steps:
       # Full history for tags, HEAD^1 and the base; blobs are fetched on demand, which needs the persisted
@@ -709,6 +709,42 @@ jobs:
           SHADOW_ISSUE: ${{ inputs.shadow-issue }}
           BODY: ${{ steps.comment.outputs.body }}
         run: gh issue comment "$SHADOW_ISSUE" --body-file "$BODY"
+
+      # The job token cannot read issues and pull requests, so the dry run uses a read-only broker token.
+      - id: dry-run-token
+        name: Exchange token for the release dry run
+        if: needs.configure.outputs.mode == 'main'
+        continue-on-error: true
+        uses: abinnovision/actions@exchange-github-token-dev
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          scope: contents:read issues:read pull_requests:read actions:read
+
+      # Shows the release PRs, tags and releases tallyrelease would create; writes nothing.
+      - name: Release dry run
+        id: dry-run
+        if: steps.dry-run-token.outcome == 'success'
+        continue-on-error: true
+        uses: abinnovision/actions@run-tallyrelease-dev
+        with:
+          token: ${{ steps.dry-run-token.outputs.token }}
+          args: |
+            run
+            --branch
+            ${{ inputs.default-branch }}
+            --dry-run
+            --summary
+
+      - name: Upload release dry run
+        if: steps.dry-run.outputs.result-file != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: tallyrelease-run
+          path: ${{ steps.dry-run.outputs.result-file }}
+          retention-days: 7
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
 
   # Single required status check for rulesets.
   status:
