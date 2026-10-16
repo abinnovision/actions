@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.2.0](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.1.4...gitops-stack-source-v2.2.0) (2026-10-16)
+
+
+### Features
+
+* **gitops-stack:** preview only affected applications on pull requests ([#696](https://github.com/abinnovision/actions/issues/696)) ([ccdadc2](https://github.com/abinnovision/actions/commit/ccdadc2a8a0f05f40e23e4e15cbc6064056ddde6))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.5.1
+
 ## [2.1.4](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.1.3...gitops-stack-source-v2.1.4) (2026-10-14)
 
 
