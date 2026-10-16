@@ -97,20 +97,32 @@ jobs:
             exit 1
           fi
 
+          # One distinct dist artifact is downloaded by name, several by the pattern "{a,b,...}".
+          artifacts=$(jq -c '[.[].payloads.dist.artifact // empty] | unique' <<< "$packages")
+
           {
             echo "packages=$packages"
-            echo "artifact=$(jq -r '.[0].payloads.dist.artifact // ""' <<< "$packages")"
+            echo "single=$(jq -r 'if length == 1 then .[0] else "" end' <<< "$artifacts")"
+            echo "pattern=$(jq -r 'if length > 1 then "{\(join(","))}" else "" end' <<< "$artifacts")"
           } >> "$GITHUB_OUTPUT"
 
           if [[ "$packages" == "[]" ]]; then
             echo "No entries match the include patterns, nothing to publish"
           fi
 
+      # Each artifact lands in its own directory, payload/<artifact>.
       - name: Download payload
-        if: steps.select.outputs.packages != '[]'
+        if: steps.select.outputs.single != ''
         uses: actions/download-artifact@v8
         with:
-          name: ${{ steps.select.outputs.artifact }}
+          name: ${{ steps.select.outputs.single }}
+          path: ${{ runner.temp }}/payload/${{ steps.select.outputs.single }}
+
+      - name: Download payloads
+        if: steps.select.outputs.pattern != ''
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ steps.select.outputs.pattern }}
           path: ${{ runner.temp }}/payload
 
       - name: Setup Node
@@ -138,6 +150,7 @@ jobs:
           INPUT_GHPR: ${{ inputs.ghpr }}
           INPUT_PROVENANCE: ${{ inputs.provenance }}
           NODE_AUTH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -150,24 +163,55 @@ jobs:
           npmrc=$(mktemp)
           echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > "$npmrc"
 
+          # A pattern download does not fail on a missing artifact and unpacks flat when only one matches.
+          mapfile -t artifacts < <(jq -r '[.[].payloads.dist.artifact // empty] | unique | .[]' <<< "$PACKAGES")
+          if [[ -n "$(find "$payload" -maxdepth 1 -type f 2> /dev/null)" ]]; then
+            echo "::error::Only one of $(jq -rn '$ARGS.positional | join(", ")' --args "${artifacts[@]}") was downloaded"
+            exit 1
+          fi
+          missing=0
+          for artifact in "${artifacts[@]}"; do
+            if [[ ! -d "$payload/$artifact" ]]; then
+              echo "::error::Artifact $artifact was not downloaded"
+              missing=1
+            fi
+          done
+          if [[ "$missing" == "1" ]]; then
+            exit 1
+          fi
+
           mapfile -t entries < <(jq -c '.[]' <<< "$PACKAGES")
 
-          # Extracts every tarball into its own directory and maps each package name to its
-          # tarball version ("old") and released version ("new").
-          version_map='{}'
+          # Extracts every tarball into its own directory and maps, per artifact, each package name
+          # to its tarball version ("old") and released version ("new").
+          version_maps='{}'
           for i in "${!entries[@]}"; do
+            artifact=$(jq -r '.payloads.dist.artifact' <<< "${entries[$i]}")
             file=$(jq -r '.payloads.dist.file' <<< "${entries[$i]}")
             new=$(jq -r '.version' <<< "${entries[$i]}")
             mkdir -p "$workdir/$i"
-            tar -xzf "$payload/$file" -C "$workdir/$i" 2> /dev/null || rm -rf "${workdir:?}/$i/package"
+            tar -xzf "$payload/$artifact/$file" -C "$workdir/$i" 2> /dev/null || rm -rf "${workdir:?}/$i/package"
 
             if [[ -f "$workdir/$i/package/package.json" ]]; then
-              version_map=$(jq -c --argjson map "$version_map" --arg new "$new" \
-                '$map + {(.name): {old: .version, new: $new}}' "$workdir/$i/package/package.json")
+              version_maps=$(jq -c --argjson maps "$version_maps" --arg artifact "$artifact" --arg new "$new" \
+                '. as $pkg | $maps | .[$artifact] += {($pkg.name): {old: $pkg.version, new: $new}}' \
+                "$workdir/$i/package/package.json")
             fi
           done
 
           failures=()
+
+          # Prints the highest stable version tagged "<prefix>X.Y.Z" on the remote, empty when there is none.
+          highest_tagged() {
+            local prefix="$1" path
+            path=$(jq -rn --arg prefix "$prefix" '$prefix | split("/") | map(@uri) | join("/")')
+            gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$path" \
+              | jq -r --arg ref "refs/tags/$prefix" '
+                  .[].ref | select(startswith($ref)) | ltrimstr($ref)
+                  | select(test("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"))
+                ' \
+              | sort -V | tail -n 1
+          }
 
           # Sets "result" to "published", "skipped (exists)" or "failed".
           publish_to() {
@@ -209,10 +253,26 @@ jobs:
           for i in "${!entries[@]}"; do
             entry="${entries[$i]}"
             entry_name=$(jq -r '.name' <<< "$entry")
+            artifact=$(jq -r '.payloads.dist.artifact' <<< "$entry")
             file=$(jq -r '.payloads.dist.file' <<< "$entry")
             version=$(jq -r '.version' <<< "$entry")
             channel=$(jq -r '.channel // ""' <<< "$entry")
+            has_prefix=$(jq -r '.tagPrefix | type == "string"' <<< "$entry")
+            tag_prefix=$(jq -r '.tagPrefix // ""' <<< "$entry")
             tag="${channel:-latest}"
+
+            # A stable entry with a tag prefix, also "", takes "backport" when a higher version is tagged.
+            if [[ -z "$channel" ]] && [[ "$has_prefix" == "true" ]]; then
+              if ! highest=$(highest_tagged "$tag_prefix"); then
+                fail_package "$entry_name" "$version" "$tag" "Reading the tags with prefix $tag_prefix failed" "tags"
+                continue
+              fi
+              if [[ -z "$highest" ]]; then
+                echo "::warning::No tag matches $tag_prefix<version>, publishing $entry_name@$version as latest"
+              elif [[ "$(printf '%s\n' "$version" "$highest" | sort -V | tail -n 1)" != "$version" ]]; then
+                tag="backport"
+              fi
+            fi
 
             manifest_file="$workdir/$i/package/package.json"
             if [[ ! -f "$manifest_file" ]]; then
@@ -271,7 +331,8 @@ jobs:
             fi
 
             # Sets the released version and moves "<old>", "^<old>" and "~<old>" ranges of packages
-            # in the version map to their released version. Other ranges are kept as written.
+            # in the version map of the entry's artifact to their released version. Other ranges are kept as written.
+            version_map=$(jq -c --arg artifact "$artifact" '.[$artifact] // {}' <<< "$version_maps")
             jq --arg version "$version" --argjson map "$version_map" '
               .version = $version
               | reduce ("dependencies", "peerDependencies", "optionalDependencies", "devDependencies") as $field (.;
@@ -288,7 +349,7 @@ jobs:
             # Re-creates the tarball with the members of the original tarball; no npm lifecycle runs.
             tarball="$workdir/$i.tgz"
             members="$workdir/$i.members"
-            if ! { tar -tzf "$payload/$file" > "$members" && tar -czf "$tarball" -C "$workdir/$i" --no-recursion -T "$members"; }; then
+            if ! { tar -tzf "$payload/$artifact/$file" > "$members" && tar -czf "$tarball" -C "$workdir/$i" --no-recursion -T "$members"; }; then
               fail_package "$name" "$version" "$tag" "Re-creating the tarball of $name@$version failed" "tarball"
               continue
             fi
