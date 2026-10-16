@@ -35,6 +35,14 @@ on:
           pipeline per unit. When `false`, all commits are scanned, unless the pipeline in Linear has a path filter.
           **Default:** `false`
 
+      maintenance:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Also sync entries of maintenance lines (`line: maintenance`). Entries without `line` are always synced.
+          **Default:** `false`
+
       dry-run:
         type: boolean
         required: false
@@ -66,6 +74,7 @@ jobs:
         env:
           RELEASES: ${{ inputs.releases }}
           LINEAR_ACCESS_KEYS: ${{ secrets.LINEAR_ACCESS_KEYS }}
+          INPUT_MAINTENANCE: ${{ inputs.maintenance }}
         run: |
           set -euo pipefail
 
@@ -90,7 +99,7 @@ jobs:
           fi
 
           # Converts a directory pattern into an anchored regex: `*` matches one segment that does not start with a dot.
-          groups=$(jq -c '
+          groups=$(jq -c --argjson maintenance "$INPUT_MAINTENANCE" '
             def pattern_regex:
               if . == "." then "^\\.$"
               else "^" + (split("*") | map(gsub("(?<c>[.+?^$()\\[\\]{}|\\\\])"; "\\\(.c)")) | join("[^/.][^/]*")) + "$"
@@ -110,7 +119,7 @@ jobs:
             | ($lines | map({(.key): .line}) | reverse | add // {}) as $first
 
             # Entries with `releaseSha` (tallyrelease) may list several releases of a unit; the highest version wins.
-            | [.[] | select(.channel == "")]
+            | [.[] | select(.channel == "" and ($maintenance or .line != "maintenance"))]
             | (map(select(.releaseSha)) | group_by(.path) | map(max_by(.version | split(".") | map(tonumber? // .))))
               as $newest
             | [.[] | select(.releaseSha == null or IN($newest[]; .)) | . as $entry
