@@ -8,9 +8,9 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 | Job                | Runs                                                            | Does                                                                                                                       |
 | :----------------- | :-------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
-| `Configure`        | Always                                                          | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, validates the configuration and discovers applications |
+| `Configure`        | Always                                                          | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, validates the configuration, discovers applications and selects the applications to preview |
 | `Check`            | Always                                                          | Repository baseline checks (install, dedupe, `check`), then validates the manifests of every application, without credentials |
-| `Preview: <name>`  | Trusted pull requests, one job per application with `.argocd-app` | Posts the ArgoCD diff as a PR comment                                                                                    |
+| `Preview: <name>`  | Trusted pull requests, one job per application with `.argocd-app` affected by the pull request | Posts the ArgoCD diff as a PR comment                                                                                    |
 | `Deploy: <name>`   | Push to `default-branch`, one job per application with `.argocd-app` matching `deploy-applications` | Triggers an ArgoCD sync and confirms it started without immediate errors (does not wait for health)                   |
 | `Status`           | Always                                                          | Single required status check, fails when any other job failed or was cancelled                                            |
 
@@ -24,8 +24,14 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 - `prune-applications` and `deploy-applications` select applications by path, one pattern per line, where `*` matches
   exactly one path segment and skips dot directories. Pruning is off by default. `deploy-applications` defaults to
   `k8s/applications/*`, so it must be updated together with `applications-directory`
+- On trusted pull requests, `Configure` runs `tallyrelease affected` through
+  [run-tallyrelease](../../actions/run-tallyrelease/README.md) and only applications containing an affected unit get a
+  `Preview`. A change to a shared base or component affects every kustomization that references it. The
+  repository's `tallyrelease.yaml` is used when present, otherwise a config with only the `kustomize` plugin, which
+  discovers every kustomization in the repository. A repository config must enable `kustomize` for the application
+  directories, otherwise their previews are skipped. Applications without a kustomization are always previewed
 - The preview comment is updated on every run: it shows the diff, notes that there are no changes or that the preview
-  failed
+  failed. The comment of an application that is no longer affected after a later push is left as is
 - With `enable-github-deployments`, each `Deploy` job runs in a GitHub environment named after the application, linked
   to the application in the ArgoCD UI. Every `Deploy` job records a GitHub deployment, also when the application was
   already in sync
