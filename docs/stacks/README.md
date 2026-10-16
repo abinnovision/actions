@@ -248,16 +248,22 @@ and the publish jobs must run in the same caller workflow.
 }
 ```
 
-| Field      | Description                                                                                         |
-| :--------- | :-------------------------------------------------------------------------------------------------- |
-| `schema`   | Protocol version, currently `1`                                                                     |
-| `name`     | Directory basename, the repository name for the root unit `.`                                       |
-| `path`     | Unit path in the repository, the unique key                                                         |
-| `version`  | Released version without build metadata                                                             |
-| `channel`  | Prerelease channel, `""` for a stable release                                                       |
-| `sha`      | Short commit SHA                                                                                    |
-| `url`      | Optional. GitHub release URL, only for stable releases of units with their own GitHub release       |
-| `payloads` | Payloads that exist for the unit, may be `{}`: `source` and `dist`, each with `artifact` and `file` |
+| Field        | Description                                                                                                        |
+| :----------- | :----------------------------------------------------------------------------------------------------------------- |
+| `schema`     | Protocol version, currently `1`                                                                                    |
+| `name`       | Directory basename, the repository name for the root unit `.`                                                      |
+| `path`       | Unit path in the repository, the unique key                                                                        |
+| `version`    | Released version without build metadata                                                                            |
+| `channel`    | Prerelease channel, `""` for a stable release                                                                      |
+| `sha`        | Short commit SHA                                                                                                   |
+| `url`        | Optional. GitHub release URL, only for stable releases of units with their own GitHub release                      |
+| `payloads`   | Payloads that exist for the unit, may be `{}`: `source` and `dist`, each with `artifact` and `file`                |
+| `catchUp`    | Optional. `true` when the release commit is not the commit of the run                                              |
+| `releaseSha` | Optional. Full SHA of the release commit                                                                           |
+| `tag`        | Optional. Git tag of a stable release, `null` for a prerelease                                                     |
+| `tagPrefix`  | Optional. Text before the version in the unit's git tags, `null` for a prerelease or when text follows the version |
+
+The optional fields are set by tallyrelease only. Publishers keep their previous behavior for entries without them.
 
 Every released unit is listed. A unit gets `payloads.source` when it is a source unit and `payloads.dist` when it is a
 dist unit.

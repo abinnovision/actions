@@ -12,17 +12,35 @@ whose `path` matches `include`.
 
 - Skips all work when `releases` is empty, `[]` or no entry matches `include`; other entries are ignored
 - Fails when a selected entry has an unsupported `schema` or no `payloads.dist`, before anything is published
-- Downloads the dist payload artifact and extracts the tarball of every selected entry
+- Downloads every distinct `payloads.dist.artifact` of the selected entries, fails before publishing when one is
+  missing, and extracts the tarball of every selected entry
 - Writes the entry `version` into the `package.json` of each tarball and bumps dependency ranges of packages released in
-  the same list: a range that is exactly `<old>`, `^<old>` or `~<old>`, where `<old>` is that package's version in its
-  tarball, becomes `<new>`, `^<new>` or `~<new>`; other ranges are kept as written
+  the same list from the same artifact: a range that is exactly `<old>`, `^<old>` or `~<old>`, where `<old>` is that
+  package's version in its tarball, becomes `<new>`, `^<new>` or `~<new>`; other ranges are kept as written
 - Re-creates the tarball with `tar` from the same files, so no lifecycle script runs
-- Publishes with the entry's `channel` as dist-tag, `latest` when it is empty
+- Publishes the entries in list order and sets the dist-tag as described in [Dist-tags](#dist-tags)
 - Skips packages with `"private": true`, packages no registry applies to (see [Registry selection](#registry-selection))
   and versions that already exist on a registry, so reruns are safe
 - A missing tarball, a leftover `workspace:` range (the tarball was not created by `yarn pack`) or a failed publish fails
   that package only: the remaining packages are still published and the job fails at the end
 - Writes a job summary with the result per package and registry
+
+## Dist-tags
+
+| Entry                          | Dist-tag                                                              |
+| :----------------------------- | :-------------------------------------------------------------------- |
+| `channel` set (prerelease)     | The `channel`                                                         |
+| Stable, without `tagPrefix`    | `latest`                                                              |
+| Stable, with `tagPrefix` (git) | `backport` when a higher stable version is tagged, `latest` otherwise |
+
+The git rule applies to every string `tagPrefix`, also `""` (tag format `{version}`), and reads the tags
+`<tagPrefix>X.Y.Z` of the repository with the workflow `GITHUB_TOKEN` when the entry is published. Tags with a
+prerelease, floating tags such as `web-v1` and other names starting with the prefix are ignored. When no tag matches,
+the entry takes `latest` with a warning. Lists from tallyrelease set `tagPrefix` and are ordered oldest first, so a
+catch-up release publishes the older version as `backport` and the newest as `latest`.
+
+A version that already exists is skipped and its dist-tags are left as they are. The first publish of a package always
+sets `latest` on the registry, also with `--tag backport`.
 
 ## Registry selection
 
