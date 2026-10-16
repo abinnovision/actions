@@ -119,7 +119,7 @@ jobs:
 This action can be used with different version ranges. The following ranges are available:
 
 - `abinnovision/actions@run-tallyrelease-v0`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions@run-tallyrelease-v0.5.1`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions@run-tallyrelease-v0.6.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ## Inputs
 

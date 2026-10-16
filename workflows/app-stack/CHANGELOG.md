@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.5.1...app-stack-source-v1.6.0) (2026-10-16)
+
+
+### Features
+
+* **app-stack:** commit tallyrelease releases as the token's bot ([#698](https://github.com/abinnovision/actions/issues/698)) ([45987db](https://github.com/abinnovision/actions/commit/45987dbad773d32f9442c5b495c7aafed6f9f675))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.6.0
+
 ## [1.5.1](https://github.com/abinnovision/actions/compare/app-stack-source-v1.5.0...app-stack-source-v1.5.1) (2026-10-16)
 
 
