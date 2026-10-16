@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/abinnovision/actions/compare/publish-npm-source-v1.0.1...publish-npm-source-v1.1.0) (2026-10-16)
+
+
+### Features
+
+* **publish-npm:** publish every artifact of the release list and set latest by git tags ([#685](https://github.com/abinnovision/actions/issues/685)) ([fa28eab](https://github.com/abinnovision/actions/commit/fa28eab8fb5e9f8420e2a2424bfd97bcb49bdc34))
+
 ## [1.0.1](https://github.com/abinnovision/actions/compare/publish-npm-source-v1.0.0...publish-npm-source-v1.0.1) (2026-10-13)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.1.3...publish-oci-source-v1.2.0) (2026-10-16)
+
+
+### Features
+
+* **publish-oci:** skip existing images and decide latest and GitOps dispatch by git tags ([#687](https://github.com/abinnovision/actions/issues/687)) ([52603b0](https://github.com/abinnovision/actions/commit/52603b0dc8e44793a73b7bcb2a5a226b8aa4b788))
+
 ## [1.1.3](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.1.2...publish-oci-source-v1.1.3) (2026-10-13)
 
 

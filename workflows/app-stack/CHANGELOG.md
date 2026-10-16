@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.4.0...app-stack-source-v1.5.0) (2026-10-16)
+
+
+### Features
+
+* **app-stack:** add tallyrelease release mode ([#690](https://github.com/abinnovision/actions/issues/690)) ([a119569](https://github.com/abinnovision/actions/commit/a119569d040cdb54f9f647495e54ff687f5db70a))
+* **app-stack:** release maintenance lines in tallyrelease release mode ([#692](https://github.com/abinnovision/actions/issues/692)) ([15774b6](https://github.com/abinnovision/actions/commit/15774b6c4f13e69fd399acb759c2bae9bf24d5a1))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.5.0
+
 ## [1.4.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.3.0...app-stack-source-v1.4.0) (2026-10-16)
 
 
