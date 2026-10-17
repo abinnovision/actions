@@ -281,6 +281,8 @@ and the publish jobs must run in the same caller workflow.
 | `releaseSha` | Optional. Full SHA of the release commit                                                                           |
 | `tag`        | Optional. Git tag of a stable release, `null` for a prerelease                                                     |
 | `tagPrefix`  | Optional. Text before the version in the unit's git tags, `null` for a prerelease or when text follows the version |
+| `id`         | Optional. tallyrelease unit id                                                                                     |
+| `prs`        | Optional. Pull request numbers of a stable release, including those of the units it was propagated from            |
 
 The optional fields are set by tallyrelease only. Publishers keep their previous behavior for entries without them.
 
@@ -289,11 +291,11 @@ dist unit.
 
 ### Publish workflows
 
-| Workflow                                                   | Publishes                                 | Default `include`             | Consumes          |
-| :--------------------------------------------------------- | :---------------------------------------- | :---------------------------- | :---------------- |
-| [publish-oci](../../workflows/publish-oci/README.md)       | Container images, then GitOps tag updates | `apps/*`                      | `payloads.source` |
-| [publish-npm](../../workflows/publish-npm/README.md)       | Packages to npmjs and GitHub Packages     | `packages/*`                  | `payloads.dist`   |
-| [publish-linear](../../workflows/publish-linear/README.md) | Stable releases to Linear Releases        | `LINEAR_ACCESS_KEYS` patterns | none              |
+| Workflow                                                   | Publishes                                 | Default `include`          | Consumes          |
+| :--------------------------------------------------------- | :---------------------------------------- | :------------------------- | :---------------- |
+| [publish-oci](../../workflows/publish-oci/README.md)       | Container images, then GitOps tag updates | `apps/*`                   | `payloads.source` |
+| [publish-npm](../../workflows/publish-npm/README.md)       | Packages to npmjs and GitHub Packages     | `packages/*`               | `payloads.dist`   |
+| [publish-linear](../../workflows/publish-linear/README.md) | Stable releases to Linear Releases        | `LINEAR_ACCESS_KEYS` units | `prs`             |
 
 - An empty string or `[]` means nothing to do; the workflow skips without failing.
 - Entries whose `path` matches `include` are selected; all other entries are ignored silently.

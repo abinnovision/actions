@@ -394,8 +394,11 @@ repository. Release PR commits are authored by that App (`<app>[bot]`). The call
   job-level concurrency
 - `prerelease-channel` is ignored; channels come from the branches in `tallyrelease.yaml`. The
   `.release-please-manifest.json` rule of `build-selection: affected` has no effect
-- Each entry carries `catchUp`, `releaseSha`, `tag` and `tagPrefix`, and `sha` is the short `releaseSha`. The publish
+- Each entry carries `id` (the tallyrelease unit id), `catchUp`, `releaseSha`, `tag` and `tagPrefix`, and `sha` is the short `releaseSha`. The publish
   workflows use them to skip what exists and to keep `latest` and GitOps on the newest version
+- Stable entries also carry `prs`, the pull requests tallyrelease attributed to the release, from the plan at the first
+  parent of `releaseSha` (the plan tallyrelease checks before tagging), including those of the units it was propagated
+  from. `publish-linear` syncs them to Linear
 
 **Catch-ups.** When a release run was cancelled by the concurrency group or failed, the next run lists those releases
 again, with `catchUp: true` and the release commit as `releaseSha`. Payloads of entries at the built commit come from
