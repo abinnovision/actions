@@ -39,6 +39,18 @@ on:
           **Default:** `{id}`
           **Example:** `app-{id}`
 
+      platforms:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Target platforms in **CSV format** (one line per unit).
+          **Format:** `unit-id,mode,platform[,platform...]`, where `unit-id` is the tallyrelease unit `id` and `platform` is `os/arch[/variant]`
+          **Mode:** `cross` builds every platform on the amd64 runner without QEMU, so every Dockerfile stage with `RUN` must use `FROM --platform=$BUILDPLATFORM`
+          **Default:** _empty_ (native platform of the runner, linux/amd64)
+          **Example:** `my-api,cross,linux/amd64,linux/arm64`
+          **Note:** Lines with fewer than 3 columns, empty columns, a mode other than `cross`, an invalid platform or a repeated unit fail the run. Lines for units not in the release list are ignored with a warning
+
       registry:
         type: string
         required: false
@@ -122,7 +134,8 @@ jobs:
       units: ${{ steps.select.outputs.units }}
       gitops-routes: ${{ steps.select.outputs.gitops-routes }}
     steps:
-      # Selects the entries tagged "source" and adds the rendered `image`, the payload `artifact` and `sha7` to each.
+      # Selects the entries tagged "source" and adds the rendered `image`, the payload `artifact`, `sha7` and
+      # `platforms` to each.
       - name: Select units
         id: select
         env:
@@ -132,6 +145,7 @@ jobs:
           INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.gcp-workload-identity-provider }}
           INPUT_GITOPS_ROUTES: ${{ inputs.gitops-routes }}
           INPUT_IMAGE: ${{ inputs.image }}
+          INPUT_PLATFORMS: ${{ inputs.platforms }}
           TOKEN_BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
         run: |
           set -euo pipefail
@@ -176,6 +190,18 @@ jobs:
             invalid = 1
           } END { exit invalid }' <<< "$INPUT_GITOPS_ROUTES"
 
+          # platforms: id,mode,platform[,platform...]
+          awk -F, '$0 != "" {
+            if (seen[$1]++) { print "::error::Duplicate platforms line for unit \047" $1 "\047"; invalid = 1; next }
+            bad = (NF < 3 || /^,|,$|,,/ || $2 != "cross")
+            for (i = 3; i <= NF; i++) if ($i !~ /^[a-z0-9]+\/[a-z0-9_]+(\/[a-z0-9]+)?$/) bad = 1
+            if (bad) { print "::error::Invalid platforms line \047" $0 "\047: expected \047id,mode,platform[,platform...]\047 with mode \047cross\047, platforms \047os/arch[/variant]\047 and without empty columns"; invalid = 1 }
+          } END { exit invalid }' <<< "$INPUT_PLATFORMS"
+
+          jq -r --arg platforms "$INPUT_PLATFORMS" '[.[].id] as $ids
+            | $platforms | split("\n")[] | select(. != "") | split(",")[0] | select(IN($ids[]) | not)
+            | "::warning::platforms line for unknown unit \u0027\(.)\u0027 is ignored"' <<< "$RELEASES"
+
           # Renders `image`, fails on a placeholder left as written, then lowercases.
           units=$(jq -c --arg image "$INPUT_IMAGE" 'map(
             select(any(.tags[]?; . == "source"))
@@ -189,6 +215,11 @@ jobs:
                 sha7: .releaseSha[0:7]
               }
           )' <<< "$RELEASES")
+
+          units=$(jq -c --arg platforms "$INPUT_PLATFORMS" '
+            ($platforms | split("\n") | map(select(. != "") | split(",") | {key: .[0], value: (.[2:] | join(","))}) | from_entries) as $p
+            | map(. + {platforms: ($p[.id] // "")})
+          ' <<< "$units")
 
           if [[ -n "$INPUT_GITOPS_ROUTES" ]]; then
             delimiter="EOF_$(openssl rand -hex 8)"
@@ -483,6 +514,7 @@ jobs:
           file: payload/${{ matrix.entry.path }}/Dockerfile
           push: true
           sbom: true
+          platforms: ${{ matrix.entry.platforms }}
           cache-from: ${{ steps.image-names.outputs.CACHE_FROM }}
           cache-to: ${{ steps.image-names.outputs.CACHE_TO }}
           labels: ${{ steps.meta.outputs.labels }}
