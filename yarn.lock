@@ -4465,7 +4465,6 @@ __metadata:
   resolution: "publish-npm@workspace:workflows/publish-npm"
   dependencies:
     "@abinnovision/prettier-config": "npm:^2.2.0"
-    match-paths: "workspace:^"
     prettier: "npm:^3.9.9"
   languageName: unknown
   linkType: soft
