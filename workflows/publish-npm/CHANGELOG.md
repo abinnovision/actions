@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/abinnovision/actions/compare/publish-npm-source-v1.1.0...publish-npm-source-v2.0.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **publish-npm:** publish release list v2 entries ([#707](https://github.com/abinnovision/actions/issues/707))
+
+### Features
+
+* **publish-npm:** publish release list v2 entries ([#707](https://github.com/abinnovision/actions/issues/707)) ([b438806](https://github.com/abinnovision/actions/commit/b4388067195f49ee4bbae2ba510e36a9aa7c0dfd))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/publish-npm-source-v1.0.1...publish-npm-source-v1.1.0) (2026-10-16)
 
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.2.0...publish-oci-source-v2.0.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **publish-oci:** publish release list v2 entries ([#706](https://github.com/abinnovision/actions/issues/706))
+
+### Features
+
+* **publish-oci:** publish release list v2 entries ([#706](https://github.com/abinnovision/actions/issues/706)) ([a623627](https://github.com/abinnovision/actions/commit/a623627c66d9c6975d0b7067e27186713d3056f0))
+
 ## [1.2.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.1.3...publish-oci-source-v1.2.0) (2026-10-16)
 
 
