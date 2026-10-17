@@ -4,16 +4,18 @@ Publishes the npm packages built by a stack to npmjs and GitHub Packages. It doe
 not install, build or run any script of a package: it writes the released version into each package tarball of the
 dist payload, bumps the ranges of dependencies released in the same list and publishes the tarball.
 
-The release list is the `releases` output of a stack, see the
-[publishing protocol](../../docs/stacks/README.md#publishing). This workflow consumes `payloads.dist` of the entries
-whose `path` matches `include`.
+The release list is the `releases` output of a stack (release list v2), see the
+[publishing protocol](../../docs/stacks/README.md#publishing). This workflow publishes the entries whose `tags` contain
+`dist`.
 
 ## Behavior
 
-- Skips all work when `releases` is empty, `[]` or no entry matches `include`; other entries are ignored
-- Fails when a selected entry has an unsupported `schema` or no `payloads.dist`, before anything is published
-- Downloads every distinct `payloads.dist.artifact` of the selected entries, fails before publishing when one is
-  missing, and extracts the tarball of every selected entry
+- Skips all work when `releases` is empty, `[]` or no entry is tagged `dist`; other entries are ignored
+- Fails when any entry has no `latest` (not a release list v2 entry), before anything is selected or published
+- Reads the tarball `<id>.tgz` of each entry from the artifact `payload-dist`, or `payload-dist-<releaseSha>` for a
+  `catchUp` entry
+- Downloads every distinct payload artifact of the selected entries, fails before publishing when one is missing, and
+  extracts the tarball of every selected entry
 - Writes the entry `version` into the `package.json` of each tarball and bumps dependency ranges of packages released in
   the same list from the same artifact: a range that is exactly `<old>`, `^<old>` or `~<old>`, where `<old>` is that
   package's version in its tarball, becomes `<new>`, `^<new>` or `~<new>`; other ranges are kept as written
@@ -27,17 +29,15 @@ whose `path` matches `include`.
 
 ## Dist-tags
 
-| Entry                          | Dist-tag                                                              |
-| :----------------------------- | :-------------------------------------------------------------------- |
-| `channel` set (prerelease)     | The `channel`                                                         |
-| Stable, without `tagPrefix`    | `latest`                                                              |
-| Stable, with `tagPrefix` (git) | `backport` when a higher stable version is tagged, `latest` otherwise |
+| Entry                      | Dist-tag      |
+| :------------------------- | :------------ |
+| `kind: prerelease`         | The `channel` |
+| Stable with `latest: true` | `latest`      |
+| Stable otherwise           | `backport`    |
 
-The git rule applies to every string `tagPrefix`, also `""` (tag format `{version}`), and reads the tags
-`<tagPrefix>X.Y.Z` of the repository with the workflow `GITHUB_TOKEN` when the entry is published. Tags with a
-prerelease, floating tags such as `web-v1` and other names starting with the prefix are ignored. When no tag matches,
-the entry takes `latest` with a warning. Lists from tallyrelease set `tagPrefix` and are ordered oldest first, so a
-catch-up release publishes the older version as `backport` and the newest as `latest`.
+`latest` is the highest stable version of the unit and is never set on a maintenance line. The re-run guard keeps a
+re-run from moving `latest`: when the run attempt is greater than 1 and the tip of the run's branch is no longer the
+commit of the run, or cannot be read, every stable entry is published as `backport` with a warning.
 
 A version that already exists is skipped and its dist-tags are left as they are. The first publish of a package always
 sets `latest` on the registry, also with `--tag backport`.
@@ -104,6 +104,12 @@ jobs:
 ```
 
 [//]: # "x-release-please-end"
+
+## Migrating from v1
+
+- `releases` must be a release list v2 (app-stack v2); a v1 list fails on the entry check
+- `include` is removed: entries are selected by the `dist` tag of the unit in the tallyrelease config
+- The dist-tag of a stable entry comes from its `latest`; the repository tags are no longer read
 
 ## Inputs
 

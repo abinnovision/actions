@@ -7,19 +7,10 @@ on:
         type: string
         required: true
         description: |-
-          Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.
-          This workflow publishes the entries matching `include` from their dist payload.
+          Release list v2 of a stack as a JSON array, the `releases` output of a stack.
+          This workflow publishes the entries tagged `dist` from their dist payload.
           An empty string or `[]` skips all work.
           **Example:** `needs.ci.outputs.releases`
-
-      include:
-        type: string
-        required: false
-        default: packages/*
-        description: |-
-          Directory patterns of the entries to publish, one per line, matched against the entry `path`.
-          `*` matches one path segment and skips dot directories.
-          **Default:** `packages/*`
 
       npm:
         type: boolean
@@ -67,28 +58,18 @@ jobs:
       id-token: write
       packages: write
     steps:
-      # Select the entries whose path matches an include pattern.
-      - name: Match packages
-        id: match
-        uses: abinnovision/actions@match-paths-dev
-        with:
-          items: ${{ inputs.releases }}
-          patterns: ${{ inputs.include }}
-
+      # Select the entries tagged dist and resolve their payload.
       - name: Select packages
         id: select
         env:
-          PACKAGES: ${{ steps.match.outputs.items }}
+          RELEASES: ${{ inputs.releases }}
         run: |
           set -euo pipefail
 
-          packages="$PACKAGES"
-
           errors=$(jq -r '
-            .[] | .name as $name
-            | (if .schema != 1 then "Entry \($name) has schema \(.schema // "none"), this workflow supports schema 1" else empty end),
-              (if .payloads.dist == null then "Entry \($name) has no dist payload" else empty end)
-          ' <<< "$packages")
+            .[] | select(has("latest") | not)
+            | "Entry \(.id // .path) is not a release list v2 entry (missing latest)"
+          ' <<< "$RELEASES")
 
           if [[ -n "$errors" ]]; then
             while IFS= read -r error; do
@@ -97,8 +78,14 @@ jobs:
             exit 1
           fi
 
+          packages=$(jq -c '
+            map(select(any(.tags[]?; . == "dist"))
+              | .artifact = (if .catchUp then "payload-dist-\(.releaseSha)" else "payload-dist" end)
+              | .file = "\(.id).tgz")
+          ' <<< "$RELEASES")
+
           # One distinct dist artifact is downloaded by name, several by the pattern "{a,b,...}".
-          artifacts=$(jq -c '[.[].payloads.dist.artifact // empty] | unique' <<< "$packages")
+          artifacts=$(jq -c '[.[].artifact] | unique' <<< "$packages")
 
           {
             echo "packages=$packages"
@@ -107,8 +94,27 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           if [[ "$packages" == "[]" ]]; then
-            echo "No entries match the include patterns, nothing to publish"
+            echo "No entries are tagged dist, nothing to publish"
           fi
+
+      # A re-run whose commit is no longer the branch tip must not move the latest dist-tag.
+      - name: Re-run guard
+        id: guard
+        if: steps.select.outputs.packages != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          stale="false"
+          if [[ "$GITHUB_RUN_ATTEMPT" != "1" ]]; then
+            if ! tip=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha) \
+              || [[ "$tip" != "$GITHUB_SHA" ]]; then
+              stale="true"
+              echo "::warning::Re-run of a superseded run: stable packages are published as backport"
+            fi
+          fi
+          echo "stale=$stale" >> "$GITHUB_OUTPUT"
 
       # Each artifact lands in its own directory, payload/<artifact>.
       - name: Download payload
@@ -149,8 +155,8 @@ jobs:
           INPUT_NPM: ${{ inputs.npm }}
           INPUT_GHPR: ${{ inputs.ghpr }}
           INPUT_PROVENANCE: ${{ inputs.provenance }}
+          STALE: ${{ steps.guard.outputs.stale }}
           NODE_AUTH_TOKEN: ${{ github.token }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -164,7 +170,7 @@ jobs:
           echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > "$npmrc"
 
           # A pattern download does not fail on a missing artifact and unpacks flat when only one matches.
-          mapfile -t artifacts < <(jq -r '[.[].payloads.dist.artifact // empty] | unique | .[]' <<< "$PACKAGES")
+          mapfile -t artifacts < <(jq -r '[.[].artifact] | unique | .[]' <<< "$PACKAGES")
           if [[ -n "$(find "$payload" -maxdepth 1 -type f 2> /dev/null)" ]]; then
             echo "::error::Only one of $(jq -rn '$ARGS.positional | join(", ")' --args "${artifacts[@]}") was downloaded"
             exit 1
@@ -186,8 +192,8 @@ jobs:
           # to its tarball version ("old") and released version ("new").
           version_maps='{}'
           for i in "${!entries[@]}"; do
-            artifact=$(jq -r '.payloads.dist.artifact' <<< "${entries[$i]}")
-            file=$(jq -r '.payloads.dist.file' <<< "${entries[$i]}")
+            artifact=$(jq -r '.artifact' <<< "${entries[$i]}")
+            file=$(jq -r '.file' <<< "${entries[$i]}")
             new=$(jq -r '.version' <<< "${entries[$i]}")
             mkdir -p "$workdir/$i"
             tar -xzf "$payload/$artifact/$file" -C "$workdir/$i" 2> /dev/null || rm -rf "${workdir:?}/$i/package"
@@ -200,18 +206,6 @@ jobs:
           done
 
           failures=()
-
-          # Prints the highest stable version tagged "<prefix>X.Y.Z" on the remote, empty when there is none.
-          highest_tagged() {
-            local prefix="$1" path
-            path=$(jq -rn --arg prefix "$prefix" '$prefix | split("/") | map(@uri) | join("/")')
-            gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$path" \
-              | jq -r --arg ref "refs/tags/$prefix" '
-                  .[].ref | select(startswith($ref)) | ltrimstr($ref)
-                  | select(test("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"))
-                ' \
-              | sort -V | tail -n 1
-          }
 
           # Sets "result" to "published", "skipped (exists)" or "failed".
           publish_to() {
@@ -252,26 +246,20 @@ jobs:
 
           for i in "${!entries[@]}"; do
             entry="${entries[$i]}"
-            entry_name=$(jq -r '.name' <<< "$entry")
-            artifact=$(jq -r '.payloads.dist.artifact' <<< "$entry")
-            file=$(jq -r '.payloads.dist.file' <<< "$entry")
+            entry_name=$(jq -r '.id' <<< "$entry")
+            artifact=$(jq -r '.artifact' <<< "$entry")
+            file=$(jq -r '.file' <<< "$entry")
             version=$(jq -r '.version' <<< "$entry")
-            channel=$(jq -r '.channel // ""' <<< "$entry")
-            has_prefix=$(jq -r '.tagPrefix | type == "string"' <<< "$entry")
-            tag_prefix=$(jq -r '.tagPrefix // ""' <<< "$entry")
-            tag="${channel:-latest}"
+            kind=$(jq -r '.kind' <<< "$entry")
+            latest=$(jq -r '.latest' <<< "$entry")
 
-            # A stable entry with a tag prefix, also "", takes "backport" when a higher version is tagged.
-            if [[ -z "$channel" ]] && [[ "$has_prefix" == "true" ]]; then
-              if ! highest=$(highest_tagged "$tag_prefix"); then
-                fail_package "$entry_name" "$version" "$tag" "Reading the tags with prefix $tag_prefix failed" "tags"
-                continue
-              fi
-              if [[ -z "$highest" ]]; then
-                echo "::warning::No tag matches $tag_prefix<version>, publishing $entry_name@$version as latest"
-              elif [[ "$(printf '%s\n' "$version" "$highest" | sort -V | tail -n 1)" != "$version" ]]; then
-                tag="backport"
-              fi
+            # Prereleases take their channel, the latest stable entry of a current run "latest", others "backport".
+            if [[ "$kind" == "prerelease" ]]; then
+              tag=$(jq -r '.channel' <<< "$entry")
+            elif [[ "$latest" == "true" ]] && [[ "$STALE" != "true" ]]; then
+              tag="latest"
+            else
+              tag="backport"
             fi
 
             manifest_file="$workdir/$i/package/package.json"
