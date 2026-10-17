@@ -26,8 +26,6 @@
 	"dependencies": {
 		"evaluate-event": "workspace:^",
 		"exchange-github-token": "workspace:^",
-		"match-paths": "workspace:^",
-		"run-release-please": "workspace:^",
 		"run-tallyrelease": "workspace:^",
 		"setup-tools": "workspace:^"
 	},
