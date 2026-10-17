@@ -1,0 +1,620 @@
+# CI for Yarn repositories: Turborepo monorepos that mix Node.js, Python and Go, and single-package repositories.
+# Checks, builds and tests every change. On every branch push it packs the affected dist units into the dist
+# payload, prunes the affected source units into the source payload and releases with tallyrelease for the
+# branch pushed. Both payloads are target-neutral artifacts. The released units are exposed as one release
+# list through the `releases` output. Publishing is wired by the caller.
+
+name: App Stack
+
+on:
+  workflow_call:
+    inputs:
+      token-broker-url:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          URL of the token broker for OIDC token exchange.
+          **Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.
+      default-branch:
+        type: string
+        required: false
+        default: "main"
+        description: |-
+          Default branch name for the repository.
+          **Default:** `main`
+          **Example:** `main`, `master`, `develop`
+      test-types:
+        type: string
+        required: false
+        default: "unit"
+        description: |-
+          Comma-separated list of test types to run.
+          **Valid values:** `unit`, `integration`, `e2e`
+          **Default:** `unit`
+          **Example:** `unit,integration,e2e`
+      run-unit-tests-in-build:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Run unit tests as part of the check job instead of a separate job.
+          Recommended for smaller monorepos to reduce overall execution time.
+          **Default:** `true`
+          **Note:** You must include `unit` in the `test-types` input for this to have any effect.
+      checkout-submodules:
+        type: string
+        required: false
+        default: "false"
+        description: |-
+          Whether to checkout submodules.
+          **Default:** `false`
+          **Example:** `true`, `false`, `recursive`
+          **Note:** Use `recursive` to recursively checkout submodules
+      checkout-token-resources:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Additional resources the checkout token must be able to read, whitespace-separated.
+          When set, the workflow exchanges its OIDC token at the token broker for an installation token with `contents:read` on this repository plus these resources, and uses it for every checkout.
+          **Default:** _empty_ (no exchange; `GITHUB_TOKEN` is used)
+          **Format:** `repo:owner/name`, `org:name` or `enterprise:slug`
+          **Example:** `repo:my-org/private-submodule repo:my-org/go-lib`
+          **Requires:** `token-broker-url` (or the `TOKEN_BROKER_URL` repository variable), and the token broker's GitHub App installed on this repository and every listed resource
+          **Note:** Unavailable on pull requests from forks, which have no OIDC token; those runs use `GITHUB_TOKEN`
+
+    outputs:
+      releases:
+        value: ${{ jobs.release.outputs.releases || '[]' }}
+        description: |-
+          Release list v2, a compact JSON array of tallyrelease release entries for publish workflows such as `publish-oci`, `publish-npm` and `publish-linear`.
+          Each entry: {id, path, kind, version, channel, tag, releaseSha, catchUp, forge, latest, tags, group, prs}, see the tallyrelease CLI README for the fields. `prs` holds the pull request numbers of the release's changes, propagated units included.
+          Payloads follow one rule: `payload-source` / `payload-dist`, with `-<releaseSha>` appended when `catchUp` is true. Files are `source.tar` and `<id>.tgz`.
+          `[]` when nothing was released.
+
+permissions: {}
+
+env:
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Resolve the event, validate the repository, resolve the affected units and discover test types.
+  configure:
+    name: Configure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      # Commit SHA to check out.
+      commit-sha: ${{ steps.event.outputs.commit-sha }}
+
+      # Pipeline mode (pr, main or none). Every branch push is `main`.
+      mode: ${{ steps.mode.outputs.mode }}
+
+      # Branch tallyrelease plans and releases for.
+      branch: ${{ steps.mode.outputs.branch }}
+
+      # Affected units tagged `source` and `dist`, compact JSON arrays of {id, path, plugin, reason, released, tags},
+      # path `.` for the repository root. `[]` outside mode `main`.
+      source-units: ${{ steps.source-units.outputs.affected || '[]' }}
+      dist-units: ${{ steps.dist-units.outputs.affected || '[]' }}
+
+      # Build base of the affected units, empty when there is no build base. `Release` passes it to `run`.
+      base: ${{ steps.source-units.outputs.base }}
+
+      # Test types to run.
+      test-types: ${{ steps.evaluate.outputs.test_types }}
+      test-types-for-matrix: ${{ steps.evaluate.outputs.test_types_for_matrix }}
+    steps:
+      # Resolve the commit SHA and mode for this event.
+      - name: Evaluate event
+        id: event
+        uses: abinnovision/actions@evaluate-event-v1.1.0
+        with:
+          default-branch: ${{ inputs.default-branch }}
+
+      # Every branch push releases for that branch; pull requests plan for their base.
+      - name: Resolve mode
+        id: mode
+        env:
+          MODE: ${{ steps.event.outputs.mode }}
+          INPUT_DEFAULT_BRANCH: ${{ inputs.default-branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          branch="$INPUT_DEFAULT_BRANCH"
+          if [[ "$EVENT_NAME" == "push" && "$GITHUB_REF" == refs/heads/* ]]; then
+            MODE=main
+            branch="$GITHUB_REF_NAME"
+          elif [[ "$EVENT_NAME" == "pull_request" && -n "$BASE_REF" ]]; then
+            branch="$BASE_REF"
+          fi
+
+          echo "Mode: $MODE, branch: $branch"
+          {
+            echo "mode=$MODE"
+            echo "branch=$branch"
+          } >> "$GITHUB_OUTPUT"
+
+      # Full history for tallyrelease in mode `main`, pull requests only read the Makefile; blobs are fetched on
+      # demand, which needs the persisted credentials on private repositories.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.event.outputs.commit-sha }}
+          submodules: false
+          fetch-depth: ${{ steps.mode.outputs.mode == 'main' && '0' || '1' }}
+          filter: blob:none
+
+      # Optional: without a Makefile, dependencies are installed with `yarn install --immutable`.
+      - name: Validate Makefile
+        run: |
+          if [ ! -f "Makefile" ]; then
+            echo "No Makefile, installing with 'yarn install --immutable'"
+            exit 0
+          fi
+          if ! grep -qE '^install-immutable:' Makefile; then
+            echo "::error::Makefile missing required 'install-immutable' target"
+            exit 1
+          fi
+
+      # Units and their `source` and `dist` tags come from tallyrelease.yaml. A repository without units of one kind
+      # gets W_TAG_UNKNOWN for that tag, which is expected.
+      - name: Resolve source units
+        id: source-units
+        if: steps.mode.outputs.mode == 'main'
+        uses: abinnovision/actions@run-tallyrelease-v0.7.0
+        with:
+          args: affected --tag source --github-output
+
+      # Reuses the base of the first call, so both unit lists share one build base.
+      - name: Resolve dist units
+        id: dist-units
+        if: steps.mode.outputs.mode == 'main'
+        uses: abinnovision/actions@run-tallyrelease-v0.7.0
+        with:
+          args: |
+            affected
+            --tag
+            dist
+            ${{ steps.source-units.outputs.base != '' && '--base' || '' }}
+            ${{ steps.source-units.outputs.base }}
+            --github-output
+
+      # Parse test types.
+      - name: Evaluate
+        id: evaluate
+        env:
+          INPUT_TEST_TYPES: ${{ inputs.test-types }}
+          INPUT_RUN_UNIT_TESTS_IN_BUILD: ${{ inputs.run-unit-tests-in-build }}
+        run: |
+          # Parse and validate test types
+          test_types=()
+          test_types_for_matrix=()
+          valid_types=("unit" "integration" "e2e")
+
+          if [ -n "$INPUT_TEST_TYPES" ]; then
+            IFS=',' read -ra types <<< "$INPUT_TEST_TYPES"
+            for type in "${types[@]}"; do
+              # Trim whitespace
+              type=$(echo "$type" | xargs)
+
+              # Validate type
+              if [[ " ${valid_types[@]} " =~ " ${type} " ]]; then
+                test_types+=("$type")
+
+                # Exclude unit tests from matrix if they run in the check job
+                if [[ "$type" == "unit" && "$INPUT_RUN_UNIT_TESTS_IN_BUILD" == "true" ]]; then
+                  echo "Unit tests will run in the check job, excluding from test matrix"
+                else
+                  test_types_for_matrix+=("$type")
+                fi
+              else
+                echo "::warning::Invalid test type '$type' - skipping. Valid types: unit, integration, e2e"
+              fi
+            done
+          fi
+
+          # Convert to JSON using jq
+          test_types_json=$(printf '%s\n' "${test_types[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          test_types_matrix_json=$(printf '%s\n' "${test_types_for_matrix[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "test_types=$test_types_json" >> $GITHUB_OUTPUT
+          echo "test_types_for_matrix=$test_types_matrix_json" >> $GITHUB_OUTPUT
+
+          # Debug output
+          echo "All test types: $test_types_json"
+          echo "Test types for matrix: $test_types_matrix_json"
+
+  # Install, build and check. Builds first so linter config in compiled workspace packages is available.
+  # On every branch push it also prunes the affected source units into the source payload and packs the
+  # affected dist units into the dist payload.
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - configure
+    permissions:
+      contents: read
+      packages: read
+      actions: write
+      id-token: write
+    # Read by the payload steps, which `Release build` shares.
+    env:
+      PAYLOAD_SOURCE_UNITS: ${{ needs.configure.outputs.source-units }}
+      PAYLOAD_DIST_UNITS: ${{ needs.configure.outputs.dist-units }}
+    steps:
+      - &checkout-token
+        id: checkout-token
+        name: Exchange token for checkout
+        if: >-
+          inputs.checkout-token-resources != ''
+          && (github.event.pull_request == null
+          || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: abinnovision/actions@exchange-github-token-v1.4.1
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          resources: "repo:${{ github.repository }} ${{ inputs.checkout-token-resources }}"
+          scope: contents:read
+
+      - &checkout
+        name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: ${{ inputs.checkout-submodules }}
+          token: ${{ steps.checkout-token.outputs.token || github.token }}
+          persist-credentials: false
+      - &setup-tools
+        name: Setup Tools
+        uses: abinnovision/actions@setup-tools-v2.0.0
+
+      # Runs before install and build so the pruned trees only contain tracked sources.
+      - &prune
+        name: Prune source units
+        if: env.PAYLOAD_SOURCE_UNITS != '[]'
+        run: |
+          set -euo pipefail
+
+          # The root unit is not pruned, the payload already holds the whole tree.
+          units=$(jq -c '[.[] | select(.path != ".")]' <<< "$PAYLOAD_SOURCE_UNITS")
+
+          if [[ $(jq 'length' <<< "$units") -gt 0 ]]; then
+            # Get turbo version from package.json (required to prune)
+            TURBO_VERSION=$(jq -r '.devDependencies.turbo // .dependencies.turbo // empty' package.json)
+
+            if [ -z "$TURBO_VERSION" ]; then
+              echo "::error::Turbo not found in package.json devDependencies or dependencies"
+              exit 1
+            fi
+
+            echo "Turbo version: $TURBO_VERSION"
+          fi
+
+          while IFS=$'\t' read -r unit id; do
+            # Package name of the unit, used as the prune scope
+            scope=$(jq -r '.name // empty' "$unit/package.json")
+            if [[ -z "$scope" ]]; then
+              echo "::error::Package name not found in $unit/package.json"
+              exit 1
+            fi
+
+            # Outside the workspace so later check steps don't pick up the pruned trees.
+            echo "Running turbo prune for scope: $scope"
+            yarn dlx turbo@"$TURBO_VERSION" prune --scope="$scope" --docker --out-dir="$RUNNER_TEMP/out/$id"
+          done < <(jq -r '.[] | [.path, .id] | @tsv' <<< "$units")
+
+          # Tracked source tree (including submodules) plus the pruned unit trees under out/.
+          git ls-files --recurse-submodules -z | tar --null -T - -cf "$RUNNER_TEMP/source.tar"
+          if [[ -d "$RUNNER_TEMP/out" ]]; then
+            tar -rf "$RUNNER_TEMP/source.tar" -C "$RUNNER_TEMP" out
+          fi
+          ls -lh "$RUNNER_TEMP/source.tar"
+
+      - &upload-source
+        name: Upload source payload
+        if: env.PAYLOAD_SOURCE_UNITS != '[]'
+        uses: actions/upload-artifact@v7
+        with:
+          name: payload-source${{ env.PAYLOAD_SUFFIX }}
+          path: ${{ runner.temp }}/source.tar
+          retention-days: 7
+          if-no-files-found: error
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+      - &install
+        name: Install dependencies
+        run: |
+          if [[ -f Makefile ]]; then
+            make install-immutable
+          else
+            yarn install --immutable
+          fi
+      - name: Check dependencies
+        run: |
+          yarn dedupe --check || (echo "yarn.lock is not up to date, run 'yarn dedupe'" && exit 1)
+          if jq -e '.devDependencies.turbo // .dependencies.turbo' package.json > /dev/null; then
+            yarn turbo boundaries || (echo "turbo boundaries failed" && exit 1)
+          fi
+      - &build
+        name: Build
+        run: yarn run build
+      - name: Check
+        run: yarn run check
+      - name: Unit Tests
+        if: ${{ inputs.run-unit-tests-in-build && contains(fromJSON(needs.configure.outputs.test-types), 'unit') }}
+        run: yarn run test-unit
+
+      # One version-free tarball per dist unit, named after the unit id.
+      - &pack
+        name: Pack dist units
+        if: env.PAYLOAD_DIST_UNITS != '[]'
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$RUNNER_TEMP/dist"
+          while IFS=$'\t' read -r unit id; do
+            (cd "$unit" && yarn pack --out "$RUNNER_TEMP/dist/$id.tgz")
+          done < <(jq -r '.[] | [.path, .id] | @tsv' <<< "$PAYLOAD_DIST_UNITS")
+
+      - &upload-dist
+        name: Upload dist payload
+        if: env.PAYLOAD_DIST_UNITS != '[]'
+        uses: actions/upload-artifact@v7
+        with:
+          name: payload-dist${{ env.PAYLOAD_SUFFIX }}
+          path: ${{ runner.temp }}/dist
+          retention-days: 7
+          if-no-files-found: error
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+  # Run tests in parallel per type (unit tests excluded if run-unit-tests-in-build is set).
+  # Runs concurrently with check: neither job consumes build artifacts from the other.
+  test:
+    name: "Test: ${{ matrix.test-type }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs:
+      - configure
+    if: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix)[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: ${{ fromJSON(needs.configure.outputs.test-types-for-matrix) }}
+    permissions:
+      contents: read
+      packages: read
+      actions: write
+      id-token: write
+    steps:
+      - *checkout-token
+      - *checkout
+      - *setup-tools
+      - *install
+      - *build
+
+      # Requires test-* scripts in root package.json.
+      - name: Run ${{ matrix.test-type }} tests
+        env:
+          TEST_TYPE: ${{ matrix.test-type }}
+        run: yarn run "test-$TEST_TYPE"
+
+  # Create releases with tallyrelease and emit the release list v2.
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - configure
+      - check
+      - test
+    # Only on branch pushes, after a successful check and a successful or skipped test job.
+    # always() prevents skipping when the test job is skipped.
+    if: >-
+      always()
+      && needs.configure.outputs.mode == 'main'
+      && needs.check.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.test.result)
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      releases: ${{ steps.releases.outputs.releases }}
+      # Payloads to build at release commits other than the built commit, grouped by commit.
+      release-builds: ${{ steps.releases.outputs.release-builds }}
+    steps:
+      # Tags and history are read locally; the CLI pushes with the broker token.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: false
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: token
+        name: Exchange token for release
+        uses: abinnovision/actions@exchange-github-token-v1.4.1
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          scope: contents:write pull_requests:write issues:read actions:read
+
+      # Tags merged release PRs, creates the GitHub releases and updates the release PRs.
+      # `--base` makes `run` use the build base of `Configure`, so every `catchUp: false` entry has a payload.
+      - id: tallyrelease
+        name: Run tallyrelease
+        uses: abinnovision/actions@run-tallyrelease-v0.7.0
+        env:
+          # Release commits are authored by the token's App.
+          GIT_AUTHOR_NAME: ${{ steps.token.outputs.committer-name }}
+          GIT_AUTHOR_EMAIL: ${{ steps.token.outputs.committer-email }}
+          GIT_COMMITTER_NAME: ${{ steps.token.outputs.committer-name }}
+          GIT_COMMITTER_EMAIL: ${{ steps.token.outputs.committer-email }}
+        with:
+          token: ${{ steps.token.outputs.token }}
+          args: |
+            run
+            --branch
+            ${{ needs.configure.outputs.branch }}
+            ${{ needs.configure.outputs.base != '' && '--base' || '' }}
+            ${{ needs.configure.outputs.base }}
+            --github-output
+            --summary
+
+      - name: Upload tallyrelease run
+        if: steps.tallyrelease.outputs.result-file != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: tallyrelease-run
+          path: ${{ steps.tallyrelease.outputs.result-file }}
+          retention-days: 7
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+      # The full list carries `changes` and can exceed the 128 KiB an environment variable allows, so it is read from
+      # the file and `changes` is replaced by `prs` before it becomes a job output. Catch-up entries get their payloads
+      # from `Release build`, grouped by release commit.
+      - id: releases
+        name: Write release list
+        env:
+          RELEASES_FILE: ${{ steps.tallyrelease.outputs.releases-file }}
+        run: |
+          set -euo pipefail
+
+          releases='[]'
+          if [[ -n "$RELEASES_FILE" ]]; then
+            releases=$(jq -c 'map(. + {prs: ([.changes[].pr // empty] | unique)} | del(.changes))' "$RELEASES_FILE")
+          fi
+
+          release_builds=$(jq -c '
+            [.[] | select(.catchUp and any(.tags[]?; . == "source" or . == "dist"))]
+            | group_by(.releaseSha)
+            | map({
+              sha: .[0].releaseSha,
+              source: [.[] | select(any(.tags[]?; . == "source")) | {id, path}],
+              dist: [.[] | select(any(.tags[]?; . == "dist")) | {id, path}]
+            })' <<< "$releases")
+
+          {
+            echo "releases=$releases"
+            echo "release-builds=$release_builds"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releases: $releases"
+          echo "Release builds: $release_builds"
+
+  # Builds the payloads of releases at commits other than the built commit, for example a release whose run was
+  # cancelled or failed. Shares the payload steps with `check`; checks and tests do not run.
+  release-build:
+    name: "Release build: ${{ matrix.build.sha }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - release
+    # !cancelled() keeps the job from being skipped along with a skipped `Test`.
+    if: >-
+      !cancelled()
+      && needs.release.outputs.release-builds != ''
+      && needs.release.outputs.release-builds != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        build: ${{ fromJSON(needs.release.outputs.release-builds) }}
+    permissions:
+      contents: read
+      packages: read
+      actions: write
+      id-token: write
+    env:
+      PAYLOAD_SOURCE_UNITS: ${{ toJSON(matrix.build.source) }}
+      PAYLOAD_DIST_UNITS: ${{ toJSON(matrix.build.dist) }}
+      PAYLOAD_SUFFIX: -${{ matrix.build.sha }}
+    steps:
+      - *checkout-token
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.build.sha }}
+          submodules: ${{ inputs.checkout-submodules }}
+          token: ${{ steps.checkout-token.outputs.token || github.token }}
+          persist-credentials: false
+      - *setup-tools
+      - *prune
+      - *upload-source
+      - *install
+      - *build
+      - *pack
+      - *upload-dist
+
+  # Plans releases with tallyrelease on pull requests, for their base branch. On push `run --summary` in `Release`
+  # already writes the plan summary.
+  # Observe only: every step may fail without failing the job, and `Status` does not need it.
+  release-plan:
+    name: Release plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - configure
+    if: needs.configure.outputs.mode == 'pr'
+    permissions:
+      contents: read
+    steps:
+      # Full history for tags, HEAD^1 and the base; blobs are fetched on demand, which needs the persisted
+      # credentials on private repositories. No repository code runs in this job.
+      - name: Checkout
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.configure.outputs.commit-sha }}
+          submodules: false
+          fetch-depth: 0
+          filter: blob:none
+
+      # Plans for the target branch, so reviewers see what merging would release.
+      - name: Plan
+        id: plan
+        continue-on-error: true
+        uses: abinnovision/actions@run-tallyrelease-v0.7.0
+        with:
+          args: |
+            plan
+            --branch
+            ${{ needs.configure.outputs.branch }}
+            --all
+            --summary
+
+      - name: Upload plan
+        if: steps.plan.outputs.result-file != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: tallyrelease-plan
+          path: ${{ steps.plan.outputs.result-file }}
+          retention-days: 7
+          # Allows re-running the job within the same workflow run.
+          overwrite: true
+
+  # Single required status check for rulesets.
+  status:
+    name: Status
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [configure, check, test, release, release-build]
+    if: always()
+    permissions: {}
+    steps:
+      - name: Evaluate status
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
