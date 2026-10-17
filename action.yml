@@ -1,0 +1,38 @@
+name: Run tallyrelease
+author: "abi group GmbH"
+description: |
+  (Beta) Runs the bundled tallyrelease CLI. The repository needs a tallyrelease.yaml.
+inputs:
+  args:
+    description: "CLI arguments, for example `affected --github-output`. Split on whitespace, or one argument per line when the value has several lines. Global flags such as `--cwd` and `--config` go here too. `shadow` gets `--pin <cli-version>` unless `--pin` is given."
+    required: true
+  token:
+    description: "Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run, and by `run` for release PRs and tags. `run` needs `contents: write`, `pull-requests: write`, `issues: read` and `actions: read`."
+    required: false
+    default: ${{ github.token }}
+outputs:
+  result:
+    description: "The JSON document of `affected`, `plan`, `shadow` or `run`, as written by `--out`. Not set for other commands."
+  result-file:
+    description: "Path of the JSON document of `affected`, `plan`, `shadow` or `run`. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands."
+  plan:
+    description: "Path of the plan document. Written by `plan --github-output` and `run --github-output`."
+  releases:
+    description: "Compact JSON array of the releases and prereleases to publish. Written by `run --github-output`. Each entry has `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`, `catchUp`, `forge`, `latest`, `changes`, `tags` and `group`; entries only gain fields within a major. `changes` includes the changes of the units the release was propagated from (`via`), so the array can be large."
+  releases-file:
+    description: "Path of a file holding the `releases` JSON of `run --github-output`, for lists too large for an environment variable."
+  affected:
+    description: "Compact JSON array of `{id, path, plugin, reason, released, tags}`. Written by `affected --github-output`."
+  affected-paths:
+    description: "One path per line. Written by `affected --github-output`."
+  all:
+    description: "`true` when every unit is built. Written by `affected --github-output`."
+  base:
+    description: "Build base sha, empty when there is none. Written by `affected --github-output`."
+  base-source:
+    description: "Where the build base came from. Written by `affected --github-output`."
+  cli-version:
+    description: "Version of the bundled `@tallyrelease/cli`."
+runs:
+  using: node24
+  main: dist/index.js
