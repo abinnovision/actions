@@ -1,55 +1,52 @@
 # {{name}}
 
-Syncs stable releases of a stack to [Linear Releases](https://linear.app/docs/releases). Each Linear release collects
-the issues referenced by the commits since the previous release of its pipeline, through
-[linear-release-action](https://github.com/linear/linear-release-action).
+Syncs stable releases of a stack to [Linear Releases](https://linear.app/docs/releases). Each Linear release lists
+the issues linked to the pull requests of the release, as computed by tallyrelease, through the
+`releaseSyncByAccessKey` mutation of the Linear API.
 
-The release list is the `releases` output of a stack, see the
-[publishing protocol](../../docs/stacks/README.md#publishing). This workflow uses no payload.
+The release list is the `releases` output of a stack released with tallyrelease, see the
+[publishing protocol](../../docs/stacks/README.md#publishing). This workflow uses no payload and no checkout.
 
 ## Behavior
 
-- Skips all work when `releases` is empty, `[]` or no stable entry matches a `LINEAR_ACCESS_KEYS` line
+- Skips all work when `releases` is empty, `[]` or no stable entry has a `LINEAR_ACCESS_KEYS` line
 - Ignores prereleases (entries with a non-empty `channel`)
-- Ignores maintenance releases (`line: maintenance`) unless `maintenance: true`; entries without `line` are synced
-- Keeps only the highest version per `path` among entries with `releaseSha` (lists from tallyrelease, which can hold
-  several releases of a unit); entries without `releaseSha` are used as listed
-- Assigns each entry the first `LINEAR_ACCESS_KEYS` line whose pattern matches its `path`
-- Syncs all entries with the same access key as one Linear release with the entry `version`; they must share the
-  version, which [linked versions](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md#linked-versions)
-  guarantee
-- Fails before syncing when a key line is malformed, an entry has an unsupported `schema` or a group has differing
-  versions
-- Links the GitHub release of every entry that has a `url`, plus the workflow run
-- Scans up to the `releaseSha` shared by all entries of a group, so a catch-up release does not collect later commits;
-  otherwise up to the commit of the run, with a warning when the entries have different release commits
-- Re-running a synced list is expected to end green: at the release commit of an existing version the scan range is
-  empty and the Linear CLI skips the sync (not yet verified against Linear)
+- Ignores maintenance releases (`line: maintenance`) unless `maintenance: true`
+- Keeps only the highest version per `path` when a list holds several releases of a unit (catch-ups), with the `prs`
+  of all of them
+- Assigns each entry the `LINEAR_ACCESS_KEYS` line of its tallyrelease unit `id`; entries without a line are skipped
+- Syncs all entries with the same access key as one Linear release named `v<version>`; they must share the version,
+  which a tallyrelease group guarantees
+- Fails before syncing when a key line is malformed, a unit has several lines, an entry has an unsupported `schema` or
+  no `id` or `prs`, or a group has differing versions
+- Sends the union of the `prs` of a group; Linear adds the issues linked to these pull requests
+- Links the GitHub release of every entry, plus the workflow run
+- Attaches the bodies of these GitHub releases as the Linear release notes, with a heading per entry when a group has
+  several; a release that cannot be read is skipped with a warning
+- Syncs at the `releaseSha` of the group, the newest one with a warning when the entries have different release
+  commits. Re-running a synced list is expected to update the same Linear release, which a continuous pipeline
+  identifies by commit (not yet verified against Linear)
 
 ## Pipelines
 
-An access key belongs to one Linear release pipeline. Create a continuous pipeline per product, then map units to its
-key:
+An access key belongs to one Linear release pipeline. Create a continuous pipeline per product, then map its
+tallyrelease units to its key, one line per unit:
 
 ```
-# Apps released together with linked versions: one pipeline.
-apps/*,lin_api_abc123
+# backend and web released together in a tallyrelease group: one pipeline.
+backend,lin_api_abc123
+web,lin_api_abc123
 
-# One pipeline per app.
-apps/backend,lin_api_abc123
-apps/web,lin_api_def456
+# One pipeline per unit.
+sdk,lin_api_def456
 ```
-
-With one pipeline per unit, set `scope-paths: true` so each release only scans the commits of its unit. Leave it `false`
-when a pipeline covers the whole repository: commits in shared packages or at the root also ship with the apps.
 
 ## Issue detection
 
-The Linear CLI finds issue identifiers in branch names, commit messages and pull requests. A squash merge commit such
-as `feat: add login (#42)` resolves to the issues Linear has linked to pull request #42. A Linear release only lists
-issues when pull requests are linked: put the identifier into the branch name, the title or the body (`Fixes ABI-123`).
-
-The first sync of a pipeline only scans the released commit. Later syncs scan from the commit of the previous release.
+`prs` holds the pull requests of the commits tallyrelease attributed to the release, including those of the units it
+was propagated from, so a release caused only by a dependency lists the issues of that dependency. Linear resolves
+each pull request to the issues it has linked: put the identifier into the branch name, the title or the body
+(`Fixes ABI-123`). Commits pushed without a pull request contribute no issues.
 
 ## Usage
 
@@ -79,7 +76,7 @@ jobs:
       contents: read
     secrets:
       LINEAR_ACCESS_KEYS: |
-        apps/*,$\{{ secrets.LINEAR_ACCESS_KEY }}
+        backend,$\{{ secrets.LINEAR_ACCESS_KEY }}
     with:
       releases: $\{{ needs.ci.outputs.releases }}
 ```

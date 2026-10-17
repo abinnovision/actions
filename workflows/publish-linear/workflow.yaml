@@ -7,13 +7,14 @@ on:
         required: true
         description: |-
           Linear release pipeline access keys in **CSV format** (one per line).
-          **Format:** `pattern,access-key`
-          `pattern` is a directory pattern matched against the entry `path`: `*` matches one path segment and skips dot
-          directories, `.` is the repository root. An entry uses the first matching line; entries without a match are
-          skipped. Entries whose lines hold the same key are synced as one Linear release and must share the version.
+          **Format:** `unit,access-key`
+          `unit` is a tallyrelease unit id, matched against the entry `id`; each unit may appear once. Entries without a
+          line are skipped. Units whose lines hold the same key are synced as one Linear release and must share the
+          version.
           **Example:**
           ```
-          apps/*,lin_api_abc123
+          backend,lin_api_abc123
+          web,lin_api_abc123
           ```
 
     inputs:
@@ -21,19 +22,11 @@ on:
         type: string
         required: true
         description: |-
-          Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.
-          Stable entries (empty `channel`) are synced to Linear; prereleases are ignored.
+          Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack released with
+          tallyrelease. Stable entries (empty `channel`) are synced to Linear; prereleases are ignored. Every synced
+          entry needs `prs`.
           An empty string or `[]` skips all work.
           **Example:** `needs.ci.outputs.releases`
-
-      scope-paths:
-        type: boolean
-        required: false
-        default: false
-        description: |-
-          Only scan commits that touch the paths of the released entries (`<path>/**`), for repositories with one
-          pipeline per unit. When `false`, all commits are scanned, unless the pipeline in Linear has a path filter.
-          **Default:** `false`
 
       maintenance:
         type: boolean
@@ -41,14 +34,6 @@ on:
         default: false
         description: |-
           Also sync entries of maintenance lines (`line: maintenance`). Entries without `line` are always synced.
-          **Default:** `false`
-
-      dry-run:
-        type: boolean
-        required: false
-        default: false
-        description: |-
-          Scan commits and log the changes without creating or updating releases in Linear.
           **Default:** `false`
 
 permissions: {}
@@ -83,11 +68,18 @@ jobs:
             jq -rn '
               $ENV.LINEAR_ACCESS_KEYS | split("\n") | map(gsub("^\\s+|\\s+$"; ""))
               | to_entries[] | select(.value != "" and (.value | test("^[^,]+,.+$") | not))
-              | "Invalid LINEAR_ACCESS_KEYS line \(.key + 1): expected \u0027pattern,access-key\u0027"
+              | "Invalid LINEAR_ACCESS_KEYS line \(.key + 1): expected \u0027unit,access-key\u0027"
+            '
+            jq -rn '
+              $ENV.LINEAR_ACCESS_KEYS | split("\n") | map(gsub("^\\s+|\\s+$"; "") | select(test("^[^,]+,.+$")) | split(",")[0] | gsub("\\s+$"; ""))
+              | group_by(.)[] | select(length > 1)
+              | "Unit \(.[0]) appears in several LINEAR_ACCESS_KEYS lines"
             '
             jq -r '
-              .[] | select(.schema != 1)
-              | "Entry \(.path) has schema \(.schema // "none"), this workflow supports schema 1"
+              .[]
+              | (select(.schema != 1) | "Entry \(.path) has schema \(.schema // "none"), this workflow supports schema 1"),
+                (select(.channel == "" and .id == null)
+                  | "Entry \(.path) has no id, publish-linear needs a release list from tallyrelease")
             ' <<< "$RELEASES"
           )
 
@@ -98,19 +90,13 @@ jobs:
             exit 1
           fi
 
-          # Converts a directory pattern into an anchored regex: `*` matches one segment that does not start with a dot.
           groups=$(jq -c --argjson maintenance "$INPUT_MAINTENANCE" '
-            def pattern_regex:
-              if . == "." then "^\\.$"
-              else "^" + (split("*") | map(gsub("(?<c>[.+?^$()\\[\\]{}|\\\\])"; "\\\(.c)")) | join("[^/.][^/]*")) + "$"
-              end;
-
             ($ENV.LINEAR_ACCESS_KEYS | split("\n") | map(gsub("^\\s+|\\s+$"; ""))
               | to_entries
               | map(select(.value != ""))
-              | map((.value | capture("^(?<pattern>[^,]+),(?<key>.+)$")) as $c | {
+              | map((.value | capture("^(?<unit>[^,]+),(?<key>.+)$")) as $c | {
                   line: .key,
-                  regex: ($c.pattern | gsub("\\s+$"; "") | pattern_regex),
+                  unit: ($c.unit | gsub("\\s+$"; "")),
                   key: ($c.key | gsub("^\\s+"; ""))
                 })
             ) as $lines
@@ -118,13 +104,15 @@ jobs:
             # Lines holding the same key share the index of its first line.
             | ($lines | map({(.key): .line}) | reverse | add // {}) as $first
 
-            # Entries with `releaseSha` (tallyrelease) may list several releases of a unit; the highest version wins.
+            # A list may hold several releases of a unit (catch-ups); the highest version wins and carries the pull
+            # requests of all of them.
             | [.[] | select(.channel == "" and ($maintenance or .line != "maintenance"))]
-            | (map(select(.releaseSha)) | group_by(.path) | map(max_by(.version | split(".") | map(tonumber? // .))))
-              as $newest
-            | [.[] | select(.releaseSha == null or IN($newest[]; .)) | . as $entry
-                | ($lines | map(select(. as $line | $entry.path | test($line.regex))) | first) as $match
-                | select($match != null)
+            | . as $stable
+            | [.[] | . as $entry | ($stable | map(select(.id == $entry.id))) as $same
+                | select($entry == ($same | max_by(.version | split(".") | map(tonumber? // .))))
+                | $entry + (if all($same[]; .prs != null) then {prs: ($same | map(.prs) | add | unique)} else {} end)]
+            | [.[] | . as $entry
+                | first($lines[] | select(.unit == $entry.id)) as $match
                 | $entry + {keyLine: $first[$match.key]}]
             | group_by(.keyLine)
             | map({
@@ -132,19 +120,24 @@ jobs:
                 name: (map(.name) | join(", ")),
                 version: .[0].version,
                 versions: (map(.version) | unique),
-                "include-paths": (if any(.path == ".") then "" else map("\(.path)/**") | join(",") end),
-                links: (map(select(.url) | "\(.name) v\(.version)=\(.url)") | join("\n"))
+                missing: map(select(.prs == null) | .name),
+                prs: (map(.prs // []) | add | unique),
+                links: map(select(.url) | {label: "\(.name) v\(.version)", url}),
+                notes: map(select(.url) | {name, version, tag}),
+                # The list is ordered oldest release commit first.
+                sha: (last | .releaseSha)
               } + (map(.name) as $names | map(.releaseSha) | unique
-                | if length == 1 and .[0] != null then {ref: .[0]}
-                  elif any(. != null) then {warning: "Entries \($names | join(", ")) have different release commits, scanning up to the commit of the run"}
+                | if length > 1 then {warning: "Entries \($names | join(", ")) have different release commits, syncing at the newest"}
                   else {} end))
           ' <<< "$RELEASES")
 
           jq -r '.[] | select(.warning) | "::warning::\(.warning)"' <<< "$groups"
 
           errors=$(jq -r '
-            .[] | select(.versions | length > 1)
-            | "Entries \(.name) share an access key but have different versions: \(.versions | join(", "))"
+            .[]
+            | (select(.versions | length > 1)
+                | "Entries \(.name) share an access key but have different versions: \(.versions | join(", "))"),
+              (.missing[] | "Entry \(.) has no prs, publish-linear needs a release list from tallyrelease")
           ' <<< "$groups")
 
           if [[ -n "$errors" ]]; then
@@ -162,7 +155,7 @@ jobs:
             jq -r '.[] | "Group \(.name): \(.version)"' <<< "$groups"
           fi
 
-  # Creates one Linear release per group from the commits since the previous release of its pipeline.
+  # Creates or updates one Linear release per group. Linear resolves the issues linked to the pull requests.
   sync:
     name: "Sync: ${{ matrix.group.name }}"
     runs-on: ubuntu-latest
@@ -176,21 +169,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      # The CLI scans the history between the previous release of the pipeline and HEAD. HEAD is the shared release
-      # commit of the group when its entries carry one, else the commit of the run.
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ matrix.group.ref }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Resolve settings
+      - name: Resolve access key
         id: key
         env:
           KEY_LINE: ${{ matrix.group.keyLine }}
-          LINKS: ${{ matrix.group.links }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           LINEAR_ACCESS_KEYS: ${{ secrets.LINEAR_ACCESS_KEYS }}
         run: |
           set -euo pipefail
@@ -201,35 +183,102 @@ jobs:
           ')
 
           echo "::add-mask::$key"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
 
-          # One link per GitHub release of the group, then the workflow run.
-          links="${LINKS:+$LINKS$'\n'}Workflow run=$RUN_URL"
-          delimiter="EOF_$(openssl rand -hex 8)"
-          {
-            echo "key=$key"
-            printf 'links<<%s\n%s\n%s\n' "$delimiter" "$links" "$delimiter"
-          } >> "$GITHUB_OUTPUT"
+      # The GitHub release bodies become the release notes, headed per entry when the group has several. A failed
+      # lookup only skips that entry.
+      - name: Write release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ toJSON(matrix.group.notes) }}
+        run: |
+          set -euo pipefail
+
+          file="$RUNNER_TEMP/release-notes.md"
+          count=$(jq 'length' <<< "$NOTES")
+          : > "$file"
+
+          while IFS=$'\t' read -r name version tag; do
+            if ! body=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq .body); then
+              echo "::warning::Could not read the GitHub release $tag, skipping its release notes"
+              continue
+            fi
+
+            if [[ -z "$body" ]]; then
+              continue
+            fi
+
+            if (( count > 1 )); then
+              printf '## %s v%s\n\n' "$name" "$version" >> "$file"
+            fi
+            printf '%s\n\n' "$body" >> "$file"
+          done < <(jq -r '.[] | [.name, .version, .tag] | @tsv' <<< "$NOTES")
+
+          if [[ -s "$file" ]]; then
+            echo "path=$file" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Sync release
         id: sync
-        uses: linear/linear-release-action@v0
-        with:
-          access_key: ${{ steps.key.outputs.key }}
-          version: ${{ matrix.group.version }}
-          include_paths: ${{ inputs.scope-paths && matrix.group.include-paths || '' }}
-          links: ${{ steps.key.outputs.links }}
-          dry_run: ${{ inputs.dry-run }}
+        env:
+          ACCESS_KEY: ${{ steps.key.outputs.key }}
+          GROUP: ${{ toJSON(matrix.group) }}
+          NOTES_FILE: ${{ steps.notes.outputs.path }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          request=$(jq -n \
+            --arg owner "${GITHUB_REPOSITORY%%/*}" \
+            --arg repo "${GITHUB_REPOSITORY#*/}" \
+            --arg repo_url "$REPOSITORY_URL" \
+            --arg run_url "$RUN_URL" \
+            --rawfile notes "${NOTES_FILE:-/dev/null}" '
+            ($ENV.GROUP | fromjson) as $group | {
+              query: "mutation ($input: ReleaseSyncInputBase!) { releaseSyncByAccessKey(input: $input) { success release { name url } } }",
+              variables: {input: ({
+                name: "v\($group.version)",
+                version: $group.version,
+                commitSha: $group.sha,
+                pullRequestReferences: $group.prs | map({repositoryOwner: $owner, repositoryName: $repo, number: .}),
+                repository: {owner: $owner, name: $repo, provider: "github", url: $repo_url},
+                links: ($group.links + [{label: "Workflow run", url: $run_url}])
+              } + if $notes == "" then {} else {releaseNotes: {content: $notes}} end)}
+            }')
+
+          echo "Pull requests: $(jq -c '.variables.input.pullRequestReferences | map(.number)' <<< "$request")"
+
+          response=$(curl -sS --fail-with-body --retry 3 \
+            -H "Authorization: $ACCESS_KEY" \
+            -H "Content-Type: application/json" \
+            --data @- https://api.linear.app/graphql <<< "$request")
+
+          errors=$(jq -r '.errors[]?.message' <<< "$response")
+          if [[ -n "$errors" ]] || ! jq -e '.data.releaseSyncByAccessKey.success' <<< "$response" > /dev/null; then
+            while IFS= read -r error; do
+              echo "::error::Linear: ${error:-sync did not succeed}"
+            done <<< "${errors:-}"
+            exit 1
+          fi
+
+          url=$(jq -r '.data.releaseSyncByAccessKey.release.url' <<< "$response")
+          echo "release-url=$url" >> "$GITHUB_OUTPUT"
+          echo "Synced $(jq -r '.data.releaseSyncByAccessKey.release.name' <<< "$response"): $url"
 
       - name: Write summary
         env:
           NAME: ${{ matrix.group.name }}
           VERSION: ${{ matrix.group.version }}
+          PRS: ${{ toJSON(matrix.group.prs) }}
           RELEASE_URL: ${{ steps.sync.outputs.release-url }}
         run: |
+          prs=$(jq -r 'map("#\(.)") | join(", ")' <<< "$PRS")
           {
             echo "### Linear release"
             echo ""
-            echo "| Entries | Version | Release |"
-            echo "| :------ | :------ | :------ |"
-            echo "| $NAME | \`$VERSION\` | ${RELEASE_URL:-none} |"
+            echo "| Entries | Version | Pull requests | Release |"
+            echo "| :------ | :------ | :------------ | :------ |"
+            echo "| $NAME | \`$VERSION\` | ${prs:-none} | ${RELEASE_URL:-none} |"
           } >> "$GITHUB_STEP_SUMMARY"
