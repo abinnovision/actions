@@ -2155,9 +2155,7 @@ __metadata:
     "@abinnovision/prettier-config": "npm:^2.2.0"
     evaluate-event: "workspace:^"
     exchange-github-token: "workspace:^"
-    match-paths: "workspace:^"
     prettier: "npm:^3.9.9"
-    run-release-please: "workspace:^"
     run-tallyrelease: "workspace:^"
     setup-tools: "workspace:^"
   languageName: unknown

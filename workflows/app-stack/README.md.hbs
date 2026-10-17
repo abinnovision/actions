@@ -2,10 +2,11 @@
 
 CI for Yarn repositories: Turborepo monorepos that mix Node.js, Python and Go, and
 [single-package repositories](#single-package-repositories). It checks, builds and tests the
-repository on every pull request. On every push to the default branch it also packs the
-[units](#units) into two target-neutral payloads and creates releases. It publishes nothing itself;
-the caller wires the [`releases`](#outputs) list into [`publish-oci`](../publish-oci/README.md) and
-[`publish-npm`](../publish-npm/README.md), which own the registries and their credentials.
+repository on every pull request. On every branch push it also packs the affected [units](#units)
+into two target-neutral payloads and creates [releases](#releases) with tallyrelease. It publishes
+nothing itself; the caller wires the [`releases`](#outputs) list into
+[`publish-oci`](../publish-oci/README.md), [`publish-npm`](../publish-npm/README.md) and
+[`publish-linear`](../publish-linear/README.md), which own the registries and their credentials.
 
 It follows the shared [stack contract](../../docs/stacks/README.md) for calling, naming, jobs and required checks.
 
@@ -13,12 +14,12 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 | Job         | Runs                                                       | Does                                                                                                                            |
 | :---------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
-| `Configure` | Always                                                     | Resolves the commit and mode,             validates the Makefile if present, resolves the units, discovers test types          |
-| `Check`     | Always                                                     | Install, dependency checks, `build`, `check` and unit tests; on push to `default-branch` (or any branch with `tallyrelease: release`) also prunes the source units and packs the dist units |
+| `Configure` | Always                                                     | Resolves the commit and mode, validates the Makefile if present, resolves the affected units on push, discovers test types     |
+| `Check`     | Always                                                     | Install, dependency checks, `build`, `check` and unit tests; on branch push also prunes the affected source units and packs the affected dist units |
 | `Test`      | One job per test type not already covered by `Check`       | Install, `build` and `test-<type>`                                                                                              |
-| `Release`   | Push to `default-branch` (any branch with `tallyrelease: release`), after `Check` and `Test` | Runs release-please (or tallyrelease with `tallyrelease: release`), which creates or lands release PRs and creates the releases, then writes the `releases` list |
-| `Release build` | With `tallyrelease: release`, one job per release commit other than the built commit | Builds the payloads of those releases, see [Release mode](#release-mode) |
-| `Release plan` | With `tallyrelease: shadow` or `release` | Runs `tallyrelease plan` and, with `shadow` on push to `default-branch`, `tallyrelease shadow` and a release dry run, see [tallyrelease](#tallyrelease-beta). Never fails |
+| `Release`   | Branch push, after `Check` and `Test` | Runs `tallyrelease run`, which lands and updates release PRs and creates the tags and GitHub releases, then writes the `releases` list |
+| `Release build` | One job per release commit with catch-up payloads | Builds the payloads of those releases, see [Catch-ups](#catch-ups) |
+| `Release plan` | Pull requests | Runs `tallyrelease plan` for the base branch. Never fails |
 | `Status`    | Always | Single required status check, fails when any other job failed or was cancelled |
 
 - Unit tests run inside `Check` by default, which avoids a second install and build. Set
@@ -30,7 +31,7 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 - The repository has a `.tool-versions` file with `nodejs` and a root `package.json` with `build` and `check` scripts,
   see [Repository layout](#repository-layout)
-- release-please is configured as described in [Releases](../../docs/stacks/README.md#releases)
+- The repository has a `tallyrelease.yaml` that tags its units, see [Units](#units) and [Releases](#releases)
 - The caller grants the [permissions](#permissions) listed below
 
 ## Usage
@@ -46,9 +47,10 @@ This is a `workflow_call` workflow, so it can't be triggered directly. Call it f
 
 ### Example Workflow File
 
-Complete, copyable caller workflow `.github/workflows/ci.yaml`. Both publish jobs receive the same
-`releases` list and select their entries with their `include` input. The list is empty on pull
-requests and on pushes that release nothing, and the publish jobs then skip all work.
+Complete, copyable caller workflow `.github/workflows/ci.yaml`. The publish jobs receive the same
+`releases` list and select their entries: `publish-oci` the entries tagged `source`, `publish-npm`
+those tagged `dist`, `publish-linear` the stable releases. The list is empty on pull requests and on
+pushes that release nothing, and the publish jobs then skip all work.
 
 ```yaml
 name: CI
@@ -74,7 +76,7 @@ jobs:
   publish-npm:
     name: Publish npm
     needs: ci
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-npm-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-npm-v2
     permissions:
       contents: read
       id-token: write
@@ -87,7 +89,7 @@ jobs:
   publish-oci:
     name: Publish OCI
     needs: ci
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-oci-v2
     permissions:
       contents: read
       id-token: write
@@ -95,17 +97,27 @@ jobs:
       actions: write
     with:
       releases: $\{{ needs.ci.outputs.releases }}
-      image: app-{name}
+      image: app-{id}
       registry: $\{{ vars.FOUNDRY_REGISTRY_DOCKER }}
       gcp-workload-identity-provider: $\{{ vars.FOUNDRY_WIF_PROVIDER }}
-      gitops-config: |
-        backend,<gitops-repo>,staging,production
+      gitops-routes: |
+        backend,prerelease,<gitops-repo>,staging
+        backend,release,<gitops-repo>,production
+
+  publish-linear:
+    name: Publish Linear
+    needs: ci
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v2
+    permissions: {}
+    secrets:
+      LINEAR_ACCESS_KEYS: $\{{ secrets.LINEAR_ACCESS_KEYS }}
+    with:
+      releases: $\{{ needs.ci.outputs.releases }}
 ```
 
 The resulting check contexts are `CI / Configure`, `CI / Check`, `CI / Test: <type>`,
-`CI / Release`, `CI / Status`, with `tallyrelease: shadow` or `release` also `CI / Release plan`, and with
-`tallyrelease: release` `CI / Release build: <sha>` per catch-up commit. Require `CI / Status` and
-`Lint commits` in your rulesets.
+`CI / Release`, `CI / Status`, on pull requests also `CI / Release plan`, and `CI / Release build: <sha>`
+per catch-up commit. Require `CI / Status` and `Lint commits` in your rulesets.
 
 The workflow takes no secrets. To read other private repositories during checkout, use
 [`checkout-token-resources`](#checking-out-other-repositories).
@@ -143,10 +155,11 @@ install-immutable:
 your-repo/
 ├── Makefile              # optional: install and install-immutable targets
 ├── .tool-versions        # asdf versions: nodejs (required), python, golang, uv
-├── packages/             # dist units by default
-│   └── <name>/package.json
-└── apps/                 # source units by default
-    └── <name>/
+├── tallyrelease.yaml     # units, their tags and the branch rules
+├── packages/             # dist units, tagged `dist`
+│   └── <id>/package.json
+└── apps/                 # source units, tagged `source`
+    └── <id>/
         ├── package.json
         └── Dockerfile    # read by publish-oci, not by this workflow
 ```
@@ -173,14 +186,13 @@ needs a matching `test-<type>` script, so enabling `test-types: unit,integration
 
 | Event                        | Runs                                       | Actions cache                                                      |
 | ---------------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
-| `pull_request`               | `Configure`, `Check`, `Test`               | Read/write in the PR scope, restores from the default branch       |
+| `pull_request`               | `Configure`, `Check`, `Test`, `Release plan` | Read/write in the PR scope, restores from the default branch     |
 | `merge_group`                | `Configure`, `Check`, `Test`               | Read/write in the queue scope, restores from the default branch    |
 | `push` to the default branch | everything, including `Release` | Read/write in the default branch scope, the cache PRs restore from |
-| `push` to another branch     | `Configure`, `Check`, `Test`; with `tallyrelease: release` everything, see [Maintenance lines](#maintenance-lines) | Read/write in the branch scope |
+| `push` to another branch     | everything, releasing for that branch, see [Maintenance lines](#maintenance-lines) | Read/write in the branch scope |
 | `pull_request_target`        | Nothing, `Configure` fails                 |                                                                    |
 
-Releasing and packing are gated inside the workflow on `push` to `default-branch` (or any branch with `tallyrelease: release`), so a pull request
-can never reach them.
+Releasing and packing are gated inside the workflow on branch pushes, so a pull request can never reach them.
 
 `merge_group` is optional and only fires when a merge queue is enabled on the branch. If you use
 one, add it to the trigger block:
@@ -201,8 +213,8 @@ concurrency:
   cancel-in-progress: $\{{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 ```
 
-Pull requests and merge groups supersede themselves; a running push to the default branch is never
-cancelled. GitHub keeps only one pending run per group, though: when several pushes land while a run
+Pull requests and merge groups supersede themselves; every branch push releases, and none of them is
+cancelled while running. GitHub keeps only one pending run per group, though: when several pushes land while a run
 is in progress, only the newest one runs afterwards and the ones in between are cancelled before they
 start. Their commits are still released by the next run, with payloads built from its commit.
 
@@ -216,11 +228,12 @@ caller must grant the union:
 | `contents: read`  | Every checkout                                                          |
 | `packages: read`  | Private GitHub Package Registry dependencies during install             |
 | `actions: write`  | Saving entries to the Actions cache and uploading the payload artifacts |
-| `id-token: write` | The checkout, release, release dry run and shadow issue token exchanges |
+| `id-token: write` | The checkout and release token exchanges                                |
 
-`Release plan` needs nothing beyond this set: its `actions: read` is covered by `actions: write`, and the issue
-comment uses a token from the token broker. A called workflow can never exceed its caller's permissions. The publish jobs declare their own
-permissions, see [`publish-npm`](../publish-npm/README.md) and [`publish-oci`](../publish-oci/README.md).
+`Configure` needs nothing beyond this set: its `actions: read` for the base lookup is covered by `actions: write`.
+`Release plan` runs on pull requests, whose base is the merge base, and only reads contents. `Release` writes with a token from the token broker, see [Releases](#releases). A called workflow can
+never exceed its caller's permissions. The publish jobs declare their own permissions, see
+[`publish-npm`](../publish-npm/README.md) and [`publish-oci`](../publish-oci/README.md).
 
 ### Forks and Dependabot
 
@@ -230,53 +243,61 @@ exchange is skipped. Dependabot pull requests keep cache writes. `Check` and `Te
 
 ## Units
 
-A unit is a directory with a `package.json`. Two inputs select them, one directory pattern per line,
-where `*` matches exactly one path segment and skips dot directories:
-
-| Input          | Default      | On push to `default-branch`                                              |
-| :------------- | :----------- | :----------------------------------------------------------------------- |
-| `source-units` | `apps/*`     | `Check` runs `turbo prune --docker` per unit into the source payload      |
-| `dist-units`  | `packages/*` | `Check` runs `yarn pack` per unit after its build into the dist payload |
+Units, their ids and their tags come from `tallyrelease.yaml`. The tags `source` and `dist` are
+app-stack conventions; a key with `*` is a glob over unit roots, where `*` matches exactly one path
+segment and skips dot directories:
 
 ```yaml
-with:
-  source-units: |
-    apps/*
-    services/*
+# tallyrelease.yaml
+units:
+  "apps/*": { release: true, tags: [source] }
+  "packages/*": { release: true, tags: [dist] }
 ```
 
-Every source unit needs a `name` in its `package.json`, and Turbo must be a dependency in the root
-`package.json`. Basenames must be unique within the source units and within the dist units, and must
-start with a letter or digit followed by letters, digits, `.`, `_` or `-`; `Configure` fails otherwise. Packing is not filtered by `private`. `turbo boundaries` runs in `Check`
-when Turbo is a dependency.
+| Tag      | On branch push                                                           |
+| :------- | :----------------------------------------------------------------------- |
+| `source` | `Check` runs `turbo prune --docker` per unit into the source payload      |
+| `dist`   | `Check` runs `yarn pack` per unit after its build into the dist payload |
+
+On push `Configure` runs `tallyrelease affected --tag source` and `--tag dist`, so only the units
+changed since the last successful run, plus the units depending on them, are pruned and packed.
+Every unit is selected when there is no base or a global input changed. A repository without units
+of one tag gets the warning `W_TAG_UNKNOWN` for it.
+
+A unit's `id` is its directory basename unless set with `id:`; tallyrelease fails with
+`E_DUPLICATE_UNIT` when two units share one. Every source unit needs a `name` in its `package.json`,
+and Turbo must be a dependency in the root `package.json`. Packing is not filtered by `private`.
+`turbo boundaries` runs in `Check` when Turbo is a dependency.
 
 ### Single-package repositories
 
-The pattern `.` selects the repository root as a unit. Its `name` is the repository name, since the
-root has no directory basename, and its dist tarball is `<repository>.tgz`. A root source unit is not
-pruned; the source payload already holds the whole tree. Turbo and a Makefile are not needed.
+Globs never match the repository root, so the root unit `.` is listed explicitly. Its `id` is the
+repository name, and its dist tarball is `<repository>.tgz`. A root source unit is not pruned; the
+source payload already holds the whole tree. Turbo and a Makefile are not needed.
 
 ```yaml
-with:
-  source-units: ""
-  dist-units: .
+# tallyrelease.yaml
+units:
+  ".": { release: true, tags: [dist] }
 ```
 
-Use `source-units: .` instead when the root has a `Dockerfile` for `publish-oci`. The publish
-workflows select the root entry with `include: .`; in `publish-oci` use `{name}`, not `{path}`, in `image`. release-please must release the root package,
-keyed `.` in `release-please-config.json`.
+Use `tags: [source]` instead when the root has a `Dockerfile` for `publish-oci`.
 
 ## Publishing
 
 The payloads, the `releases` list and the rules of the publish workflows are described in the
-[publish protocol](../../docs/stacks/README.md#publishing). Every released workspace is listed, with
-`payloads.source` when it is a source unit and `payloads.dist` when it is a dist unit. A failing
-`yarn pack` or prune fails the run before anything is released.
+[publish protocol](../../docs/stacks/README.md#publishing). A failing `yarn pack` or prune fails the
+run before anything is released. Every entry's payload follows one rule:
+
+| Tag      | Artifact                                                    | File         |
+| :------- | :---------------------------------------------------------- | :----------- |
+| `source` | `payload-source`, `payload-source-<releaseSha>` on catch-up | `source.tar` |
+| `dist`   | `payload-dist`, `payload-dist-<releaseSha>` on catch-up     | `<id>.tgz`   |
 
 ## Dockerfiles
 
 `publish-oci` builds each image from the source payload with `<path>/Dockerfile`, using the tar
-root as build context. A Dockerfile copies from the pruned `out/<name>/` tree: `json/` and the
+root as build context. A Dockerfile copies from the pruned `out/<id>/` tree: `json/` and the
 lockfile for the dependency layer, `full/` for the sources. A root source unit (`.`) is not pruned,
 so its `Dockerfile` copies from the tracked source tree at the tar root. The build arguments, such as
 `app_name`, `node_version` and `build_version`, are provided by `publish-oci`, see its
@@ -309,117 +330,60 @@ Prefer `repo:` over `org:` or `enterprise:`: the token is persisted as a git cre
 whole job, so every later step, including test code, can read everything it grants. Private GitHub
 Package Registry dependencies use the job `GITHUB_TOKEN` and are unaffected.
 
-## tallyrelease (beta)
+## Releases
 
-With `tallyrelease: shadow`, the `Release plan` job runs [tallyrelease](https://github.com/abinnovision/tally-release)
-next to release-please through [run-tallyrelease](../../actions/run-tallyrelease/README.md). It only observes:
-release-please still owns versions, the release list is unchanged, every step of the job may fail without failing it,
-and `Status` does not depend on it. The repository needs a `tallyrelease.yaml`.
-
-| Runs                         | Command                                     | Step summary | Artifact                                           |
-| :--------------------------- | :------------------------------------------ | :----------- | :------------------------------------------------- |
-| Pull requests and pushes to `default-branch` | `plan --branch <default-branch> --all`      | Plan table   | `tallyrelease-plan` (`tallyrelease-plan.json`, 7 days)          |
-| Push to `default-branch`     | `shadow --branch <default-branch>`          | Shadow rows  | `tallyrelease-shadow` (`tallyrelease-shadow.json`, 90 days) |
-| Push to `default-branch`     | `run --branch <default-branch> --dry-run`   | Release actions and plan table | `tallyrelease-run` (`tallyrelease-run.json`, 7 days) |
-
-`shadow` compares each unit's next version with the manifest change of a release merge and skips every other push
-(`W_SHADOW_SKIPPED`). Its report records the bundled CLI version as `pin`. With `shadow-issue` set, every compared
-release merge adds one comment with the rows to that issue, using a token with `issues:write` from the token broker.
-
-```yaml
-with:
-  tallyrelease: shadow
-  shadow-issue: "42"
-```
-
-The release dry run shows the release PRs, tags and releases tallyrelease would create, without writing anything. The
-job token cannot read issues and pull requests, so it uses a token from the token broker with
-`contents:read issues:read pull_requests:read actions:read`; the caller grants no new permissions. If the exchange
-fails, the dry run is skipped.
-
-- On pull requests the plan uses the default-branch rules, so prerelease numbers are indicative. It is relative to the
-  pull request head: tags created on the default branch after the branch point are not visible
-- On the release merge push, `plan` can run before `Release` creates the new tags and list the just-released units as
-  pending. `shadow` plans the parent commit and is not affected
-- Re-running a run that already commented adds a second comment; the comment links the run attempt
-- When the caller's concurrency group cancels a pending push run, a release merge in it is not compared. Replay it with
-  `tallyrelease shadow --head <sha> --branch <default-branch>`
-- If the token broker does not allow `issues:write`, leave `shadow-issue` empty and comment from a caller job instead:
-
-```yaml
-shadow-comment:
-  name: Shadow comment
-  needs: ci
-  if: always() && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-  runs-on: ubuntu-latest
-  permissions:
-    actions: read
-    issues: write
-  steps:
-    - uses: actions/download-artifact@v8
-      id: download
-      continue-on-error: true
-      with:
-        name: tallyrelease-shadow
-    - if: steps.download.outcome == 'success'
-      env:
-        GH_TOKEN: $\{{ github.token }}
-        GH_REPO: $\{{ github.repository }}
-      run: |
-        jq -e '.skipped == null' tallyrelease-shadow.json > /dev/null || exit 0
-        jq -r '.rows[] | "- `\(.path)`: \(.status), release-please \(.after // "-"), tallyrelease \(.next // "-")"' tallyrelease-shadow.json > comment.md
-        gh issue comment <issue> --body-file comment.md
-```
-
-### Release mode
-
-With `tallyrelease: release`, tallyrelease owns versions and release-please does not run. The repository needs a
-`tallyrelease.yaml`; release-please files are no longer read.
-
-| Mode      | Releases with  | `Release plan`                                     | `Release build` |
-| :-------- | :------------- | :------------------------------------------------- | :-------------- |
-| `off`     | release-please | Skipped                                            | Skipped         |
-| `shadow`  | release-please | `plan`, and on push `shadow` and `run --dry-run`   | Skipped         |
-| `release` | tallyrelease   | `plan`                                             | Catch-ups only  |
-
-`Release` checks out the full history and runs `tallyrelease run --branch <default-branch> --github-output --summary`:
-it tags merged release PRs, creates the GitHub releases, updates the release PRs and writes the `releases` list from the
-CLI's `releases` output (artifact `tallyrelease-run`). The token comes from the token broker with
+Every branch push releases with [tallyrelease](https://github.com/abinnovision/tally-release) through
+[run-tallyrelease](../../actions/run-tallyrelease/README.md). `Release` checks out the full history and runs
+`tallyrelease run --branch <branch> --base <base> --github-output --summary`, with the build base of `Configure`: it tags
+merged release PRs, creates the GitHub releases, updates the release PRs, writes the plan summary and the `releases`
+list (artifact `tallyrelease-run`). The token comes from the token broker with
 `contents:write pull_requests:write issues:read actions:read`, so the broker's GitHub App needs these permissions on the
-repository. Release PR commits are authored by that App (`<app>[bot]`). The caller grants no new permissions. tallyrelease creates the labels `tallyrelease: pending`,
-`tallyrelease: released` and `tallyrelease: stale` when they are missing; creating them up front is recommended.
+repository. Release PR commits are authored by that App (`<app>[bot]`). The caller grants no new permissions.
+tallyrelease creates the labels `tallyrelease: pending`, `tallyrelease: released` and `tallyrelease: stale` when they are
+missing; creating them up front is recommended.
 
-- Every branch push releases for the branch pushed, see [Maintenance lines](#maintenance-lines)
+- Channels come from the branch rules in `tallyrelease.yaml`: a line with `channel` lists its units with pending changes
+  as prereleases of that channel
+- On pull requests `Release plan` runs `tallyrelease plan --branch <base> --all --summary` (artifact
+  `tallyrelease-plan`). It only observes: every step may fail without failing it, and `Status` does not depend on it
 - The caller must declare the workflow-level concurrency group shown in [Concurrency](#concurrency). The stack adds no
   job-level concurrency
-- `prerelease-channel` is ignored; channels come from the branches in `tallyrelease.yaml`. The
-  `.release-please-manifest.json` rule of `build-selection: affected` has no effect
-- Each entry carries `catchUp`, `releaseSha`, `tag` and `tagPrefix`, and `sha` is the short `releaseSha`. The publish
-  workflows use them to skip what exists and to keep `latest` and GitOps on the newest version
-
-**Catch-ups.** When a release run was cancelled by the concurrency group or failed, the next run lists those releases
-again, with `catchUp: true` and the release commit as `releaseSha`. Payloads of entries at the built commit come from
-`Check`; every other release commit gets a `Release build: <sha>` job that checks it out, prunes, builds and packs the
-released units into `payload-source-<sha>` and `payload-dist-<sha>`. Checks and tests do not run there. A failing
-catch-up build fails `Status`, and since `publish-oci` dispatches GitOps only when all builds succeeded, it also holds
-back the deploy of the newer release.
-
-**Re-runs.** "Re-run failed jobs" reuses the release list and payloads of the first attempt; publishers skip what was
-published. A prerelease is deployed again on a re-run only while its commit is still the tip of the default branch. When
-a run is stuck on a tallyrelease error (`E_BASE_REQUIRED`, `E_TAG_EXISTS`, `E_PUSH_LEASE`), follow the
-[recovery steps](https://github.com/abinnovision/tally-release/blob/main/packages/cli/README.md#releases-in-ci) of the CLI.
 
 ```yaml
-with:
-  tallyrelease: release
+# tallyrelease.yaml
+branches:
+  - { name: main, line: default, channel: beta }
 ```
+
+### Catch-ups
+
+When a release run was cancelled by the concurrency group or failed, the next run lists those releases again, with
+`catchUp: true` and the release commit as `releaseSha`. A release of a unit outside the build set is a catch-up too.
+Every `catchUp: false` entry gets its payloads from `Check`; every release commit with catch-ups gets a
+`Release build: <sha>` job that checks it out, prunes, builds and packs the released units into
+`payload-source-<releaseSha>` and `payload-dist-<releaseSha>`. Checks and tests do not run there. A failing
+`Release build` fails `Status` and the caller's `ci` job, so publish jobs with `needs: ci` are skipped for the whole run;
+the next run lists those releases again.
+
+**Re-runs.** "Re-run failed jobs" reuses the release list and payloads of the first attempt; publishers skip what was
+published. When a run is stuck on a tallyrelease error (`E_BASE_REQUIRED`, `E_TAG_EXISTS`, `E_PUSH_LEASE`), follow the
+[recovery steps](https://github.com/abinnovision/tally-release/blob/main/packages/cli/README.md#releases-in-ci) of the CLI.
+
+### Release list
+
+`releases` (v2) is tallyrelease's `releases` output with `changes` replaced by `prs`, `[]` when nothing was released.
+Each entry has `id`, `path`, `kind` (`release` or `prerelease`), `version`, `channel`, `tag`, `releaseSha`, `catchUp`,
+`forge`, `latest`, `tags` and `group`, see the [CLI README](https://github.com/abinnovision/tally-release/blob/main/packages/cli/README.md#releases-in-ci).
+`prs` holds the pull request numbers of the release's changes, those of propagated units included. `changes` is dropped
+because the list travels through `env:` in every publisher, which caps a variable at 128 KiB. The payloads follow the
+rule in [Publishing](#publishing).
 
 ### Maintenance lines
 
-In release mode every branch push packs the payloads and runs `tallyrelease run --branch <branch>`, and `Release plan`
-plans pull requests for their base branch. Branch rules live in `tallyrelease.yaml`: a branch with `line: maintenance`
-releases on its line, `unit:` or `group:` names what the line releases for the absolute version check. A branch without a
-line rule releases nothing: tallyrelease warns `W_EFFECT_SKIPPED`, the `releases` list is `[]` and the run stays green.
+Every branch push packs the payloads and runs `tallyrelease run --branch <branch>`, and `Release plan` plans pull
+requests for their base branch. Branch rules live in `tallyrelease.yaml`: a branch with `line: maintenance` releases on
+its line, `unit:` or `group:` names what the line releases for the absolute version check. A branch without a line rule
+releases nothing: tallyrelease warns `W_EFFECT_SKIPPED`, the `releases` list is `[]` and the run stays green.
 
 ```yaml
 # tallyrelease.yaml
@@ -438,11 +402,25 @@ on:
     branches: [main, "release/**"]
 ```
 
-- A maintenance release gets a GitHub release that is not marked latest. `publish-npm` publishes it with the dist-tag
-  `backport` and `publish-oci` pushes `<version>` without `latest` and does not dispatch GitOps, since a higher version
-  is tagged. `publish-linear` skips it unless `maintenance: true`
+- A maintenance release gets a GitHub release that is not marked latest, and its entry has `latest: false`.
+  `publish-npm` publishes it with the dist-tag `backport` and `publish-oci` pushes `<version>` without `latest` and does
+  not dispatch GitOps, since `latest` is never set on a maintenance line. `publish-linear` skips it unless `maintenance: true`
 - Rulesets on `release/**` must allow merging the release PRs, like on the default branch
-- Keep `push.branches` limited to the default branch and the maintenance patterns, since every push in release mode is a release run
+- Keep `push.branches` limited to the default branch and the maintenance patterns, since every push is a release run
+
+## Migrating from v1
+
+- Delete `release-please-config.json` and `.release-please-manifest.json`, and close open release-please PRs
+- Add a `tallyrelease.yaml` and set `tagFormat` so it matches the existing tags
+- Move the `source-units` and `dist-units` patterns into `tallyrelease.yaml` as `source` and `dist` tags; list the root
+  `.` explicitly
+- Add `id:` where two units share a basename, since tallyrelease fails with `E_DUPLICATE_UNIT`
+- An `id:` override changes the `out/<id>/` path Dockerfiles copy from and the `<id>.tgz` file name
+- Callers whose `push.branches` covers more than the default branch now release on those branches too
+- Drop the removed inputs `tallyrelease`, `shadow-issue`, `prerelease-channel`, `source-units`, `dist-units` and
+  `build-selection`; prerelease channels move to the branch rules
+- Update `publish-oci`, `publish-npm` and `publish-linear` to their v2 together with this workflow: they fail on a v1
+  release list, and v1 publishers cannot read a v2 one
 
 ## Inputs
 
