@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v2.0.0...publish-oci-source-v2.1.0) (2026-10-17)
+
+
+### Features
+
+* **publish-oci:** build per-unit multi-platform images ([#715](https://github.com/abinnovision/actions/issues/715)) ([79bdc56](https://github.com/abinnovision/actions/commit/79bdc567859202acd15cb8b5f165e89e1813e037))
+
 ## [2.0.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v1.2.0...publish-oci-source-v2.0.0) (2026-10-17)
 
 
