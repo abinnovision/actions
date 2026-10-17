@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/abinnovision/actions/compare/app-stack-source-v2.0.0...app-stack-source-v2.0.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **app-stack:** fetch full history in mode main ([#713](https://github.com/abinnovision/actions/issues/713)) ([0574dcf](https://github.com/abinnovision/actions/commit/0574dcf240690b93047b0240c7f8c2c257269315))
+
 ## [2.0.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.6.0...app-stack-source-v2.0.0) (2026-10-17)
 
 
