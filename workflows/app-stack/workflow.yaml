@@ -152,7 +152,7 @@ jobs:
         with:
           ref: ${{ steps.event.outputs.commit-sha }}
           submodules: false
-          fetch-depth: ${{ steps.mode.outputs.mode == 'main' && 0 || 1 }}
+          fetch-depth: ${{ steps.mode.outputs.mode == 'main' && '0' || '1' }}
           filter: blob:none
 
       # Optional: without a Makefile, dependencies are installed with `yarn install --immutable`.
