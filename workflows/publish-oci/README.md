@@ -82,9 +82,46 @@ Both follow the entry, as decided by tallyrelease:
   only some have it, the image is built and pushed to all. A re-run therefore dispatches again under
   the rules above
 
+## Platforms
+
+`platforms` is CSV, one line per unit, and defaults to the runner platform (`linux/amd64`):
+
+```
+id,mode,platform[,platform...]
+```
+
+`mode` selects how the platforms are built. The only mode is `cross`.
+
+In `cross` mode, builds run on `ubuntu-latest` without QEMU, so the Dockerfile cross-compiles. Every stage with `RUN`
+uses `FROM --platform=$BUILDPLATFORM`, target stages only `COPY`, and the final base image publishes
+every listed platform.
+
+```dockerfile
+ARG golang_version
+FROM --platform=$BUILDPLATFORM golang:${golang_version} AS build
+ARG TARGETOS TARGETARCH
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/app .
+
+FROM gcr.io/distroless/static
+COPY --from=build /out/app /app
+USER 65532
+ENTRYPOINT ["/app"]
+```
+
+- CGO needs a cross toolchain such as `tonistiigi/xx`
+- Node apps install and build in the `$BUILDPLATFORM` stage; native dependencies need prebuilt
+  binaries for every platform, e.g. via `supportedArchitectures` in `.yarnrc.yml`
+- Adding a platform takes effect with the next version, since an existing version in every registry
+  is not rebuilt
+- Lines with fewer than 3 columns, empty columns, a mode other than `cross`, a platform not matching
+  `os/arch[/variant]` or a repeated unit fail `Prepare`; lines for unknown units are ignored with a warning
+
 ## Caches
 
-- **Registry layer cache:** with `registry` set, `<registry>/<image>-cache:latest` (`mode=max`)
+- **Registry layer cache:** with `registry` set, `<registry>/<image>-cache:latest` (`mode=max`); one
+  ref holds every platform
 - **Turbo remote cache:** with `turbo.json` in the payload root, a local cache server backed by the
   GitHub Actions cache runs on the runner. `TURBO_API`, `TURBO_TEAM` and `TURBO_TOKEN` are plain
   build args; declare them as `ARG` in the Dockerfile.
@@ -170,6 +207,7 @@ jobs:
     with:
       releases: ${{ needs.ci.outputs.releases }}
       image: app-{id}
+      platforms: backend,cross,linux/amd64,linux/arm64
       registry: ${{ vars.FOUNDRY_REGISTRY_DOCKER }}
       gcp-workload-identity-provider: ${{ vars.FOUNDRY_WIF_PROVIDER }}
       gitops-routes: |
@@ -187,6 +225,7 @@ jobs:
 | :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :----------------- |
 | `releases`                       | Release list v2 of a stack as a JSON array, the `releases` output of a stack.<br>This workflow builds the entries tagged `source` from the source payload.<br>An empty string, `[]` or a list without entries tagged `source` skips all work.<br>**Example:** `needs.ci.outputs.releases`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Yes      |                    |
 | `image`                          | Image repository name, used for every registry. `{id}` (the unit `id`) and `{path}` are replaced per unit, and the result is lowercased. Other placeholders fail the run.<br>A value without placeholders is used as is for every unit.<br>**Default:** `{id}`<br>**Example:** `app-{id}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | No       | `{id}`             |
+| `platforms`                      | Target platforms in **CSV format** (one line per unit).<br>**Format:** `unit-id,mode,platform[,platform...]`, where `unit-id` is the tallyrelease unit `id` and `platform` is `os/arch[/variant]`<br>**Mode:** `cross` builds every platform on the amd64 runner without QEMU, so every Dockerfile stage with `RUN` must use `FROM --platform=$BUILDPLATFORM`<br>**Default:** _empty_ (native platform of the runner, linux/amd64)<br>**Example:** `my-api,cross,linux/amd64,linux/arm64`<br>**Note:** Lines with fewer than 3 columns, empty columns, a mode other than `cross`, an invalid platform or a repeated unit fail the run. Lines for units not in the release list are ignored with a warning                                                                                                                              | No       | _empty_            |
 | `registry`                       | GCP Artifact Registry repository URL for the images.<br>**Default:** _empty_ (GCP Artifact Registry disabled)<br>**Requires:** `gcp-workload-identity-provider`<br>**Example:** `europe-docker.pkg.dev/project-id/repository-name`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | No       | _empty_            |
 | `gcp-workload-identity-provider` | Full Workload Identity Federation provider resource name.<br>Authenticates directly as the repository without a service account.<br>This is public configuration, not a secret.<br>**Required:** When `registry` is set<br>**Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | No       | _empty_            |
 | `ghcr`                           | Publish images to GitHub Container Registry (GHCR).<br>**Default:** `false`<br>**Authentication:** Uses `GITHUB_TOKEN` (automatically available)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | No       | _empty_            |

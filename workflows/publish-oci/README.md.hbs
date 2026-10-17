@@ -82,9 +82,46 @@ Both follow the entry, as decided by tallyrelease:
   only some have it, the image is built and pushed to all. A re-run therefore dispatches again under
   the rules above
 
+## Platforms
+
+`platforms` is CSV, one line per unit, and defaults to the runner platform (`linux/amd64`):
+
+```
+id,mode,platform[,platform...]
+```
+
+`mode` selects how the platforms are built. The only mode is `cross`.
+
+In `cross` mode, builds run on `ubuntu-latest` without QEMU, so the Dockerfile cross-compiles. Every stage with `RUN`
+uses `FROM --platform=$BUILDPLATFORM`, target stages only `COPY`, and the final base image publishes
+every listed platform.
+
+```dockerfile
+ARG golang_version
+FROM --platform=$BUILDPLATFORM golang:${golang_version} AS build
+ARG TARGETOS TARGETARCH
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/app .
+
+FROM gcr.io/distroless/static
+COPY --from=build /out/app /app
+USER 65532
+ENTRYPOINT ["/app"]
+```
+
+- CGO needs a cross toolchain such as `tonistiigi/xx`
+- Node apps install and build in the `$BUILDPLATFORM` stage; native dependencies need prebuilt
+  binaries for every platform, e.g. via `supportedArchitectures` in `.yarnrc.yml`
+- Adding a platform takes effect with the next version, since an existing version in every registry
+  is not rebuilt
+- Lines with fewer than 3 columns, empty columns, a mode other than `cross`, a platform not matching
+  `os/arch[/variant]` or a repeated unit fail `Prepare`; lines for unknown units are ignored with a warning
+
 ## Caches
 
-- **Registry layer cache:** with `registry` set, `<registry>/<image>-cache:latest` (`mode=max`)
+- **Registry layer cache:** with `registry` set, `<registry>/<image>-cache:latest` (`mode=max`); one
+  ref holds every platform
 - **Turbo remote cache:** with `turbo.json` in the payload root, a local cache server backed by the
   GitHub Actions cache runs on the runner. `TURBO_API`, `TURBO_TEAM` and `TURBO_TOKEN` are plain
   build args; declare them as `ARG` in the Dockerfile.
@@ -157,6 +194,7 @@ jobs:
     with:
       releases: $\{{ needs.ci.outputs.releases }}
       image: app-{id}
+      platforms: backend,cross,linux/amd64,linux/arm64
       registry: $\{{ vars.FOUNDRY_REGISTRY_DOCKER }}
       gcp-workload-identity-provider: $\{{ vars.FOUNDRY_WIF_PROVIDER }}
       gitops-routes: |
