@@ -1,0 +1,700 @@
+name: Publish OCI
+
+on:
+  workflow_call:
+    secrets:
+      APP_IMAGE_SECRETS:
+        required: false
+        description: |-
+          App-specific build secrets for image builds in **CSV format** (one per line).
+          **Format:** `unit-id,secret-name,secret-value`, where `unit-id` is the tallyrelease unit `id`
+          **Example:**
+          ```
+          my-api,NPM_TOKEN,npm_abc123xyz
+          my-api,API_KEY,secret_key_here
+          my-frontend,BUILD_KEY,value,with,commas,is,ok
+          ```
+          **Note:** Only the first two commas are delimiters; the secret value can contain commas.
+
+          Each secret is passed to Docker BuildKit as an individual secret mount with its own ID.
+
+          **Usage in Dockerfile:** `--mount=type=secret,id=NPM_TOKEN` (available at `/run/secrets/NPM_TOKEN`)
+    inputs:
+      releases:
+        type: string
+        required: true
+        description: |-
+          Release list v2 of a stack as a JSON array, the `releases` output of a stack.
+          This workflow builds the entries tagged `source` from the source payload.
+          An empty string, `[]` or a list without entries tagged `source` skips all work.
+          **Example:** `needs.ci.outputs.releases`
+
+      image:
+        type: string
+        required: false
+        default: "{id}"
+        description: |-
+          Image repository name, used for every registry. `{id}` (the unit `id`) and `{path}` are replaced per unit, and the result is lowercased. Other placeholders fail the run.
+          A value without placeholders is used as is for every unit.
+          **Default:** `{id}`
+          **Example:** `app-{id}`
+
+      platforms:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Target platforms in **CSV format** (one line per unit).
+          **Format:** `unit-id,mode,platform[,platform...]`, where `unit-id` is the tallyrelease unit `id` and `platform` is `os/arch[/variant]`
+          **Mode:** `cross` builds every platform on the amd64 runner without QEMU, so every Dockerfile stage with `RUN` must use `FROM --platform=$BUILDPLATFORM`
+          **Default:** _empty_ (native platform of the runner, linux/amd64)
+          **Example:** `my-api,cross,linux/amd64,linux/arm64`
+          **Note:** Lines with fewer than 3 columns, empty columns, a mode other than `cross`, an invalid platform or a repeated unit fail the run. Lines for units not in the release list are ignored with a warning
+
+      registry:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          GCP Artifact Registry repository URL for the images.
+          **Default:** _empty_ (GCP Artifact Registry disabled)
+          **Requires:** `gcp-workload-identity-provider`
+          **Example:** `europe-docker.pkg.dev/project-id/repository-name`
+
+      gcp-workload-identity-provider:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Full Workload Identity Federation provider resource name.
+          Authenticates directly as the repository without a service account.
+          This is public configuration, not a secret.
+          **Required:** When `registry` is set
+          **Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`
+
+      ghcr:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Publish images to GitHub Container Registry (GHCR).
+          **Default:** `false`
+          **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
+
+      gitops-routes:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          GitOps routes in **CSV format** (one per line).
+          **Format:** `unit-id,type,target-repo,application[,image-name]`, where `unit-id` is the tallyrelease unit `id`
+          **Type:** `release` for entries of kind `release`, `prerelease` for entries of kind `prerelease`
+          **Example:**
+          `my-api,prerelease,gitops-dev,my-api-dev`
+          `my-api,release,gitops-prod,my-api-prod-eu`
+          `my-api,release,gitops-prod,my-api-prod-us`
+          **Image name:** Defaults to the resolved `image` of the unit
+          **Deployment tags:** Every route uses the clean semver version as tag
+          **Note:** Every matching line is dispatched. Lines with fewer than 4 or more than 5 columns, empty columns or an unknown type fail the run. A unit with a line but without a Dockerfile fails its build. Units without a matching line are not dispatched
+
+      gitops-workflow-file:
+        type: string
+        required: false
+        default: "update-tags.yaml"
+        description: |-
+          GitOps workflow file to dispatch for deployment updates.
+          **Default:** `update-tags.yaml`
+          **Example:** `update-tags.yaml`, `deploy.yaml`
+          **Note:** Only used when `gitops-routes` is provided
+
+      token-broker-url:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          URL of the token broker for OIDC token exchange.
+          **Default:** Falls back to `vars.TOKEN_BROKER_URL` if not provided.
+          **Note:** Only used when `gitops-routes` is provided
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Selects the entries tagged `source` and validates them and the configuration before any image is built.
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: inputs.releases != '' && inputs.releases != '[]'
+    permissions: {}
+    outputs:
+      units: ${{ steps.select.outputs.units }}
+      gitops-routes: ${{ steps.select.outputs.gitops-routes }}
+    steps:
+      # Selects the entries tagged "source" and adds the rendered `image`, the payload `artifact`, `sha7` and
+      # `platforms` to each.
+      - name: Select units
+        id: select
+        env:
+          RELEASES: ${{ inputs.releases }}
+          INPUT_REGISTRY: ${{ inputs.registry }}
+          INPUT_GHCR: ${{ inputs.ghcr }}
+          INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.gcp-workload-identity-provider }}
+          INPUT_GITOPS_ROUTES: ${{ inputs.gitops-routes }}
+          INPUT_IMAGE: ${{ inputs.image }}
+          INPUT_PLATFORMS: ${{ inputs.platforms }}
+          TOKEN_BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+        run: |
+          set -euo pipefail
+
+          # Checked on every entry before selection, so a list older than v2 always fails.
+          errors=$(jq -r '
+            .[] | select(has("latest") | not)
+            | "Entry \(.id // .path) is not a release list v2 entry (missing latest)"
+          ' <<< "$RELEASES")
+
+          if [[ -n "$errors" ]]; then
+            while IFS= read -r error; do
+              echo "::error::$error"
+            done <<< "$errors"
+            exit 1
+          fi
+
+          if [[ -z "$INPUT_REGISTRY" ]] && [[ "$INPUT_GHCR" != "true" ]]; then
+            echo "::error::No registry configured. Set 'registry' and/or 'ghcr'."
+            exit 1
+          fi
+
+          if [[ -n "$INPUT_REGISTRY" ]] && [[ -z "$INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER" ]]; then
+            echo "::error::'registry' requires 'gcp-workload-identity-provider'"
+            exit 1
+          fi
+
+          # An empty image would only fail after the build, as an invalid image reference.
+          if [[ -z "$INPUT_IMAGE" ]]; then
+            echo "::error::'image' must not be empty"
+            exit 1
+          fi
+
+          if [[ -n "$INPUT_GITOPS_ROUTES" ]] && [[ -z "$TOKEN_BROKER_URL" ]]; then
+            echo "::error::token-broker-url is required when gitops-routes is provided"
+            exit 1
+          fi
+
+          # gitops-routes: id,type,target-repo,application[,image-name]
+          awk -F, '$0 != "" && (NF < 4 || NF > 5 || /^,|,$|,,/ || ($2 != "release" && $2 != "prerelease")) {
+            print "::error::Invalid gitops-routes line \047" $0 "\047: expected \047id,type,target-repo,application[,image-name]\047 with type \047release\047 or \047prerelease\047 and without empty columns"
+            invalid = 1
+          } END { exit invalid }' <<< "$INPUT_GITOPS_ROUTES"
+
+          # platforms: id,mode,platform[,platform...]
+          awk -F, '$0 != "" {
+            if (seen[$1]++) { print "::error::Duplicate platforms line for unit \047" $1 "\047"; invalid = 1; next }
+            bad = (NF < 3 || /^,|,$|,,/ || $2 != "cross")
+            for (i = 3; i <= NF; i++) if ($i !~ /^[a-z0-9]+\/[a-z0-9_]+(\/[a-z0-9]+)?$/) bad = 1
+            if (bad) { print "::error::Invalid platforms line \047" $0 "\047: expected \047id,mode,platform[,platform...]\047 with mode \047cross\047, platforms \047os/arch[/variant]\047 and without empty columns"; invalid = 1 }
+          } END { exit invalid }' <<< "$INPUT_PLATFORMS"
+
+          jq -r --arg platforms "$INPUT_PLATFORMS" '[.[].id] as $ids
+            | $platforms | split("\n")[] | select(. != "") | split(",")[0] | select(IN($ids[]) | not)
+            | "::warning::platforms line for unknown unit \u0027\(.)\u0027 is ignored"' <<< "$RELEASES"
+
+          # Renders `image`, fails on a placeholder left as written, then lowercases.
+          units=$(jq -c --arg image "$INPUT_IMAGE" 'map(
+            select(any(.tags[]?; . == "source"))
+            | . as $entry
+            | ($image | gsub("\\{id\\}"; $entry.id) | gsub("\\{path\\}"; $entry.path)) as $rendered
+            | ([$rendered | scan("\\{[^}]*\\}")] | first) as $unknown
+            | if $unknown then "::error::Unknown placeholder \u0027\($unknown)\u0027 in image\n" | halt_error(1) else . end
+            | . + {
+                image: ($rendered | ascii_downcase),
+                artifact: (if .catchUp then "payload-source-\(.releaseSha)" else "payload-source" end),
+                sha7: .releaseSha[0:7]
+              }
+          )' <<< "$RELEASES")
+
+          units=$(jq -c --arg platforms "$INPUT_PLATFORMS" '
+            ($platforms | split("\n") | map(select(. != "") | split(",") | {key: .[0], value: (.[2:] | join(","))}) | from_entries) as $p
+            | map(. + {platforms: ($p[.id] // "")})
+          ' <<< "$units")
+
+          if [[ -n "$INPUT_GITOPS_ROUTES" ]]; then
+            delimiter="EOF_$(openssl rand -hex 8)"
+            printf 'gitops-routes<<%s\n%s\n%s\n' "$delimiter" "$INPUT_GITOPS_ROUTES" "$delimiter" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Units: $(jq -r 'map(.id) | join(", ")' <<< "$units")"
+          echo "units=$units" >> "$GITHUB_OUTPUT"
+
+  # Build and push one image per unit that has a Dockerfile.
+  build:
+    name: "Build: ${{ matrix.entry.id }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: prepare
+    if: needs.prepare.outputs.units != '[]' && needs.prepare.outputs.units != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        entry: ${{ fromJSON(needs.prepare.outputs.units) }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      actions: write
+    steps:
+      # A re-run whose commit is no longer the branch tip must not move "latest" or dispatch GitOps updates. Runs in
+      # every job that "Re-run failed jobs" can re-run on its own.
+      - &guard
+        name: Re-run guard
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          stale="false"
+          if [[ "$GITHUB_RUN_ATTEMPT" != "1" ]]; then
+            if ! tip=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha) \
+              || [[ "$tip" != "$GITHUB_SHA" ]]; then
+              stale="true"
+              echo "::warning::Re-run of a superseded run: no latest tags and no GitOps dispatch"
+            fi
+          fi
+          echo "stale=$stale" >> "$GITHUB_OUTPUT"
+
+      - name: Download payload
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.entry.artifact }}
+          path: artifact
+
+      - name: Extract payload
+        run: |
+          mkdir -p payload
+          tar -xf artifact/source.tar -C payload
+
+      # Resolves the per-unit settings. A unit without a Dockerfile ends the leg successfully without an image, unless
+      # it has a GitOps route.
+      - name: Resolve unit
+        id: unit
+        env:
+          APP: ${{ matrix.entry.id }}
+          APP_PATH: ${{ matrix.entry.path }}
+          GITOPS_ROUTES: ${{ needs.prepare.outputs.gitops-routes }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! -f "payload/$APP_PATH/Dockerfile" ]]; then
+            if awk -F, '$1 == ENVIRON["APP"] { found = 1 } END { exit !found }' <<< "$GITOPS_ROUTES"; then
+              echo "::error::Unit '$APP' has a GitOps route but no Dockerfile at '$APP_PATH/Dockerfile'"
+              exit 1
+            fi
+            echo "::notice::Unit '$APP' has no Dockerfile at '$APP_PATH/Dockerfile', no image is built for it"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          turbo_cache="false"
+          if [[ -f payload/turbo.json ]]; then
+            turbo_cache="true"
+          fi
+
+          echo "turbo-cache=$turbo_cache" >> "$GITHUB_OUTPUT"
+          echo "Unit '$APP': turbo cache $turbo_cache"
+
+      - id: buildx
+        name: Setup Docker Buildx
+        if: steps.unit.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            network=host
+
+      # Runs while the registry logins below set up; joined before the build args.
+      - id: turbo-cache
+        name: Setup Turbo cache
+        if: steps.unit.outputs.turbo-cache == 'true'
+        background: true
+        uses: rharkor/caching-for-turbo@v2.3.13
+
+      # Prepare guarantees GCP authentication whenever `registry` is set.
+      - name: Setup GCP Authentication
+        if: steps.unit.outputs.skip != 'true' && inputs.registry != ''
+        uses: abinnovision/actions@setup-gcp-v1.2.0
+        with:
+          workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
+
+      - name: Setup gcloud
+        if: steps.unit.outputs.skip != 'true' && inputs.registry != ''
+        uses: google-github-actions/setup-gcloud@v3
+
+      # Uses the gcloud credential helper so tokens are refreshed during long builds.
+      - name: Login to GCP Artifact Registry
+        if: steps.unit.outputs.skip != 'true' && inputs.registry != ''
+        env:
+          INPUT_REGISTRY: ${{ inputs.registry }}
+        run: gcloud auth configure-docker "${INPUT_REGISTRY%%/*}" --quiet
+
+      - name: Login to GitHub Container Registry
+        if: steps.unit.outputs.skip != 'true' && inputs.ghcr
+        uses: docker/login-action@v4
+        with:
+          registry: "ghcr.io"
+          username: "${{ github.actor }}"
+          password: "${{ github.token }}"
+
+      - name: Prepare image names
+        id: image-names
+        if: steps.unit.outputs.skip != 'true'
+        env:
+          OCI_IMAGE: ${{ matrix.entry.image }}
+          INPUT_REGISTRY: ${{ inputs.registry }}
+          INPUT_GHCR: ${{ inputs.ghcr }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          images=()
+          cache_from=""
+          cache_to=""
+
+          # GCP Artifact Registry, with registry caching
+          if [[ -n "$INPUT_REGISTRY" ]]; then
+            gcpar_image="$INPUT_REGISTRY/$OCI_IMAGE"
+            gcpar_cache="$INPUT_REGISTRY/$OCI_IMAGE-cache"
+            images+=("$gcpar_image")
+            cache_from="type=registry,ref=$gcpar_cache:latest"
+            cache_to="type=registry,ref=$gcpar_cache:latest,mode=max"
+            echo "GCP AR image: $gcpar_image"
+          fi
+
+          # GitHub Container Registry
+          if [[ "$INPUT_GHCR" == "true" ]]; then
+            ghcr_image="ghcr.io/$REPOSITORY_OWNER/$OCI_IMAGE"
+            images+=("$ghcr_image")
+            echo "GHCR image: $ghcr_image"
+          fi
+
+          echo "IMAGES<<EOF" >> $GITHUB_OUTPUT
+          printf '%s\n' "${images[@]}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "CACHE_FROM=$cache_from" >> $GITHUB_OUTPUT
+          echo "CACHE_TO=$cache_to" >> $GITHUB_OUTPUT
+          echo "Configured registries: ${#images[@]}"
+
+      # An entry skips build and push when every registry has its version tag; otherwise the image is built and pushed
+      # to all registries.
+      - name: Check existing image
+        id: probe
+        if: steps.unit.outputs.skip != 'true'
+        env:
+          APP: ${{ matrix.entry.id }}
+          APP_VERSION: ${{ matrix.entry.version }}
+          IMAGES: ${{ steps.image-names.outputs.IMAGES }}
+        run: |
+          while IFS= read -r image; do
+            if ! error=$(docker buildx imagetools inspect "$image:$APP_VERSION" 2>&1 > /dev/null); then
+              echo "$image:$APP_VERSION not found, building: $error"
+              exit 0
+            fi
+          done <<< "$IMAGES"
+
+          echo "::notice::$APP $APP_VERSION exists in every registry, skipping build and push"
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "### 📦 \`$APP\` \`v$APP_VERSION\`"
+            echo ""
+            echo "skipped (exists)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Wait for Turbo cache
+        wait: [turbo-cache]
+
+      # Derived build args (tool versions from .tool-versions, unit metadata) and the turbo remote-cache passthrough
+      # when enabled.
+      - name: Prepare build args
+        id: build-args
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
+        env:
+          APP: ${{ matrix.entry.id }}
+          APP_VERSION: ${{ matrix.entry.version }}
+          APP_SHA: ${{ matrix.entry.sha7 }}
+          TURBO_CACHE: ${{ steps.unit.outputs.turbo-cache }}
+        run: |
+          set -euo pipefail
+
+          # One "<tool>_version=<version>" line per tool, first occurrence wins; nodejs maps to node.
+          tool_versions=""
+          if [[ -f payload/.tool-versions ]]; then
+            tool_versions=$(awk '
+              { sub(/\r$/, "") }
+              NF >= 2 && $1 !~ /^#/ {
+                tool = ($1 == "nodejs") ? "node" : $1
+                if (!(tool in seen)) { seen[tool] = 1; print tool "_version=" $2 }
+              }
+            ' payload/.tool-versions)
+          fi
+
+          if [[ -z "$(sed -n 's/^node_version=//p' <<< "$tool_versions")" ]]; then
+            echo "::warning::.tool-versions has no nodejs entry, node_version is empty for unit $APP"
+          fi
+
+          delimiter="EOF_$(openssl rand -hex 8)"
+          {
+            echo "BUILD_ARGS<<$delimiter"
+            echo "app_name=$APP"
+            # Always present, empty when the tool is absent.
+            for tool in node python golang uv; do
+              echo "${tool}_version=$(sed -n "s/^${tool}_version=//p" <<< "$tool_versions")"
+            done
+            if [[ -n "$tool_versions" ]]; then
+              grep -v -E '^(node|python|golang|uv)_version=' <<< "$tool_versions" || true
+            fi
+            echo "build_version=v$APP_VERSION+$APP_SHA"
+            echo "build_commit=$APP_SHA"
+            if [[ "$TURBO_CACHE" == "true" ]]; then
+              echo "TURBO_API=${TURBO_API/localhost/127.0.0.1}"
+              echo "TURBO_TEAM=$TURBO_TEAM"
+              echo "TURBO_TOKEN=$TURBO_TOKEN"
+            fi
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Extract Docker metadata
+        id: meta
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.image-names.outputs.IMAGES }}
+          # "latest" only for entries tallyrelease marks latest, never on a re-run of a superseded run.
+          flavor: latest=false
+          tags: |
+            type=raw,value=sha-${{ matrix.entry.sha7 }}
+            type=semver,pattern={{version}},value=v${{ matrix.entry.version }}
+            type=raw,value=${{ matrix.entry.kind == 'release' && 'release' || 'prerelease' }}-${{ matrix.entry.version }}
+            type=raw,value=latest,enable=${{ matrix.entry.latest && steps.guard.outputs.stale != 'true' }}
+
+      # One secret file per matching APP_IMAGE_SECRETS line; an empty mount string mounts no secrets.
+      - name: Prepare app-specific secrets
+        id: app-secrets
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
+        env:
+          APP: ${{ matrix.entry.id }}
+          # CSV format: unit-id,secret-name,secret-value (one per line)
+          APP_IMAGE_SECRETS: ${{ secrets.APP_IMAGE_SECRETS }}
+        run: |
+          secrets_dir=$(mktemp -d)
+          mounts=()
+          while IFS= read -r line; do
+            [[ "$line" == "$APP,"* ]] || continue
+            # Only the first two commas are delimiters; the value can contain commas.
+            rest="${line#"$APP",}"
+            secret_name="${rest%%,*}"
+            printf '%s' "${rest#*,}" > "$secrets_dir/secret_$secret_name"
+            mounts+=("$secret_name=$secrets_dir/secret_$secret_name")
+            echo "Prepared secret: $secret_name"
+          done <<< "$APP_IMAGE_SECRETS"
+
+          {
+            echo "SECRETS_MOUNT_STRING<<EOF"
+            printf '%s\n' "${mounts[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        id: build
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
+        uses: docker/build-push-action@v7
+        env:
+          # Replaced by the "Write image summary" step.
+          DOCKER_BUILD_SUMMARY: "false"
+        with:
+          context: payload
+          file: payload/${{ matrix.entry.path }}/Dockerfile
+          push: true
+          sbom: true
+          platforms: ${{ matrix.entry.platforms }}
+          cache-from: ${{ steps.image-names.outputs.CACHE_FROM }}
+          cache-to: ${{ steps.image-names.outputs.CACHE_TO }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: ${{ steps.build-args.outputs.BUILD_ARGS }}
+          secret-files: ${{ steps.app-secrets.outputs.SECRETS_MOUNT_STRING }}
+          allow: network.host
+
+      - name: Write image summary
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
+        env:
+          APP: ${{ matrix.entry.id }}
+          APP_VERSION: ${{ matrix.entry.version }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          BUILD_REF: ${{ steps.build.outputs.metadata && fromJSON(steps.build.outputs.metadata)['buildx.build.ref'] || '' }}
+          CACHE_FROM: ${{ steps.image-names.outputs.CACHE_FROM }}
+        run: |
+          echo "Successfully built and pushed the following images for $APP:"
+          echo "$TAGS" | while IFS= read -r tag; do
+            echo "  - $tag"
+          done
+          echo ""
+          echo "Image digest: $DIGEST"
+
+          # Compressed size per platform, read from the registry. Attestation manifests are skipped.
+          first_tag=$(echo "$TAGS" | head -n1)
+          repo="${first_tag%:*}"
+          sizes=$(
+            raw=$(docker buildx imagetools inspect --raw "$repo@$DIGEST") || exit 0
+            if echo "$raw" | jq -e '.manifests' > /dev/null; then
+              echo "$raw" | jq -r '.manifests[] | select(.platform.os != "unknown")
+                | "\(.platform.os)/\(.platform.architecture)\(if .platform.variant then "/" + .platform.variant else "" end) \(.digest)"'
+            else
+              echo "single $DIGEST"
+            fi | while read -r platform digest; do
+              size=$(docker buildx imagetools inspect --raw "$repo@$digest" | jq '.config.size + ([.layers[].size] | add)') || size=""
+              echo "| $platform | $(numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "n/a") |"
+            done
+          ) || true
+
+          # Build duration and cache usage from the buildx build record.
+          build_info="n/a"
+          if history=$(docker buildx history inspect --builder "${BUILD_REF%%/*}" "${BUILD_REF##*/}" --format json 2>/dev/null); then
+            build_info=$(echo "$history" | jq -r '"\(.Duration / 1e9 | floor | "\(. / 60 | floor)m \(. % 60)s") · \(.NumCachedSteps)/\(.NumTotalSteps) steps cached"') || build_info="n/a"
+          fi
+
+          {
+            echo "### 📦 \`$APP\` \`v$APP_VERSION\`"
+            echo ""
+            echo "| Platform | Size (compressed) |"
+            echo "| :------- | ----------------: |"
+            echo "${sizes:-| n/a | n/a |}"
+            echo ""
+            echo "**Build:** $build_info"
+            echo ""
+            if [[ -n "$CACHE_FROM" ]]; then
+              echo "**Registry cache:** \`${CACHE_FROM#*ref=}\`"
+            else
+              echo "**Registry cache:** none"
+            fi
+            echo ""
+            echo "**Digest:** \`$DIGEST\`"
+            echo ""
+            echo "**Tags:**"
+            echo ""
+            echo "$TAGS" | sed '/^$/d; s/.*/- `&`/'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Dispatch GitOps updates for the whole release.
+  # Updates for the same (target-repo, application) pair are batched into a single dispatch.
+  gitops:
+    name: GitOps Updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [prepare, build]
+    # All-or-nothing: dispatch only when no image build of this release failed. A unit with a GitOps route fails its
+    # build without a Dockerfile, so every configured unit has an image here. A re-run of a superseded run dispatches
+    # nothing.
+    if: needs.build.result == 'success' && needs.prepare.outputs.gitops-routes != ''
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - *guard
+
+      - name: Group GitOps deployments by target
+        id: routes
+        env:
+          # CSV format: id,type,target-repo,application[,image-name]
+          GITOPS_ROUTES: ${{ needs.prepare.outputs.gitops-routes }}
+          UNITS: ${{ needs.prepare.outputs.units }}
+          DEFAULT_LINE: ${{ github.ref_name == github.event.repository.default_branch }}
+          STALE: ${{ steps.guard.outputs.stale }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$STALE" == "true" ]]; then
+            echo "::warning::Superseded run: no GitOps dispatch"
+            echo "has-groups=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          resolved_file=$(mktemp)
+
+          while IFS=$'\t' read -r app image deployment_tag kind latest; do
+            # Dispatched when latest or a prerelease on the default branch. Releases on maintenance lines are never latest,
+            # and maintenance prereleases are not deployed.
+            if [[ "$latest" != "true" ]] && [[ "$kind" != "prerelease" || "$DEFAULT_LINE" != "true" ]]; then
+              echo "Skipping GitOps deployment of '$app' $deployment_tag, neither latest nor a prerelease on the default branch"
+              continue
+            fi
+
+            type="$kind"
+
+            # Every route of the unit and type; columns were validated by the prepare job.
+            unit_routes=$(APP="$app" TYPE="$type" awk -F, '$1 == ENVIRON["APP"] && $2 == ENVIRON["TYPE"]' <<< "$GITOPS_ROUTES")
+
+            if [[ -z "$unit_routes" ]]; then
+              echo "::warning::No GitOps route for '$app' ($type). Skipping GitOps deployment."
+              continue
+            fi
+
+            while IFS=, read -r _ _ target_repo deploy_app image_name; do
+              image_name="${image_name:-$image}"
+
+              if [[ "$target_repo" != *"/"* ]]; then
+                target_repo="$REPOSITORY_OWNER/$target_repo"
+              fi
+
+              jq -n -c --arg repo "$target_repo" --arg application "$deploy_app" --arg update "$image_name:$deployment_tag" \
+                '{targetRepo: $repo, application: $application, update: $update}' >> "$resolved_file"
+              echo "Collected $app -> $target_repo ($deploy_app): $image_name:$deployment_tag"
+            done <<< "$unit_routes"
+          done < <(jq -r '.[] | [.id, .image, .version, .kind, .latest] | @tsv' <<< "$UNITS")
+
+          # Batch all updates targeting the same repository and application into one entry
+          groups=$(jq -s -c 'group_by(.targetRepo + "|" + .application)
+            | map({targetRepo: .[0].targetRepo, application: .[0].application, updates: (map(.update) | unique | join(","))})' "$resolved_file")
+
+          target_resources=$(echo "$groups" | jq -r '[.[].targetRepo] | unique | map("repo:" + .) | join(" ")')
+
+          echo "groups=$groups" >> $GITHUB_OUTPUT
+          echo "target-resources=$target_resources" >> $GITHUB_OUTPUT
+          echo "has-groups=$(echo "$groups" | jq -c 'length > 0')" >> $GITHUB_OUTPUT
+
+          echo "Deployment groups: $groups"
+
+      # One token covering every target repository; the dispatch loop cannot call an action per group.
+      - id: gitops-token
+        name: Exchange token for GitOps dispatch
+        if: steps.routes.outputs.has-groups == 'true'
+        uses: abinnovision/actions@exchange-github-token-v1.4.1
+        with:
+          broker-url: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
+          resources: ${{ steps.routes.outputs.target-resources }}
+          scope: contents:read actions:write
+
+      - name: Update GitOps deployments
+        if: steps.routes.outputs.has-groups == 'true'
+        env:
+          GH_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          GITOPS_GROUPS: ${{ steps.routes.outputs.groups }}
+          GITOPS_WORKFLOW_FILE: ${{ inputs.gitops-workflow-file }}
+        run: |
+          set -euo pipefail
+
+          groups_file=$(mktemp)
+          echo "$GITOPS_GROUPS" | jq -c '.[]' > "$groups_file"
+
+          while read -r group; do
+            target_repo=$(echo "$group" | jq -r '.targetRepo')
+            application=$(echo "$group" | jq -r '.application')
+            updates=$(echo "$group" | jq -r '.updates')
+
+            echo "Dispatching GitOps update to $target_repo for $application: $updates"
+
+            gh workflow run "$GITOPS_WORKFLOW_FILE" \
+              --repo "$target_repo" \
+              --field "application=$application" \
+              --field "updates=$updates"
+          done < "$groups_file"
