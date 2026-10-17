@@ -1,55 +1,56 @@
 # publish-linear
 
-Syncs stable releases of a stack to [Linear Releases](https://linear.app/docs/releases). Each Linear release collects
-the issues referenced by the commits since the previous release of its pipeline, through
-[linear-release-action](https://github.com/linear/linear-release-action).
+Syncs the releases of a stack to [Linear Releases](https://linear.app/docs/releases). Each Linear release lists the
+issues linked to the pull requests tallyrelease attributed to the release, through the `releaseSyncByAccessKey`
+mutation of the Linear API.
 
 The release list is the `releases` output of a stack, see the
-[publishing protocol](../../docs/stacks/README.md#publishing). This workflow uses no payload.
+[publishing protocol](../../docs/stacks/README.md#publishing). This workflow uses no payload and no checkout.
 
 ## Behavior
 
-- Skips all work when `releases` is empty, `[]` or no stable entry matches a `LINEAR_ACCESS_KEYS` line
-- Ignores prereleases (entries with a non-empty `channel`)
-- Ignores maintenance releases (`line: maintenance`) unless `maintenance: true`; entries without `line` are synced
-- Keeps only the highest version per `path` among entries with `releaseSha` (lists from tallyrelease, which can hold
-  several releases of a unit); entries without `releaseSha` are used as listed
-- Assigns each entry the first `LINEAR_ACCESS_KEYS` line whose pattern matches its `path`
-- Syncs all entries with the same access key as one Linear release with the entry `version`; they must share the
-  version, which [linked versions](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md#linked-versions)
-  guarantee
-- Fails before syncing when a key line is malformed, an entry has an unsupported `schema` or a group has differing
-  versions
-- Links the GitHub release of every entry that has a `url`, plus the workflow run
-- Scans up to the `releaseSha` shared by all entries of a group, so a catch-up release does not collect later commits;
-  otherwise up to the commit of the run, with a warning when the entries have different release commits
-- Re-running a synced list is expected to end green: at the release commit of an existing version the scan range is
-  empty and the Linear CLI skips the sync (not yet verified against Linear)
+- Skips all work when `releases` is empty, `[]` or no release has a `LINEAR_ACCESS_KEYS` line
+- Ignores prereleases (entries of kind `prerelease`)
+- Skips runs on branches other than the default branch, i.e. maintenance lines, unless `maintenance: true`; entries
+  carry no line, so the branch of the run decides
+- Assigns each entry the `LINEAR_ACCESS_KEYS` line of its release item: the fixed `group` of the entry, or its unit
+  `id`; entries without a line are skipped
+- Syncs one Linear release named `v<version>` per item and version, at the `releaseSha` of its first entry. The
+  entries of a fixed group release together and share the commit; a list holding several versions of a unit
+  (catch-ups) creates one Linear release per version, oldest first
+- Sends the union of the `prs` of the entries; Linear adds the issues linked to these pull requests. `prs` includes
+  the pull requests of the units a release was propagated from, so a release caused only by a dependency lists the
+  issues of that dependency
+- Links the GitHub release of every entry that has one, plus the workflow run
+- Fails before syncing when a key line is malformed, an item has several lines or an entry has no `latest` (a release
+  list v1)
+- Re-running a synced list is expected to update the same Linear release, which a continuous pipeline identifies by
+  commit (not yet verified against Linear)
 
 ## Pipelines
 
-An access key belongs to one Linear release pipeline. Create a continuous pipeline per product, then map units to its
-key:
+An access key belongs to one Linear release pipeline. Create a continuous pipeline per product, then map its release
+items to its key, one line per item. An item is the name of a fixed tallyrelease group or a unit id. In this example,
+backend and web release together in the fixed group `platform` and share one pipeline, while the `sdk` unit has its
+own:
 
 ```
-# Apps released together with linked versions: one pipeline.
-apps/*,lin_api_abc123
-
-# One pipeline per app.
-apps/backend,lin_api_abc123
-apps/web,lin_api_def456
+platform,lin_api_abc123
+sdk,lin_api_def456
 ```
-
-With one pipeline per unit, set `scope-paths: true` so each release only scans the commits of its unit. Leave it `false`
-when a pipeline covers the whole repository: commits in shared packages or at the root also ship with the apps.
 
 ## Issue detection
 
-The Linear CLI finds issue identifiers in branch names, commit messages and pull requests. A squash merge commit such
-as `feat: add login (#42)` resolves to the issues Linear has linked to pull request #42. A Linear release only lists
-issues when pull requests are linked: put the identifier into the branch name, the title or the body (`Fixes ABI-123`).
+Linear resolves each pull request to the issues it has linked. A Linear release only lists issues when pull requests
+are linked: put the identifier into the branch name, the title or the body (`Fixes ABI-123`). Commits pushed without a
+pull request contribute no issues.
 
-The first sync of a pipeline only scans the released commit. Later syncs scan from the commit of the previous release.
+## Migrating from v1
+
+- Call it with the release list v2 of app-stack v2; a list v1 fails on the entry check
+- Key `LINEAR_ACCESS_KEYS` by release item (`backend,lin_api_abc123`) instead of a directory pattern (`apps/*`)
+- Remove `scope-paths` and `dry-run`
+- `maintenance` now follows the branch of the run instead of the `line` of the entries
 
 ## Usage
 
@@ -92,11 +93,10 @@ jobs:
     name: Publish Linear
     needs: ci
     uses: abinnovision/actions/.github/workflows/workflow.yaml@publish-linear-v1
-    permissions:
-      contents: read
+    permissions: {}
     secrets:
       LINEAR_ACCESS_KEYS: |
-        apps/*,${{ secrets.LINEAR_ACCESS_KEY }}
+        backend,${{ secrets.LINEAR_ACCESS_KEY }}
     with:
       releases: ${{ needs.ci.outputs.releases }}
 ```
@@ -105,15 +105,13 @@ jobs:
 
 ## Inputs
 
-| Input         | Description                                                                                                                                                                                                                                                     | Required | Default |
-| :------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :------ |
-| `releases`    | Release list (schema 1) of a stack as a JSON array, the `releases` output of a stack.<br>Stable entries (empty `channel`) are synced to Linear; prereleases are ignored.<br>An empty string or `[]` skips all work.<br>**Example:** `needs.ci.outputs.releases` | Yes      |         |
-| `scope-paths` | Only scan commits that touch the paths of the released entries (`<path>/**`), for repositories with one<br>pipeline per unit. When `false`, all commits are scanned, unless the pipeline in Linear has a path filter.<br>**Default:** `false`                   | No       | _empty_ |
-| `maintenance` | Also sync entries of maintenance lines (`line: maintenance`). Entries without `line` are always synced.<br>**Default:** `false`                                                                                                                                 | No       | _empty_ |
-| `dry-run`     | Scan commits and log the changes without creating or updating releases in Linear.<br>**Default:** `false`                                                                                                                                                       | No       | _empty_ |
+| Input         | Description                                                                                                                                                                                                                                      | Required | Default |
+| :------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :------ |
+| `releases`    | Release list v2 of a stack as a JSON array, the `releases` output of a stack.<br>Entries of kind `release` are synced to Linear; prereleases are ignored.<br>An empty string or `[]` skips all work.<br>**Example:** `needs.ci.outputs.releases` | Yes      |         |
+| `maintenance` | Also sync releases of runs on branches other than the default branch, i.e. maintenance lines. Entries carry no<br>line, so the branch of the run decides.<br>**Default:** `false`                                                                | No       | _empty_ |
 
 ## Secrets
 
-| Secret               | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Required |
-| :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
-| `LINEAR_ACCESS_KEYS` | Linear release pipeline access keys in **CSV format** (one per line).<br>**Format:** `pattern,access-key`<br>`pattern` is a directory pattern matched against the entry `path`: `*` matches one path segment and skips dot<br>directories, `.` is the repository root. An entry uses the first matching line; entries without a match are<br>skipped. Entries whose lines hold the same key are synced as one Linear release and must share the version.<br>**Example:**<br>`<br>apps/*,lin_api_abc123<br>` | Yes      |
+| Secret               | Description                                                                                                                                                                                                                                                                                                                                                 | Required |
+| :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
+| `LINEAR_ACCESS_KEYS` | Linear release pipeline access keys in **CSV format** (one per line).<br>**Format:** `item,access-key`<br>`item` is a tallyrelease release item: the fixed `group` of an entry, or its unit `id` when the entry has no<br>group. Each item may appear once. Entries whose item has no line are skipped.<br>**Example:**<br>`<br>backend,lin_api_abc123<br>` | Yes      |
