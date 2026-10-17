@@ -332,7 +332,7 @@ Package Registry dependencies use the job `GITHUB_TOKEN` and are unaffected.
 
 ## Releases
 
-Every branch push releases with [tallyrelease](https://github.com/abinnovision/tally-release) through
+Every branch push releases with [tallyrelease](https://github.com/abinnovision/tallyrelease) through
 [run-tallyrelease](../../actions/run-tallyrelease/README.md). `Release` checks out the full history and runs
 `tallyrelease run --branch <branch> --base <base> --github-output --summary`, with the build base of `Configure`: it tags
 merged release PRs, creates the GitHub releases, updates the release PRs, writes the plan summary and the `releases`
@@ -367,13 +367,13 @@ the next run lists those releases again.
 
 **Re-runs.** "Re-run failed jobs" reuses the release list and payloads of the first attempt; publishers skip what was
 published. When a run is stuck on a tallyrelease error (`E_BASE_REQUIRED`, `E_TAG_EXISTS`, `E_PUSH_LEASE`), follow the
-[recovery steps](https://github.com/abinnovision/tally-release/blob/main/packages/cli/README.md#releases-in-ci) of the CLI.
+[recovery steps](https://github.com/abinnovision/tallyrelease/blob/main/packages/cli/README.md#releases-in-ci) of the CLI.
 
 ### Release list
 
 `releases` (v2) is tallyrelease's `releases` output with `changes` replaced by `prs`, `[]` when nothing was released.
 Each entry has `id`, `path`, `kind` (`release` or `prerelease`), `version`, `channel`, `tag`, `releaseSha`, `catchUp`,
-`forge`, `latest`, `tags` and `group`, see the [CLI README](https://github.com/abinnovision/tally-release/blob/main/packages/cli/README.md#releases-in-ci).
+`forge`, `latest`, `tags` and `group`, see the [CLI README](https://github.com/abinnovision/tallyrelease/blob/main/packages/cli/README.md#releases-in-ci).
 `prs` holds the pull request numbers of the release's changes, those of propagated units included. `changes` is dropped
 because the list travels through `env:` in every publisher, which caps a variable at 128 KiB. The payloads follow the
 rule in [Publishing](#publishing).
