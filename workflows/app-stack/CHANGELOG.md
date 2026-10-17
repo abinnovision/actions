@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.0.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.6.0...app-stack-source-v2.0.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **publish-linear:** sync release list v2 entries through the Linear API ([#708](https://github.com/abinnovision/actions/issues/708))
+* **app-stack:** release with tallyrelease only ([#705](https://github.com/abinnovision/actions/issues/705))
+
+### Features
+
+* **app-stack:** release with tallyrelease only ([#705](https://github.com/abinnovision/actions/issues/705)) ([21f265a](https://github.com/abinnovision/actions/commit/21f265a06cdd2e74ec9dcf10250cb01fb01f890a))
+* **publish-linear:** sync release list v2 entries through the Linear API ([#708](https://github.com/abinnovision/actions/issues/708)) ([fd640e9](https://github.com/abinnovision/actions/commit/fd640e9edbf6a645efa6372b3f56e13d223e6268))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.7.0
+
 ## [1.6.0](https://github.com/abinnovision/actions/compare/app-stack-source-v1.5.1...app-stack-source-v1.6.0) (2026-10-16)
 
 

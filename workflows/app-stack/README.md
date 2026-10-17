@@ -44,7 +44,7 @@ This is a `workflow_call` workflow, so it can't be triggered directly. Call it f
 ```yaml
 jobs:
   app-stack:
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v2
 ```
 
 [//]: # "x-release-please-end"
@@ -53,8 +53,8 @@ jobs:
 
 This workflow can be used with different version ranges. The following ranges are available:
 
-- `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1`: Targeting major version <!-- x-release-please-major -->
-- `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1.6.0`: Targeting a patch version <!-- x-release-please-version -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v2`: Targeting major version <!-- x-release-please-major -->
+- `abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v2.0.0`: Targeting a patch version <!-- x-release-please-version -->
 
 ### Example Workflow File
 
@@ -77,7 +77,7 @@ permissions: {}
 jobs:
   ci:
     name: CI
-    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v1 # x-release-please-major
+    uses: abinnovision/actions/.github/workflows/workflow.yaml@app-stack-v2 # x-release-please-major
     permissions:
       contents: read
       packages: read

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/abinnovision/actions/compare/publish-linear-source-v1.1.0...publish-linear-source-v2.0.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **publish-linear:** sync release list v2 entries through the Linear API ([#708](https://github.com/abinnovision/actions/issues/708))
+
+### Features
+
+* **publish-linear:** sync release list v2 entries through the Linear API ([#708](https://github.com/abinnovision/actions/issues/708)) ([fd640e9](https://github.com/abinnovision/actions/commit/fd640e9edbf6a645efa6372b3f56e13d223e6268))
+
 ## [1.1.0](https://github.com/abinnovision/actions/compare/publish-linear-source-v1.0.0...publish-linear-source-v1.1.0) (2026-10-16)
 
 
