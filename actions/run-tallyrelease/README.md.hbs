@@ -94,10 +94,20 @@ with `github.token` trigger no workflows, so pass an app token when release PRs 
     RELEASES: $\{{ steps.tr.outputs.releases }}
 ```
 
-A step output is limited to about 1 MB. For large repositories read `result-file` instead, or upload
-it with `actions/upload-artifact`. `plan` and `releases` are the outputs of `--github-output` this
-action declares; other keys the CLI writes (for example those of `affected --github-output`) still
-appear as step outputs, but they are not part of this action's contract.
+Each `releases` entry has the fields `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`,
+`catchUp`, `forge`, `latest`, `changes`, `tags` and `group`; see the CLI README for their meaning.
+`changes` lists the unit's own changes and those of the units the release was propagated from, each
+with `via` set to the owning unit. Within a major, entries only gain fields, so ignore unknown ones.
+
+A step output is limited to about 1 MB, and `releases` can be large because of `changes`. A list
+that large does not fit an environment variable (128 KiB on Linux), so `releases-file` holds the
+same JSON as a file; app-stack reads it. For other large documents read `result-file` instead, or
+upload it with `actions/upload-artifact`.
+
+`plan`, `releases`, `releases-file` and the keys of `affected --github-output` (`affected`,
+`affected-paths`, `all`, `base`, `base-source`) are the `--github-output` outputs this action
+declares. The action re-emits every key the CLI writes, but only the declared ones are part of its
+contract.
 
 ## Usage
 

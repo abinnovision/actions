@@ -94,10 +94,20 @@ with `github.token` trigger no workflows, so pass an app token when release PRs 
     RELEASES: ${{ steps.tr.outputs.releases }}
 ```
 
-A step output is limited to about 1 MB. For large repositories read `result-file` instead, or upload
-it with `actions/upload-artifact`. `plan` and `releases` are the outputs of `--github-output` this
-action declares; other keys the CLI writes (for example those of `affected --github-output`) still
-appear as step outputs, but they are not part of this action's contract.
+Each `releases` entry has the fields `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`,
+`catchUp`, `forge`, `latest`, `changes`, `tags` and `group`; see the CLI README for their meaning.
+`changes` lists the unit's own changes and those of the units the release was propagated from, each
+with `via` set to the owning unit. Within a major, entries only gain fields, so ignore unknown ones.
+
+A step output is limited to about 1 MB, and `releases` can be large because of `changes`. A list
+that large does not fit an environment variable (128 KiB on Linux), so `releases-file` holds the
+same JSON as a file; app-stack reads it. For other large documents read `result-file` instead, or
+upload it with `actions/upload-artifact`.
+
+`plan`, `releases`, `releases-file` and the keys of `affected --github-output` (`affected`,
+`affected-paths`, `all`, `base`, `base-source`) are the `--github-output` outputs this action
+declares. The action re-emits every key the CLI writes, but only the declared ones are part of its
+contract.
 
 ## Usage
 
@@ -126,14 +136,20 @@ This action can be used with different version ranges. The following ranges are 
 | Input   | Description                                                                                                                                                                                                                                                  | Required | Default               |
 | :------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :-------------------- |
 | `args`  | CLI arguments, for example `affected --github-output`. Split on whitespace, or one argument per line when the value has several lines. Global flags such as `--cwd` and `--config` go here too. `shadow` gets `--pin <cli-version>` unless `--pin` is given. | Yes      |                       |
-| `token` | Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run, and by `run` for release PRs and tags. `run --dry-run` needs read access to contents, issues, pull requests and actions.                                       | No       | `${{ github.token }}` |
+| `token` | Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run, and by `run` for release PRs and tags. `run` needs `contents: write`, `pull-requests: write`, `issues: read` and `actions: read`.                              | No       | `${{ github.token }}` |
 
 ## Outputs
 
-| Output        | Description                                                                                                                                        |
-| :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `result`      | The JSON document of `affected`, `plan`, `shadow` or `run`, as written by `--out`. Not set for other commands.                                     |
-| `result-file` | Path of the JSON document of `affected`, `plan`, `shadow` or `run`. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands. |
-| `plan`        | Path of the plan document. Written by `plan --github-output` and `run --github-output`.                                                            |
-| `releases`    | Compact JSON array of the releases and prereleases to publish. Written by `run --github-output`; see the CLI README for the entry fields.          |
-| `cli-version` | Version of the bundled `@tallyrelease/cli`.                                                                                                        |
+| Output           | Description                                                                                                                                                                                                                                                                                                                                                                                            |
+| :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `result`         | The JSON document of `affected`, `plan`, `shadow` or `run`, as written by `--out`. Not set for other commands.                                                                                                                                                                                                                                                                                         |
+| `result-file`    | Path of the JSON document of `affected`, `plan`, `shadow` or `run`. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands.                                                                                                                                                                                                                                                     |
+| `plan`           | Path of the plan document. Written by `plan --github-output` and `run --github-output`.                                                                                                                                                                                                                                                                                                                |
+| `releases`       | Compact JSON array of the releases and prereleases to publish. Written by `run --github-output`. Each entry has `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`, `catchUp`, `forge`, `latest`, `changes`, `tags` and `group`; entries only gain fields within a major. `changes` includes the changes of the units the release was propagated from (`via`), so the array can be large. |
+| `releases-file`  | Path of a file holding the `releases` JSON of `run --github-output`, for lists too large for an environment variable.                                                                                                                                                                                                                                                                                  |
+| `affected`       | Compact JSON array of `{id, path, plugin, reason, released, tags}`. Written by `affected --github-output`.                                                                                                                                                                                                                                                                                             |
+| `affected-paths` | One path per line. Written by `affected --github-output`.                                                                                                                                                                                                                                                                                                                                              |
+| `all`            | `true` when every unit is built. Written by `affected --github-output`.                                                                                                                                                                                                                                                                                                                                |
+| `base`           | Build base sha, empty when there is none. Written by `affected --github-output`.                                                                                                                                                                                                                                                                                                                       |
+| `base-source`    | Where the build base came from. Written by `affected --github-output`.                                                                                                                                                                                                                                                                                                                                 |
+| `cli-version`    | Version of the bundled `@tallyrelease/cli`.                                                                                                                                                                                                                                                                                                                                                            |
