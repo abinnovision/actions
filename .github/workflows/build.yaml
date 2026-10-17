@@ -94,7 +94,7 @@ jobs:
     # Only run on push to "main" branch.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     outputs:
-      releases: ${{ steps.tallyrelease.outputs.releases }}
+      releases: ${{ steps.releases.outputs.releases }}
     steps:
       # Tags and history are read locally; the CLI pushes with the broker token.
       - name: Checkout
@@ -126,6 +126,22 @@ jobs:
             main
             --github-output
             --summary
+
+      # `changes` is dropped because the list is passed to Publish through the environment (128 KiB per variable).
+      - id: releases
+        name: Write release list
+        env:
+          RELEASES_FILE: ${{ steps.tallyrelease.outputs.releases-file }}
+        run: |
+          set -euo pipefail
+
+          releases='[]'
+          if [[ -n "$RELEASES_FILE" ]]; then
+            releases=$(jq -c 'map(del(.changes))' "$RELEASES_FILE")
+          fi
+
+          echo "releases=$releases" >> "$GITHUB_OUTPUT"
+          echo "Releases: $releases"
 
   publish:
     name: Publish
