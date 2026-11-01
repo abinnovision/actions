@@ -1465,26 +1465,28 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tallyrelease/cli@npm:0.4.1":
-  version: 0.4.1
-  resolution: "@tallyrelease/cli@npm:0.4.1"
+"@tallyrelease/cli@npm:0.5.0":
+  version: 0.5.0
+  resolution: "@tallyrelease/cli@npm:0.5.0"
   dependencies:
     "@octokit/rest": "npm:^22.0.1"
-    "@tallyrelease/core": "npm:^0.4.1"
+    "@tallyrelease/core": "npm:^0.5.0"
+    "@tallyrelease/plugins": "npm:^0.5.0"
     commander: "npm:^15.0.0"
+    jiti: "npm:^2.7.0"
     picomatch: "npm:^4.0.7"
     tinyglobby: "npm:^0.2.17"
     yaml: "npm:^2.9.1"
-    zod: "npm:^4.6.6"
+    zod: "npm:^4.6.7"
   bin:
     tallyrelease: dist/bin.js
-  checksum: 10/e52edd378b0fedb3b14c5afbac6b698f92ede17aa084e1ad80485fc5222511bbd6d12b4c28d556070b44fc2a10b9c9524782d853dfe93480190ca74c6bed8cb1
+  checksum: 10/a257066a8312ca5be0354658ad27cf1e64555dc3984865dc1870977a1a0c4f668ffeae4a9837720ed8e6a42f02e12a113af52f877ef27612cdbcfccd7c59151f
   languageName: node
   linkType: hard
 
-"@tallyrelease/core@npm:^0.4.1":
-  version: 0.4.1
-  resolution: "@tallyrelease/core@npm:0.4.1"
+"@tallyrelease/core@npm:^0.5.0":
+  version: 0.5.0
+  resolution: "@tallyrelease/core@npm:0.5.0"
   dependencies:
     "@standard-schema/spec": "npm:^1.1.0"
     picomatch: "npm:^4.0.7"
@@ -1494,7 +1496,18 @@ __metadata:
   peerDependenciesMeta:
     vitest:
       optional: true
-  checksum: 10/99481fec4b23bfbb41a602cf7fefc652504afbed2b1a1f90828426d4b3833465d8831d05a70bece16e7151c3d6f80d4aae4358c4b5dfa52d5f787f427bc361ca
+  checksum: 10/5f3af030b03e023be734f0bfef4c5fa7636f93ec346abc0e4cc382561694cc047345856b9987d5e32f1f24a2073f716d2277ed696ecec30e485e00a94df4cad2
+  languageName: node
+  linkType: hard
+
+"@tallyrelease/plugins@npm:^0.5.0":
+  version: 0.5.0
+  resolution: "@tallyrelease/plugins@npm:0.5.0"
+  dependencies:
+    "@tallyrelease/core": "npm:^0.5.0"
+    yaml: "npm:^2.9.1"
+    zod: "npm:^4.6.7"
+  checksum: 10/f334f6c1bbabbeba351c625f576ab6ffa24cfe33d1f5762e779d252c282049e70c5b43982cbd1232b055f208a60d834bae7c29230f6f42e91995bdfb3d0fd315
   languageName: node
   linkType: hard
 
@@ -3693,7 +3706,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jiti@npm:^2.6.1":
+"jiti@npm:^2.6.1, jiti@npm:^2.7.0":
   version: 2.7.0
   resolution: "jiti@npm:2.7.0"
   bin:
@@ -4787,7 +4800,7 @@ __metadata:
     "@abinnovision/eslint-config-base": "npm:^3.4.2"
     "@abinnovision/prettier-config": "npm:^2.2.0"
     "@actions/core": "npm:^3.0.1"
-    "@tallyrelease/cli": "npm:0.4.1"
+    "@tallyrelease/cli": "npm:0.5.0"
     "@types/node": "npm:^26.6.5"
     "@vercel/ncc": "npm:^0.45.0"
     eslint: "npm:^10.13.0"
@@ -5800,7 +5813,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zod@npm:^4.6.6":
+"zod@npm:^4.6.7":
   version: 4.6.7
   resolution: "zod@npm:4.6.7"
   checksum: 10/3ca8b8d6bb401538e59504c543db629ea7beaa775e504c3f22269b406fdffbf1431c856d59a597bf66d8487e4d2be12b03a55d76fc2c63d9f046eae1ca173bca

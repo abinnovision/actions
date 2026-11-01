@@ -4,7 +4,7 @@ import pkg from "../package.json";
 const GLOBAL_VALUE_FLAGS = new Set(["--cwd", "--config", "--token"]);
 
 /** Commands that write their JSON document with `--out`. */
-const OUT_COMMANDS = new Set(["affected", "plan", "shadow", "run"]);
+const OUT_COMMANDS = new Set(["affected", "plan", "run"]);
 
 /**
  * The command: the first argument that is neither a flag nor the value of a global flag.
@@ -37,18 +37,6 @@ export function parseArgs(input: string): string[] {
 				.map((line) => line.trim())
 				.filter(Boolean)
 		: input.split(/\s+/).filter(Boolean);
-}
-
-/**
- * Appends `--pin <version>` to a `shadow` command without an explicit `--pin`.
- */
-export function withPin(args: string[], version: string): string[] {
-	const hasPin = args.some(
-		(arg) => arg === "--pin" || arg.startsWith("--pin="),
-	);
-	return command(args) === "shadow" && !hasPin
-		? [...args, "--pin", version]
-		: args;
 }
 
 /**
