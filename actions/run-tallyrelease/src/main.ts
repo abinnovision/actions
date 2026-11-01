@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { cliVersion, parseArgs, withOut, withPin } from "./args.js";
+import { cliVersion, parseArgs, withOut } from "./args.js";
 import { parseGithubOutput } from "./outputs.js";
 
 void (async () => {
@@ -15,7 +15,7 @@ void (async () => {
 	const token = core.getInput("token");
 	const tempDir = process.env["RUNNER_TEMP"] ?? tmpdir();
 	const { args, out } = withOut(
-		withPin(parseArgs(core.getInput("args", { required: true })), cliVersion),
+		parseArgs(core.getInput("args", { required: true })),
 		tempDir,
 	);
 	// The CLI writes to a private file so outputs can be re-emitted and `releases` also saved as a file.
@@ -47,7 +47,7 @@ void (async () => {
 		}
 	}
 
-	// Also after a failure: shadow --strict writes the report before it exits 1.
+	// Also after a failure: the document may be written before the command exits non-zero.
 	if (out !== undefined) {
 		const file = path.resolve(out);
 		if (existsSync(file)) {

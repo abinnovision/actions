@@ -5,17 +5,16 @@
 This action is in beta. It bundles a fixed version of `@tallyrelease/cli`, so a CLI update is
 shipped as a new release of the action.
 
-`affected`, `plan`, `shadow` and `run` need the full history (`fetch-depth: 0`, optionally with
+`affected`, `plan` and `run` need the full history (`fetch-depth: 0`, optionally with
 `filter: blob:none`). `affected` and `plan` on push also need the `actions: read` permission to find
 the last successful run as the base.
 
 `args` is split on whitespace. When it has several lines, every non-empty line is one argument, so
-values may contain spaces. `shadow` gets `--pin <cli-version>` appended unless `--pin` is given, so
-every report records the bundled version.
+values may contain spaces.
 
-`affected`, `plan`, `shadow` and `run` always write their JSON document: unless `args` has `--out`,
+`affected`, `plan` and `run` always write their JSON document: unless `args` has `--out`,
 the action adds `--out $RUNNER_TEMP/tallyrelease-<command>.json`. The `result` output holds the
-document and `result-file` its path, also when the command fails after writing it (for example `shadow --strict`).
+document and `result-file` its path, also when the command fails after writing it.
 Other commands set neither. The documents follow the published schemas
 [`affected.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/affected.schema.json) and
 [`plan.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/plan.schema.json).
@@ -133,17 +132,17 @@ This action can be used with different version ranges. The following ranges are 
 
 ## Inputs
 
-| Input   | Description                                                                                                                                                                                                                                                  | Required | Default               |
-| :------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :-------------------- |
-| `args`  | CLI arguments, for example `affected --github-output`. Split on whitespace, or one argument per line when the value has several lines. Global flags such as `--cwd` and `--config` go here too. `shadow` gets `--pin <cli-version>` unless `--pin` is given. | Yes      |                       |
-| `token` | Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run, and by `run` for release PRs and tags. `run` needs `contents: write`, `pull-requests: write`, `issues: read` and `actions: read`.                              | No       | `${{ github.token }}` |
+| Input   | Description                                                                                                                                                                                                                     | Required | Default               |
+| :------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------- | :-------------------- |
+| `args`  | CLI arguments, for example `affected --github-output`. Split on whitespace, or one argument per line when the value has several lines. Global flags such as `--cwd` and `--config` go here too.                                 | Yes      |                       |
+| `token` | Token exposed to the CLI as `GITHUB_TOKEN`, used to look up the last successful workflow run, and by `run` for release PRs and tags. `run` needs `contents: write`, `pull-requests: write`, `issues: read` and `actions: read`. | No       | `${{ github.token }}` |
 
 ## Outputs
 
 | Output           | Description                                                                                                                                                                                                                                                                                                                                                                                            |
 | :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `result`         | The JSON document of `affected`, `plan`, `shadow` or `run`, as written by `--out`. Not set for other commands.                                                                                                                                                                                                                                                                                         |
-| `result-file`    | Path of the JSON document of `affected`, `plan`, `shadow` or `run`. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands.                                                                                                                                                                                                                                                     |
+| `result`         | The JSON document of `affected`, `plan` or `run`, as written by `--out`. Not set for other commands.                                                                                                                                                                                                                                                                                                   |
+| `result-file`    | Path of the JSON document of `affected`, `plan` or `run`. `--out` is added under `RUNNER_TEMP` unless given. Not set for other commands.                                                                                                                                                                                                                                                               |
 | `plan`           | Path of the plan document. Written by `plan --github-output` and `run --github-output`.                                                                                                                                                                                                                                                                                                                |
 | `releases`       | Compact JSON array of the releases and prereleases to publish. Written by `run --github-output`. Each entry has `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`, `catchUp`, `forge`, `latest`, `changes`, `tags` and `group`; entries only gain fields within a major. `changes` includes the changes of the units the release was propagated from (`via`), so the array can be large. |
 | `releases-file`  | Path of a file holding the `releases` JSON of `run --github-output`, for lists too large for an environment variable.                                                                                                                                                                                                                                                                                  |
