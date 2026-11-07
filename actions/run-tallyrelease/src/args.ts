@@ -1,7 +1,12 @@
 import pkg from "../package.json";
 
 /** Global flags that take a separate value. */
-const GLOBAL_VALUE_FLAGS = new Set(["--cwd", "--config", "--token"]);
+const GLOBAL_VALUE_FLAGS = new Set([
+	"--cwd",
+	"--config",
+	"--token",
+	"--channel",
+]);
 
 /** Commands that write their JSON document with `--out`. */
 const OUT_COMMANDS = new Set(["affected", "plan", "run"]);
