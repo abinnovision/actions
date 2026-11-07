@@ -5,9 +5,14 @@
 This action is in beta. It bundles a fixed version of `@tallyrelease/cli`, so a CLI update is
 shipped as a new release of the action.
 
-`affected`, `plan` and `run` need the full history (`fetch-depth: 0`, optionally with
-`filter: blob:none`). `affected` and `plan` on push also need the `actions: read` permission to find
-the last successful run as the base.
+`affected`, `plan`, `run` and `version` need the full history (`fetch-depth: 0`, optionally with
+`filter: blob:none`). `affected` and `plan` on push and schedule also need the `actions: read`
+permission to find the last successful run as the base. A scheduled run builds on the last
+successful scheduled run.
+
+Scheduled runs use the `nightly` channel when the branch rule sets `channels.nightly`. To select a
+channel explicitly, pass `--channel build` or `--channel nightly` in `args`, or set
+`TALLYRELEASE_CHANNEL` in the step's `env`.
 
 `args` is split on whitespace. When it has several lines, every non-empty line is one argument, so
 values may contain spaces.
@@ -94,7 +99,10 @@ with `github.token` trigger no workflows, so pass an app token when release PRs 
 ```
 
 Each `releases` entry has the fields `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`,
-`catchUp`, `forge`, `latest`, `changes`, `tags` and `group`; see the CLI README for their meaning.
+`catchUp`, `forge`, `latest`, `changes`, `tags`, `group`, `line` and `buildNumber`, as described by
+[`releases.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/releases.schema.json).
+`kind` is `prerelease` for build, nightly and cut prereleases, with `channel` naming the channel.
+`buildNumber` is null unless the unit configures `buildNumber`.
 `changes` lists the unit's own changes and those of the units the release was propagated from, each
 with `via` set to the owning unit. Within a major, entries only gain fields, so ignore unknown ones.
 

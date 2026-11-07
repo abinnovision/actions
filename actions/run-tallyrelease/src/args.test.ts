@@ -30,6 +30,8 @@ describe("command", () => {
 			"affected",
 		);
 		expect(command(["--config=x.yaml", "explain", "shadow"])).toBe("explain");
+		expect(command(["--channel", "nightly", "run"])).toBe("run");
+		expect(command(["--channel=nightly", "plan"])).toBe("plan");
 		expect(command(["--verbose"])).toBeUndefined();
 	});
 });
@@ -47,6 +49,9 @@ describe("withOut", () => {
 			args: ["run", "--dry-run", "--out", "/tmp/tallyrelease-run.json"],
 			out: "/tmp/tallyrelease-run.json",
 		});
+		expect(withOut(["--channel", "nightly", "run"], "/tmp").out).toBe(
+			"/tmp/tallyrelease-run.json",
+		);
 	});
 
 	it("keeps an explicit --out", () => {

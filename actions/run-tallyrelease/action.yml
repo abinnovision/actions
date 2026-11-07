@@ -18,7 +18,7 @@ outputs:
   plan:
     description: "Path of the plan document. Written by `plan --github-output` and `run --github-output`."
   releases:
-    description: "Compact JSON array of the releases and prereleases to publish. Written by `run --github-output`. Each entry has `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`, `catchUp`, `forge`, `latest`, `changes`, `tags` and `group`; entries only gain fields within a major. `changes` includes the changes of the units the release was propagated from (`via`), so the array can be large."
+    description: "Compact JSON array of the releases and prereleases to publish. Written by `run --github-output`. Each entry has `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`, `catchUp`, `forge`, `latest`, `changes`, `tags`, `group`, `line` and `buildNumber`; entries only gain fields within a major. `changes` includes the changes of the units the release was propagated from (`via`), so the array can be large."
   releases-file:
     description: "Path of a file holding the `releases` JSON of `run --github-output`, for lists too large for an environment variable."
   affected:
