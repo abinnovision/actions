@@ -1,0 +1,48 @@
+name: Match paths
+author: "abi group GmbH"
+description: |
+  Discovers directories by marker file or takes a list of items, then filters or
+  flags them by directory patterns and optionally renders a template per item.
+inputs:
+  patterns:
+    description: "Directory patterns, one per line. `*` matches one path segment and `.` is the repository root. Blank lines are ignored; without patterns nothing matches."
+    required: false
+    default: ""
+  items:
+    description: "JSON array of objects with a string `path` (filter mode). Exactly one of `items` or `marker` is required."
+    required: false
+    default: ""
+  marker:
+    description: "File name globs, one per line (discovery mode). A directory is a candidate when it directly contains a matching file in HEAD."
+    required: false
+    default: ""
+  read-marker:
+    description: "Add the trimmed first line of the marker file as `content` to each item. Requires a single literal `marker`."
+    required: false
+    default: "false"
+  flag:
+    description: "Field name to set to true or false on every item instead of removing non-matching items (filter mode only)."
+    required: false
+    default: ""
+  template:
+    description: "Template rendered per item into `value`. Supports the `{path}` and `{name}` placeholders."
+    required: false
+    default: ""
+  require-match:
+    description: "Fail when a pattern matches no candidate."
+    required: false
+    default: "false"
+  unique:
+    description: "Fail when two items share this field (`name` or `value`)."
+    required: false
+    default: ""
+outputs:
+  items:
+    description: "JSON array of the resulting items, each with `path` and `name`, plus `content`, the flag field and `value` when requested."
+  paths:
+    description: "JSON array of the resulting item paths."
+  values:
+    description: "JSON object mapping each path to its rendered value. Only set when `template` is set."
+runs:
+  using: node24
+  main: dist/index.js
