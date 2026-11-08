@@ -1,0 +1,20 @@
+name: Evaluate event
+author: "abi group GmbH"
+description: |
+  Evaluates the triggering event for the stack workflows. Resolves the commit to
+  build, the run mode and whether the run may use credentials. Fails on
+  pull_request_target events.
+inputs:
+  default-branch:
+    description: "Default branch of the repository. A push to it runs in `main` mode."
+    required: true
+outputs:
+  commit-sha:
+    description: "Commit to build: the pull request head, the merge group head or the pushed commit."
+  mode:
+    description: "`pr` for pull requests, `main` for pushes to the default branch, otherwise `none`."
+  trusted:
+    description: "`false` for pull requests from forks or Dependabot, otherwise `true`."
+runs:
+  using: node24
+  main: dist/index.js
