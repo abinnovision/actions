@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.0](https://github.com/abinnovision/actions/compare/run-tallyrelease-source-v0.7.0...run-tallyrelease-source-v0.8.0) (2026-11-08)
+
+
+### Features
+
+* **run-tallyrelease:** bundle tallyrelease 0.5.0 ([#729](https://github.com/abinnovision/actions/issues/729)) ([a56290e](https://github.com/abinnovision/actions/commit/a56290e6ee0819ad0ce41682a2d2fb30d3bcacb5))
+* **run-tallyrelease:** bundle tallyrelease 0.6.0 ([#732](https://github.com/abinnovision/actions/issues/732)) ([7fe7392](https://github.com/abinnovision/actions/commit/7fe7392e48f54cba2490f2bf6241a417e8f79b8a))
+* **run-tallyrelease:** bundle tallyrelease 0.7.0 ([#734](https://github.com/abinnovision/actions/issues/734)) ([0a13161](https://github.com/abinnovision/actions/commit/0a1316195da882870bc905a04edb891ca55b923e))
+
 ## [0.7.0](https://github.com/abinnovision/actions/compare/run-tallyrelease-source-v0.6.0...run-tallyrelease-source-v0.7.0) (2026-10-17)
 
 
