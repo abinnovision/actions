@@ -98,11 +98,14 @@ with `github.token` trigger no workflows, so pass an app token when release PRs 
     RELEASES: $\{{ steps.tr.outputs.releases }}
 ```
 
-Each `releases` entry has the fields `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseSha`,
-`catchUp`, `forge`, `latest`, `changes`, `tags`, `group`, `line` and `buildNumber`, as described by
+Each `releases` entry has the fields `id`, `path`, `kind`, `version`, `channel`, `tag`, `releaseTag`,
+`releaseSha`, `catchUp`, `forge`, `latest`, `changes`, `tags`, `group`, `line` and `buildNumber`, as
+described by
 [`releases.schema.json`](https://cdn.jsdelivr.net/npm/@tallyrelease/cli@0/dist/releases.schema.json).
 `kind` is `prerelease` for build, nightly and cut prereleases, with `channel` naming the channel.
 `buildNumber` is null unless the unit configures `buildNumber`.
+`releaseTag` is the tag of the forge release. It differs from `tag` for members of a group that sets
+`releaseTag`, which share one GitHub release.
 `changes` lists the unit's own changes and those of the units the release was propagated from, each
 with `via` set to the owning unit. Within a major, entries only gain fields, so ignore unknown ones.
 
