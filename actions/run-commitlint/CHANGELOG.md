@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.7](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.3.6...run-commitlint-source-v1.3.7) (2026-11-08)
+
+
+### Bug Fixes
+
+* **deps:** bump @commitlint/lint from 21.2.3 to 21.2.4 ([#723](https://github.com/abinnovision/actions/issues/723)) ([0a2d3fe](https://github.com/abinnovision/actions/commit/0a2d3fee6025e50a2d5ba61d591b15d414109e61))
+
 ## [1.3.6](https://github.com/abinnovision/actions/compare/run-commitlint-source-v1.3.5...run-commitlint-source-v1.3.6) (2026-10-13)
 
 
