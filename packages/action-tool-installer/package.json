@@ -42,7 +42,7 @@
 		"@actions/core": "^3.0.1",
 		"@actions/github": "^9.1.1",
 		"@actions/tool-cache": "^4.0.0",
-		"semver": "^7.8.5"
+		"semver": "^7.8.6"
 	},
 	"devDependencies": {
 		"@abinnovision/eslint-config-base": "^3.4.2",
