@@ -27,6 +27,7 @@
 		"evaluate-event": "workspace:^",
 		"exchange-github-token": "workspace:^",
 		"match-paths": "workspace:^",
+		"run-tallyrelease": "workspace:^",
 		"setup-gcp": "workspace:^",
 		"setup-tools": "workspace:^"
 	},
