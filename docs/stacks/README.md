@@ -143,7 +143,8 @@ Rulesets require exactly two contexts, independent of the kind:
 - Every checkout uses the commit resolved by `Configure` (`ref: needs.configure.outputs.commit-sha`) with
   `persist-credentials: false`; only `Release build` checks out the release commit it builds. `Configure` uses a
   blob-less checkout and keeps the credentials, since the missing blobs are fetched on demand: a sparse checkout of only
-  what it needs in gitops-stack and iac-stack, one checkout with the full history for tallyrelease in app-stack.
+  what it needs in gitops-stack and iac-stack, widened to the full tree and history on trusted pull requests for
+  `tallyrelease affected`, and one checkout with the full history for tallyrelease in app-stack.
 - Lanes that need credentials depend on `Check`.
 - Stacks set no `concurrency`. Callers own it through the workflow-level group shown above: it cancels superseded pull
   request runs and serialises runs on the default branch; a newer pending run replaces an older pending one.

@@ -10,11 +10,16 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 | :---------- | :------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
 | `Configure` | Always                                       | Resolves the mode (`pr`, `main` or `none`) and whether the event is trusted, and validates the configuration    |
 | `Check`     | Always                                       | Node repo checks (`yarn install --immutable`, `yarn dedupe --check`, `yarn check`), then `tofu fmt -check -recursive`, `tofu init -backend=false`, `tofu validate` for every root, and `tofu test` with `enable-tests` |
-| `Plan: <root>` | Trusted pull requests                     | `tofu plan` per root and one sticky PR comment per root via [terraform-plan-comment](https://github.com/borchero/terraform-plan-comment); a failed or unrenderable plan replaces it with a link to the run |
+| `Plan: <root>` | Trusted pull requests, one job per root affected by the pull request | `tofu plan` per root and one sticky PR comment per root via [terraform-plan-comment](https://github.com/borchero/terraform-plan-comment); a failed or unrenderable plan replaces it with a link to the run |
 | `Apply: <root>` | Push to `default-branch`                 | Fresh `tofu plan -out` and `tofu apply` per root in `apply-environment`                                         |
 | `Status`    | Always | Single required status check, fails when any other job failed or was cancelled |
 
 - `working-directory` takes patterns, one per line, where `*` matches one path segment and skips dot directories. Every pattern must match a root. Every matching directory with a `*.tf` or `*.tofu` file is a root and gets its own `Plan` and `Apply` job
+- On trusted pull requests, `Configure` runs `tallyrelease affected` through
+  [run-tallyrelease](../../actions/run-tallyrelease/README.md) with a generated config that declares every root as a
+  unit, and only the affected roots get a `Plan`. A change outside every root, such as a shared local module or
+  `.tool-versions`, plans every root. `Check` and `Apply` always cover every root. The plan comment of a root that is no
+  longer affected after a later push is left as is
 - State and plan files are always encrypted with OpenTofu's `gcp_kms` key provider
 - Optional GitHub token exchange via the token broker, passed as `GITHUB_TOKEN` to the GitHub provider
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to GCP

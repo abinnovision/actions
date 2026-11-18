@@ -158,6 +158,9 @@ jobs:
       # Root module directories as a compact JSON array.
       roots: ${{ steps.roots.outputs.paths }}
 
+      # Roots that get a `Plan` job, as a compact JSON array. On trusted pull requests only the affected roots.
+      plan-roots: ${{ steps.plan-roots.outputs.paths }}
+
       # Roots that receive the GitHub provider token, as a compact JSON array.
       github-token-roots: ${{ steps.token-roots.outputs.paths || steps.roots.outputs.paths }}
 
@@ -172,11 +175,13 @@ jobs:
         with:
           default-branch: ${{ inputs.default-branch }}
 
-      # Check out the root files of the resolved commit only; root discovery reads the git tree.
+      # Check out the root files of the resolved commit only; root discovery reads the git tree. Trusted pull requests
+      # fetch the full history for `tallyrelease affected`.
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: ${{ steps.event.outputs.commit-sha }}
+          fetch-depth: ${{ steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true' && '0' || '1' }}
           filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
@@ -206,6 +211,60 @@ jobs:
           items: ${{ steps.roots.outputs.items }}
           patterns: ${{ inputs.github-token-roots }}
           require-match: true
+
+      # `tallyrelease affected` reads the roots from the working tree.
+      - name: Disable sparse checkout
+        if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
+        run: git sparse-checkout disable
+
+      # Every root is a unit. Ids are derived from the path, since roots may share their last segment.
+      - name: Write tallyrelease config
+        id: tallyrelease-config
+        if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
+        env:
+          ROOTS: ${{ steps.roots.outputs.paths }}
+        run: |
+          set -euo pipefail
+
+          file="$RUNNER_TEMP/tallyrelease.yaml"
+          jq -r '"units:", (.[] | "  \(@json): " + (if . == "." then "{}" else "{ id: \(gsub("[^A-Za-z0-9._-]"; "-") | @json) }" end))' \
+            <<< "$ROOTS" > "$file"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+      # Roots changed by the pull request.
+      - name: Find affected roots
+        id: affected
+        if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
+        uses: abinnovision/actions@run-tallyrelease-dev
+        with:
+          args: |
+            affected
+            --config
+            ${{ steps.tallyrelease-config.outputs.file }}
+
+      # Changed files outside every root, such as shared modules or tool versions, can affect any root, so every root
+      # is planned.
+      - name: Select planned roots
+        id: plan-roots
+        env:
+          ROOTS: ${{ steps.roots.outputs.paths }}
+          RESULT: ${{ steps.affected.outputs.result }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$RESULT" ]] || jq -e '.build.all or (.unattributed | length > 0)' <<< "$RESULT" > /dev/null; then
+            echo "paths=$ROOTS" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          paths=$(jq -c --argjson units "$(jq -c '[.units[].path]' <<< "$RESULT")" '[.[] | select(IN($units[]))]' <<< "$ROOTS")
+
+          skipped=$(jq -r --argjson paths "$paths" '[.[] | select(IN($paths[]) | not)] | join(", ")' <<< "$ROOTS")
+          if [[ -n "$skipped" ]]; then
+            echo "::notice::Not affected, no plan: $skipped"
+          fi
+
+          echo "paths=$paths" >> "$GITHUB_OUTPUT"
 
       - name: Evaluate
         id: evaluate
@@ -327,11 +386,14 @@ jobs:
     needs:
       - configure
       - check
-    if: needs.configure.outputs.mode == 'pr' && needs.configure.outputs.trusted == 'true'
+    if: >-
+      needs.configure.outputs.mode == 'pr'
+      && needs.configure.outputs.trusted == 'true'
+      && needs.configure.outputs.plan-roots != '[]'
     strategy:
       fail-fast: false
       matrix:
-        root: ${{ fromJSON(needs.configure.outputs.roots) }}
+        root: ${{ fromJSON(needs.configure.outputs.plan-roots) }}
     env:
       WORKING_DIR: ${{ matrix.root }}
       STATE_PREFIX: ${{ fromJSON(needs.configure.outputs.state-prefixes)[matrix.root] }}

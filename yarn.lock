@@ -3597,6 +3597,7 @@ __metadata:
     exchange-github-token: "workspace:^"
     match-paths: "workspace:^"
     prettier: "npm:^3.10.1"
+    run-tallyrelease: "workspace:^"
     setup-gcp: "workspace:^"
     setup-tools: "workspace:^"
   languageName: unknown
