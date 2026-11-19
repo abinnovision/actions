@@ -217,22 +217,20 @@ jobs:
         if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
         run: git sparse-checkout disable
 
-      # Every root is a unit. Ids are derived from the path, since roots may share their last segment.
-      - name: Write tallyrelease config
+      # The repository's `tallyrelease.yaml`, else a config with the terraform plugin only.
+      - name: Resolve tallyrelease config
         id: tallyrelease-config
         if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
-        env:
-          ROOTS: ${{ steps.roots.outputs.paths }}
         run: |
-          set -euo pipefail
+          if [[ -f tallyrelease.yaml ]]; then
+            echo "file=tallyrelease.yaml" >> "$GITHUB_OUTPUT"
+          else
+            printf 'plugins:\n  terraform: {}\n' > "$RUNNER_TEMP/tallyrelease.yaml"
+            echo "file=$RUNNER_TEMP/tallyrelease.yaml" >> "$GITHUB_OUTPUT"
+          fi
 
-          file="$RUNNER_TEMP/tallyrelease.yaml"
-          jq -r '"units:", (.[] | "  \(@json): " + (if . == "." then "{}" else "{ id: \(gsub("[^A-Za-z0-9._-]"; "-") | @json) }" end))' \
-            <<< "$ROOTS" > "$file"
-          echo "file=$file" >> "$GITHUB_OUTPUT"
-
-      # Roots changed by the pull request.
-      - name: Find affected roots
+      # Units changed by the pull request, including those that call a changed local module.
+      - name: Find affected units
         id: affected
         if: steps.event.outputs.mode == 'pr' && steps.event.outputs.trusted == 'true'
         uses: abinnovision/actions@run-tallyrelease-dev
@@ -242,8 +240,8 @@ jobs:
             --config
             ${{ steps.tallyrelease-config.outputs.file }}
 
-      # Changed files outside every root, such as shared modules or tool versions, can affect any root, so every root
-      # is planned.
+      # Affected units that are roots. Changed files outside every unit, such as `.tool-versions`, can affect any root,
+      # so every root is planned.
       - name: Select planned roots
         id: plan-roots
         env:
