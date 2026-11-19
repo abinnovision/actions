@@ -16,10 +16,14 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 - `working-directory` takes patterns, one per line, where `*` matches one path segment and skips dot directories. Every pattern must match a root. Every matching directory with a `*.tf` or `*.tofu` file is a root and gets its own `Plan` and `Apply` job
 - On trusted pull requests, `Configure` runs `tallyrelease affected` through
-  [run-tallyrelease](../../actions/run-tallyrelease/README.md) with a generated config that declares every root as a
-  unit, and only the affected roots get a `Plan`. A change outside every root, such as a shared local module or
-  `.tool-versions`, plans every root. `Check` and `Apply` always cover every root. The plan comment of a root that is no
-  longer affected after a later push is left as is
+  [run-tallyrelease](../../actions/run-tallyrelease/README.md), and only the affected roots get a `Plan`. The
+  repository's `tallyrelease.yaml` is used when present, otherwise a config with only the `terraform` plugin, which
+  discovers every root and local module in the repository. A root is affected when its own files change or a local
+  module it calls changes. A repository config must enable `terraform` for the roots, otherwise every root is planned.
+  A change outside every root and module, such as `.tool-versions`, plans every root. Files read with `file()` or
+  `templatefile()` from outside the root are not detected; add them to the root's `include` in `tallyrelease.yaml`.
+  `Check` and `Apply` always cover every root. The plan comment of a root that is no longer affected after a later push
+  is left as is
 - State and plan files are always encrypted with OpenTofu's `gcp_kms` key provider
 - Optional GitHub token exchange via the token broker, passed as `GITHUB_TOKEN` to the GitHub provider
 - Pull requests from forks and from Dependabot only run `Configure` and `Check`, since they cannot authenticate to GCP
