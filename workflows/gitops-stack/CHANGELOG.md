@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.2.4](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.2.3...gitops-stack-source-v2.2.4) (2026-11-19)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * run-tallyrelease bumped to 0.8.1
+    * setup-oidc-token-cli bumped to 1.1.5
+
 ## [2.2.3](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.2.2...gitops-stack-source-v2.2.3) (2026-11-08)
 
 

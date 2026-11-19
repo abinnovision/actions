@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.1](https://github.com/abinnovision/actions/compare/publish-oci-source-v2.1.0...publish-oci-source-v2.1.1) (2026-11-19)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.4.2
+
 ## [2.1.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v2.0.0...publish-oci-source-v2.1.0) (2026-10-17)
 
 
