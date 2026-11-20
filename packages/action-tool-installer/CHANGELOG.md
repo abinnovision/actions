@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.2](https://github.com/abinnovision/actions/compare/action-tool-installer-source-v3.0.1...action-tool-installer-source-v3.0.2) (2026-11-19)
+
+
+### Bug Fixes
+
+* **deps:** bump semver from 7.8.5 to 7.8.6 ([#738](https://github.com/abinnovision/actions/issues/738)) ([ae6259e](https://github.com/abinnovision/actions/commit/ae6259e470ad57b2cd41211b92b879ccd80888ca))
+
 ## [3.0.1](https://github.com/abinnovision/actions/compare/action-tool-installer-source-v3.0.0...action-tool-installer-source-v3.0.1) (2026-10-07)
 
 

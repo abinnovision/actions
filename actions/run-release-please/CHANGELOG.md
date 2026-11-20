@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.3.0...run-release-please-source-v1.3.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **deps:** bump semver from 7.8.5 to 7.8.6 ([#738](https://github.com/abinnovision/actions/issues/738)) ([ae6259e](https://github.com/abinnovision/actions/commit/ae6259e470ad57b2cd41211b92b879ccd80888ca))
+
 ## [1.3.0](https://github.com/abinnovision/actions/compare/run-release-please-source-v1.2.0...run-release-please-source-v1.3.0) (2026-10-15)
 
 

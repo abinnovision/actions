@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.4.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.3.3...iac-stack-source-v1.4.0) (2026-11-19)
+
+
+### Features
+
+* **iac-stack:** plan only affected roots on pull requests ([#743](https://github.com/abinnovision/actions/issues/743)) ([45668e5](https://github.com/abinnovision/actions/commit/45668e54c800c9d698231187add5308ee33ff4e0))
+
+
+### Bug Fixes
+
+* **iac-stack:** find affected roots with the tallyrelease terraform plugin ([#746](https://github.com/abinnovision/actions/issues/746)) ([7256621](https://github.com/abinnovision/actions/commit/72566214d0f8be289f7df948377a6aa1a18d5ad2))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.4.2
+    * run-tallyrelease bumped to 0.8.1
+
 ## [1.3.3](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.3.2...iac-stack-source-v1.3.3) (2026-10-16)
 
 

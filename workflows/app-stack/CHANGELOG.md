@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.3](https://github.com/abinnovision/actions/compare/app-stack-source-v2.0.2...app-stack-source-v2.0.3) (2026-11-19)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * exchange-github-token bumped to 1.4.2
+    * run-tallyrelease bumped to 0.8.1
+
 ## [2.0.2](https://github.com/abinnovision/actions/compare/app-stack-source-v2.0.1...app-stack-source-v2.0.2) (2026-11-08)
 
 
