@@ -14,7 +14,7 @@ Runs in repositories that use [gitops-stack](../gitops-stack/README.md#repositor
 
 ## Requirements
 
-- The repository has a `.tool-versions` file with `nodejs` and `kustomize`, installed through
+- The repository has a mise config (`mise.toml` or `.tool-versions`) with `nodejs` and `kustomize`, installed through
   [setup-tools](../../actions/setup-tools/README.md)
 
 ## Usage

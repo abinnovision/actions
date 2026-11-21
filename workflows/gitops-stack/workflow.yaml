@@ -392,7 +392,7 @@ jobs:
           missing=0
           for tool in "${tools[@]}"; do
             if ! command -v "$tool" > /dev/null; then
-              echo "::error::$tool is not installed, add it to .tool-versions"
+              echo "::error::$tool is not installed, add it to the mise config (.tool-versions or mise.toml)"
               missing=1
             fi
           done
@@ -470,7 +470,7 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-      # Root files only, for `.tool-versions`. ArgoCD renders the manifests at `--revision` server-side.
+      # Root files and mise config directories only, for the tool versions. ArgoCD renders the manifests at `--revision` server-side.
       - &checkout
         name: Checkout
         uses: actions/checkout@v7
@@ -482,6 +482,9 @@ jobs:
           sparse-checkout: |
             /*
             !/*/
+            /.config/mise*
+            /.mise/
+            /mise/
 
       - &setup-tools
         name: Setup Tools
@@ -503,7 +506,7 @@ jobs:
           set -euo pipefail
 
           if ! command -v argocd > /dev/null; then
-            echo "::error::argocd is not installed, add it to .tool-versions"
+            echo "::error::argocd is not installed, add it to the mise config (.tool-versions or mise.toml)"
             exit 1
           fi
 
