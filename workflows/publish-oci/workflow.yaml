@@ -411,7 +411,21 @@ jobs:
       - name: Wait for Turbo cache
         wait: [turbo-cache]
 
-      # Derived build args (tool versions from .tool-versions, unit metadata) and the turbo remote-cache passthrough
+      # Reads the requested tool versions from the payload mise config without installing anything. env is disabled so
+      # payload [env] values never reach later steps.
+      - name: Setup mise
+        if: steps.unit.outputs.skip != 'true' && steps.probe.outputs.exists != 'true'
+        uses: jdx/mise-action@v5
+        with:
+          # Keep in sync with actions/setup-tools.
+          version: 2026.10.9
+          working_directory: payload
+          install: "false"
+          cache: "false"
+          env: "false"
+          add_shims_to_path: "false"
+
+      # Derived build args (tool versions from the mise config, unit metadata) and the turbo remote-cache passthrough
       # when enabled.
       - name: Prepare build args
         id: build-args
@@ -421,23 +435,34 @@ jobs:
           APP_VERSION: ${{ matrix.entry.version }}
           APP_SHA: ${{ matrix.entry.sha7 }}
           TURBO_CACHE: ${{ steps.unit.outputs.turbo-cache }}
+          MISE_OFFLINE: "1"
+          MISE_CEILING_PATHS: ${{ github.workspace }}
         run: |
           set -euo pipefail
 
-          # One "<tool>_version=<version>" line per tool, first occurrence wins; nodejs maps to node.
+          # One "<tool>_version=<version>" line per mise tool, using the first requested version. Tools with a backend
+          # prefix are skipped; node and go map to node_version and golang_version.
           tool_versions=""
-          if [[ -f payload/.tool-versions ]]; then
-            tool_versions=$(awk '
-              { sub(/\r$/, "") }
-              NF >= 2 && $1 !~ /^#/ {
-                tool = ($1 == "nodejs") ? "node" : $1
-                if (!(tool in seen)) { seen[tool] = 1; print tool "_version=" $2 }
-              }
-            ' payload/.tool-versions)
+          if ! tools=$(cd payload && mise ls --current --json | jq -r 'keys[]'); then
+            echo "::error::Unable to read the mise config of unit $APP"
+            exit 1
           fi
+          for tool in $tools; do
+            if [[ "$tool" == *[:/]* ]]; then
+              echo "::notice::Skipping $tool, backend-prefixed tools are not exposed as build args"
+              continue
+            fi
+            version=$(cd payload && mise tool "$tool" --requested | awk '{print $1}')
+            case "$tool" in
+              go) name=golang ;;
+              *) name=$tool ;;
+            esac
+            tool_versions+="${name}_version=${version}"$'\n'
+          done
+          tool_versions=${tool_versions%$'\n'}
 
           if [[ -z "$(sed -n 's/^node_version=//p' <<< "$tool_versions")" ]]; then
-            echo "::warning::.tool-versions has no nodejs entry, node_version is empty for unit $APP"
+            echo "::warning::mise config has no node tool, node_version is empty for unit $APP"
           fi
 
           delimiter="EOF_$(openssl rand -hex 8)"

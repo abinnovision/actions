@@ -39,16 +39,19 @@ repository code runs here.
 | Build arg                                | Value                                                            |
 | :--------------------------------------- | :--------------------------------------------------------------- |
 | `app_name`                               | Entry `id`                                                       |
-| `node_version`                           | `nodejs` version from `.tool-versions`, empty when absent        |
-| `python_version`                         | `python` version from `.tool-versions`, empty when absent        |
-| `golang_version`                         | `golang` version from `.tool-versions`, empty when absent        |
-| `uv_version`                             | `uv` version from `.tool-versions`, empty when absent            |
-| `<tool>_version`                         | Every other tool listed in `.tool-versions`                      |
+| `node_version`                           | `node` version from the mise config, empty when absent           |
+| `python_version`                         | `python` version from the mise config, empty when absent         |
+| `golang_version`                         | `go` version from the mise config, empty when absent             |
+| `uv_version`                             | `uv` version from the mise config, empty when absent             |
+| `<tool>_version`                         | Every other tool in the mise config                              |
 | `build_version`                          | `v<version>+` followed by the first 7 characters of `releaseSha` |
 | `build_commit`                           | The first 7 characters of `releaseSha`                           |
 | `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` | Only with the turbo remote cache enabled                         |
 
-`.tool-versions` is read from the payload root.
+The mise config (`mise.toml`, `.config/mise.toml`, `.tool-versions` and the other files mise reads) is read from the
+payload root. Values are the requested versions, the first one when several are listed. mise normalises tool names:
+`nodejs` and `node` both give `node_version`, `golang` and `go` both give `golang_version`. Tools with a backend prefix
+(for example `aqua:`) and tools outside the mise registry are skipped.
 
 ## Images and tags
 
