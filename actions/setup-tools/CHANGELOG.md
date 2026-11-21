@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/abinnovision/actions/compare/setup-tools-source-v2.0.0...setup-tools-source-v2.1.0) (2026-11-21)
+
+
+### Features
+
+* **setup-tools:** support mise config files without .tool-versions ([#747](https://github.com/abinnovision/actions/issues/747)) ([852794f](https://github.com/abinnovision/actions/commit/852794f9fc19c3d1146834b648e5173d11bb4f74))
+
 ## [2.0.0](https://github.com/abinnovision/actions/compare/setup-tools-source-v1.2.1...setup-tools-source-v2.0.0) (2026-10-14)
 
 

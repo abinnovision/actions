@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v2.1.1...publish-oci-source-v2.2.0) (2026-11-21)
+
+
+### Features
+
+* **publish-oci:** derive tool version build args from the mise config ([#748](https://github.com/abinnovision/actions/issues/748)) ([e41505e](https://github.com/abinnovision/actions/commit/e41505e45032447bd4ad1d70c71f1e364a0e3cbb))
+
 ## [2.1.1](https://github.com/abinnovision/actions/compare/publish-oci-source-v2.1.0...publish-oci-source-v2.1.1) (2026-11-19)
 
 
