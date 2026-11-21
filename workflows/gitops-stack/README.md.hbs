@@ -19,8 +19,8 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
   `validation-logs` artifact. Directories without a `kustomization.yaml`, `kustomization.yml` or `Kustomization` file
   are skipped
 - Directories with an `.argocd-app` file also get a `Preview` and a `Deploy` job. ArgoCD renders the manifests
-  server-side, so these jobs only check out the root files. `Configure` fails when no directory has an `.argocd-app`
-  file; dot directories are skipped
+  server-side, so these jobs only check out the root files. Without any `.argocd-app` file only `Check` runs and
+  `Configure` emits a warning; dot directories are skipped
 - `prune-applications` and `deploy-applications` select applications by path, one pattern per line, where `*` matches
   exactly one path segment and skips dot directories. Pruning is off by default. `deploy-applications` defaults to
   `k8s/applications/*`, so it must be updated together with `applications-directory`

@@ -215,7 +215,13 @@ jobs:
           marker: .argocd-app
           read-marker: true
           patterns: ${{ format('{0}/*', inputs.applications-directory) }}
-          require-match: true
+
+      # Without applications only `Check` runs, e.g. in template repositories.
+      - name: Warn about no applications
+        if: steps.discover.outputs.items == '[]'
+        env:
+          APPLICATIONS_DIRECTORY: ${{ inputs.applications-directory }}
+        run: echo "::warning::No directory in $APPLICATIONS_DIRECTORY has an .argocd-app file, nothing is previewed or deployed"
 
       # `sync-prune` is replaced by `prune-applications`.
       - name: Warn about sync-prune
