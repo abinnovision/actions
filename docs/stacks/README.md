@@ -130,9 +130,9 @@ Rulesets require exactly two contexts, independent of the kind:
 
 ### Repository checks
 
-`Check` runs the same baseline in every stack: tool setup from `.tool-versions`, `yarn install --immutable`,
+`Check` runs the same baseline in every stack: tool setup from the mise config, `yarn install --immutable`,
 `yarn dedupe --check` and `yarn check`. `app-stack` installs through `make install-immutable` when a Makefile exists, runs
-`turbo boundaries` when Turbo is a dependency and builds before `check`. Every repository therefore needs a `.tool-versions` with `nodejs` and a
+`turbo boundaries` when Turbo is a dependency and builds before `check`. Every repository therefore needs a mise config (`mise.toml` or `.tool-versions`) with `nodejs` and a
 `check` script in its `package.json`; app repositories also need a `build` script.
 
 ## Conventions inside the workflows

@@ -39,11 +39,11 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 - `pull_request_target` is rejected
 - Names of application directories with an `.argocd-app` file must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`
 - Concurrency is owned by the caller
-- Tool versions come from `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
+- Tool versions come from the mise config, `mise.toml` or `.tool-versions` (see [setup-tools](../../actions/setup-tools/README.md))
 
 ## Requirements
 
-- The repository has a `.tool-versions` file with `nodejs`, `kustomize` and `argocd`, plus `kubeconform` and
+- The repository has a mise config (`mise.toml` or `.tool-versions`) with `nodejs`, `kustomize` and `argocd`, plus `kubeconform` and
   `kube-score` unless disabled, and a `package.json` with a `check` script. `kustomize build --enable-helm` needs
   `helm` when an application uses Helm charts
 - The caller grants `contents: read`, `packages: read`, `id-token: write` and `pull-requests: write`
@@ -126,7 +126,7 @@ The ArgoCD and DEX settings are read from the repository variables. Pass `argocd
   `DEX_CORE_ENDPOINT`, `DEX_CORE_GITHUB_ACTIONS_CLIENT` and `DEX_CORE_GITHUB_ACTIONS_CONNECTOR` itself; the inputs
   `argocd-server`, `dex-endpoint`, `dex-client-id` and `dex-connector` override them
 - Remove `auth-method` and `health-timeout`. Token authentication (`ARGOCD_TOKEN`) is no longer supported
-- Add `kustomize`, `kubeconform`, `kube-score` and `argocd` to `.tool-versions`
+- Add `kustomize`, `kubeconform`, `kube-score` and `argocd` to the mise config
 - Job names change to `Preview: <name>` and `Deploy: <name>`; `CI / Status` stays the required check
 - With `enable-github-deployments`, deploy jobs authenticate with the subject
   `repo:<owner>/<repo>:environment:<name>`. Update the DEX and ArgoCD mappings to allow it
@@ -141,7 +141,7 @@ The ArgoCD and DEX settings are read from the repository variables. Pass `argocd
 - Use the `gitops-stack-v2` tag instead of `gitops-deploy-v1` <!-- x-release-please-major -->
 - Switch the caller trigger from `pull_request_target` to `pull_request`
 - Make `CI / Status` the required status check
-- Add a `.tool-versions` file with `nodejs` and the Kubernetes tools
+- Add a mise config (`mise.toml` or `.tool-versions`) with `nodejs` and the Kubernetes tools
 - Pull request runs now authenticate with the OIDC identity of a `pull_request` event (subject
   `repo:<owner>/<repo>:pull_request`). ArgoCD and DEX RBAC rules must accept it
 
@@ -154,7 +154,7 @@ gitops-repo/
 ├── .github/workflows/
 │   ├── ci.yaml
 │   └── update-tags.yaml   # see gitops-update-tags
-├── .tool-versions
+├── mise.toml              # or .tool-versions
 ├── package.json
 ├── yarn.lock
 └── k8s/
@@ -202,9 +202,9 @@ images:
 
 ### Root files
 
-`.tool-versions` pins the tools of every job (see [setup-tools](../../actions/setup-tools/README.md)). `Check` uses
+The mise config pins the tools of every job (see [setup-tools](../../actions/setup-tools/README.md)). `Check` uses
 Node.js and the validation tools, `Preview` and `Deploy` use `argocd`, and
-[gitops-update-tags](../gitops-update-tags/README.md) uses Node.js and `kustomize`:
+[gitops-update-tags](../gitops-update-tags/README.md) uses Node.js and `kustomize`. Example `.tool-versions`:
 
 ```
 nodejs 24.18.0
@@ -213,6 +213,9 @@ kubeconform 0.7.0
 kube-score 1.20.0
 argocd 3.1.8
 ```
+
+`Preview` and `Deploy` check out only root files and `.config/mise*`, `.mise/` and `mise/`. mise monorepo mode
+(`[monorepo] config_roots`) is not supported there.
 
 The root `package.json` provides the `check` script, here formatting only:
 

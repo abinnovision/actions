@@ -33,7 +33,7 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 - The repository is provisioned by foundry with `foundry-state-backend: true`, which publishes the
   `FOUNDRY_WIF_PROVIDER`, `FOUNDRY_STATE_BUCKET` and `FOUNDRY_STATE_KEY` variables. The
   `gcp-workload-identity-provider`, `state-bucket` and `state-key` inputs override them
-- The repository has a `.tool-versions` file with `nodejs` and `opentofu`, and a `package.json` with a `check` script
+- The repository has a mise config (`mise.toml` or `.tool-versions`) with `nodejs` and `opentofu`, and a `package.json` with a `check` script
 - The `apply-environment` environment (default `production`) is restricted to the default branch
 - The root module declares an empty GCS backend:
 

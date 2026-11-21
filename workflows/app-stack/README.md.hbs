@@ -29,7 +29,7 @@ It follows the shared [stack contract](../../docs/stacks/README.md) for calling,
 
 ## Requirements
 
-- The repository has a `.tool-versions` file with `nodejs` and a root `package.json` with `build` and `check` scripts,
+- The repository has a mise config (`mise.toml` or `.tool-versions`) with `nodejs` and a root `package.json` with `build` and `check` scripts,
   see [Repository layout](#repository-layout)
 - The repository has a `tallyrelease.yaml` that tags its units, see [Units](#units) and [Releases](#releases)
 - The caller grants the [permissions](#permissions) listed below
@@ -154,7 +154,7 @@ install-immutable:
 ```
 your-repo/
 ├── Makefile              # optional: install and install-immutable targets
-├── .tool-versions        # asdf versions: nodejs (required), python, golang, uv
+├── mise.toml             # or .tool-versions: nodejs (required), python, golang, uv
 ├── tallyrelease.yaml     # units, their tags and the branch rules
 ├── packages/             # dist units, tagged `dist`
 │   └── <id>/package.json
