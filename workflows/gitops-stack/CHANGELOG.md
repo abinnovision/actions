@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.3.0](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.2.4...gitops-stack-source-v2.3.0) (2026-11-21)
+
+
+### Features
+
+* **setup-tools:** support mise config files without .tool-versions ([#747](https://github.com/abinnovision/actions/issues/747)) ([852794f](https://github.com/abinnovision/actions/commit/852794f9fc19c3d1146834b648e5173d11bb4f74))
+
+
+### Bug Fixes
+
+* **gitops-stack:** allow repositories without applications ([#749](https://github.com/abinnovision/actions/issues/749)) ([4d6be39](https://github.com/abinnovision/actions/commit/4d6be39ff8c5e2f12bdab0ade56576d488425481))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 2.1.0
+
 ## [2.2.4](https://github.com/abinnovision/actions/compare/gitops-stack-source-v2.2.3...gitops-stack-source-v2.2.4) (2026-11-19)
 
 

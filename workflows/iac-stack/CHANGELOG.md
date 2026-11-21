@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.4.0...iac-stack-source-v1.5.0) (2026-11-21)
+
+
+### Features
+
+* **setup-tools:** support mise config files without .tool-versions ([#747](https://github.com/abinnovision/actions/issues/747)) ([852794f](https://github.com/abinnovision/actions/commit/852794f9fc19c3d1146834b648e5173d11bb4f74))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * setup-tools bumped to 2.1.0
+
 ## [1.4.0](https://github.com/abinnovision/actions/compare/iac-stack-source-v1.3.3...iac-stack-source-v1.4.0) (2026-11-19)
 
 
