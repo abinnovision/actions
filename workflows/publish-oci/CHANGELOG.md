@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v2.2.0...publish-oci-source-v2.3.0) (2026-11-24)
+
+
+### Features
+
+* **publish-oci:** use the GitHub Actions layer cache by default ([#756](https://github.com/abinnovision/actions/issues/756)) ([4922067](https://github.com/abinnovision/actions/commit/49220679f57e602f8b6a972741e06221d6517f0d))
+
 ## [2.2.0](https://github.com/abinnovision/actions/compare/publish-oci-source-v2.1.1...publish-oci-source-v2.2.0) (2026-11-21)
 
 
