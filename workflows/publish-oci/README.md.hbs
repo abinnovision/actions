@@ -123,8 +123,11 @@ ENTRYPOINT ["/app"]
 
 ## Caches
 
-- **Registry layer cache:** with `registry` set, `<registry>/<image>-cache:latest` (`mode=max`); one
-  ref holds every platform
+- **Layer cache:** `layer-cache` selects the BuildKit layer cache for every unit of the run. `gha` (default) uses the
+  GitHub Actions cache with `mode=max` and the scope `publish-oci-<image>`; one scope holds every platform. A failed
+  cache export does not fail the build. `none` disables it. The GitHub Actions cache is limited per repository and
+  evicts the least recently used entries, so set `none` when the turbo cache already fills it. No cache is written to
+  the image registries
 - **Turbo remote cache:** with `turbo.json` in the payload root, a local cache server backed by the
   GitHub Actions cache runs on the runner. `TURBO_API`, `TURBO_TEAM` and `TURBO_TOKEN` are plain
   build args; declare them as `ARG` in the Dockerfile.

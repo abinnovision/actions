@@ -72,6 +72,16 @@ on:
           **Required:** When `registry` is set
           **Example:** `projects/123456789/locations/global/workloadIdentityPools/pool-id/providers/provider-id`
 
+      layer-cache:
+        type: string
+        required: false
+        default: "gha"
+        description: |-
+          BuildKit layer cache for every unit of the run.
+          **Values:** `gha` (GitHub Actions cache, `mode=max`, one scope per image), `none`
+          **Default:** `gha`
+          **Note:** Shared with the turbo remote cache in the size-limited GitHub Actions cache; use `none` when turbo fills it
+
       ghcr:
         type: boolean
         required: false
@@ -146,6 +156,7 @@ jobs:
           INPUT_GITOPS_ROUTES: ${{ inputs.gitops-routes }}
           INPUT_IMAGE: ${{ inputs.image }}
           INPUT_PLATFORMS: ${{ inputs.platforms }}
+          INPUT_LAYER_CACHE: ${{ inputs.layer-cache }}
           TOKEN_BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
         run: |
           set -euo pipefail
@@ -176,6 +187,11 @@ jobs:
           # An empty image would only fail after the build, as an invalid image reference.
           if [[ -z "$INPUT_IMAGE" ]]; then
             echo "::error::'image' must not be empty"
+            exit 1
+          fi
+
+          if [[ "$INPUT_LAYER_CACHE" != "gha" ]] && [[ "$INPUT_LAYER_CACHE" != "none" ]]; then
+            echo "::error::Invalid layer-cache '$INPUT_LAYER_CACHE': expected 'gha' or 'none'"
             exit 1
           fi
 
@@ -353,19 +369,25 @@ jobs:
           OCI_IMAGE: ${{ matrix.entry.image }}
           INPUT_REGISTRY: ${{ inputs.registry }}
           INPUT_GHCR: ${{ inputs.ghcr }}
+          INPUT_LAYER_CACHE: ${{ inputs.layer-cache }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           images=()
           cache_from=""
           cache_to=""
 
-          # GCP Artifact Registry, with registry caching
+          # GitHub Actions layer cache, one scope per image. A failed cache export does not fail the build.
+          if [[ "$INPUT_LAYER_CACHE" == "gha" ]]; then
+            cache_scope="publish-oci-$OCI_IMAGE"
+            cache_from="type=gha,scope=$cache_scope"
+            cache_to="type=gha,scope=$cache_scope,mode=max,ignore-error=true"
+            echo "Layer cache: gha (scope $cache_scope)"
+          fi
+
+          # GCP Artifact Registry
           if [[ -n "$INPUT_REGISTRY" ]]; then
             gcpar_image="$INPUT_REGISTRY/$OCI_IMAGE"
-            gcpar_cache="$INPUT_REGISTRY/$OCI_IMAGE-cache"
             images+=("$gcpar_image")
-            cache_from="type=registry,ref=$gcpar_cache:latest"
-            cache_to="type=registry,ref=$gcpar_cache:latest,mode=max"
             echo "GCP AR image: $gcpar_image"
           fi
 
@@ -597,9 +619,9 @@ jobs:
             echo "**Build:** $build_info"
             echo ""
             if [[ -n "$CACHE_FROM" ]]; then
-              echo "**Registry cache:** \`${CACHE_FROM#*ref=}\`"
+              echo "**Layer cache:** gha \`${CACHE_FROM#*scope=}\`"
             else
-              echo "**Registry cache:** none"
+              echo "**Layer cache:** none"
             fi
             echo ""
             echo "**Digest:** \`$DIGEST\`"
