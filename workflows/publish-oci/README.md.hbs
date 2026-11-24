@@ -123,7 +123,8 @@ ENTRYPOINT ["/app"]
 
 ## Caches
 
-- **Layer cache:** `layer-cache` selects the BuildKit layer cache for every unit of the run. `gha` (default) uses the
+- **Layer cache:** `layer-cache` selects the BuildKit layer cache, `layer-cache-units` overrides it per unit
+  (`id,provider` lines, e.g. `geo,gha` with `layer-cache: none`). `gha` (default) uses the
   GitHub Actions cache with `mode=max` and the scope `publish-oci-<image>`; one scope holds every platform. A failed
   cache export does not fail the build. `none` disables it. The GitHub Actions cache is limited per repository and
   evicts the least recently used entries, so set `none` when the turbo cache already fills it. No cache is written to

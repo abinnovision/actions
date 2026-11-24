@@ -77,10 +77,21 @@ on:
         required: false
         default: "gha"
         description: |-
-          BuildKit layer cache for every unit of the run.
+          BuildKit layer cache for units without a `layer-cache-units` line.
           **Values:** `gha` (GitHub Actions cache, `mode=max`, one scope per image), `none`
           **Default:** `gha`
           **Note:** Shared with the turbo remote cache in the size-limited GitHub Actions cache; use `none` when turbo fills it
+
+      layer-cache-units:
+        type: string
+        required: false
+        default: ""
+        description: |-
+          Per-unit `layer-cache` in **CSV format** (one line per unit).
+          **Format:** `unit-id,provider`, where `unit-id` is the tallyrelease unit `id` and `provider` is `gha` or `none`
+          **Default:** _empty_ (every unit uses `layer-cache`)
+          **Example:** `geo,gha`
+          **Note:** Lines without exactly 2 columns, an unknown provider or a repeated unit fail the run. Lines for units not in the release list are ignored with a warning
 
       ghcr:
         type: boolean
@@ -144,8 +155,8 @@ jobs:
       units: ${{ steps.select.outputs.units }}
       gitops-routes: ${{ steps.select.outputs.gitops-routes }}
     steps:
-      # Selects the entries tagged "source" and adds the rendered `image`, the payload `artifact`, `sha7` and
-      # `platforms` to each.
+      # Selects the entries tagged "source" and adds the rendered `image`, the payload `artifact`, `sha7`,
+      # `platforms` and `layer-cache` to each.
       - name: Select units
         id: select
         env:
@@ -157,6 +168,7 @@ jobs:
           INPUT_IMAGE: ${{ inputs.image }}
           INPUT_PLATFORMS: ${{ inputs.platforms }}
           INPUT_LAYER_CACHE: ${{ inputs.layer-cache }}
+          INPUT_LAYER_CACHE_UNITS: ${{ inputs.layer-cache-units }}
           TOKEN_BROKER_URL: ${{ inputs.token-broker-url || vars.TOKEN_BROKER_URL }}
         run: |
           set -euo pipefail
@@ -218,6 +230,16 @@ jobs:
             | $platforms | split("\n")[] | select(. != "") | split(",")[0] | select(IN($ids[]) | not)
             | "::warning::platforms line for unknown unit \u0027\(.)\u0027 is ignored"' <<< "$RELEASES"
 
+          # layer-cache-units: id,provider
+          awk -F, '$0 != "" {
+            if (seen[$1]++) { print "::error::Duplicate layer-cache-units line for unit \047" $1 "\047"; invalid = 1; next }
+            if (NF != 2 || $1 == "" || ($2 != "gha" && $2 != "none")) { print "::error::Invalid layer-cache-units line \047" $0 "\047: expected \047id,provider\047 with provider \047gha\047 or \047none\047"; invalid = 1 }
+          } END { exit invalid }' <<< "$INPUT_LAYER_CACHE_UNITS"
+
+          jq -r --arg caches "$INPUT_LAYER_CACHE_UNITS" '[.[].id] as $ids
+            | $caches | split("\n")[] | select(. != "") | split(",")[0] | select(IN($ids[]) | not)
+            | "::warning::layer-cache-units line for unknown unit \u0027\(.)\u0027 is ignored"' <<< "$RELEASES"
+
           # Renders `image`, fails on a placeholder left as written, then lowercases.
           units=$(jq -c --arg image "$INPUT_IMAGE" 'map(
             select(any(.tags[]?; . == "source"))
@@ -235,6 +257,11 @@ jobs:
           units=$(jq -c --arg platforms "$INPUT_PLATFORMS" '
             ($platforms | split("\n") | map(select(. != "") | split(",") | {key: .[0], value: (.[2:] | join(","))}) | from_entries) as $p
             | map(. + {platforms: ($p[.id] // "")})
+          ' <<< "$units")
+
+          units=$(jq -c --arg caches "$INPUT_LAYER_CACHE_UNITS" --arg default "$INPUT_LAYER_CACHE" '
+            ($caches | split("\n") | map(select(. != "") | split(",") | {key: .[0], value: .[1]}) | from_entries) as $c
+            | map(. + {"layer-cache": ($c[.id] // $default)})
           ' <<< "$units")
 
           if [[ -n "$INPUT_GITOPS_ROUTES" ]]; then
@@ -369,7 +396,7 @@ jobs:
           OCI_IMAGE: ${{ matrix.entry.image }}
           INPUT_REGISTRY: ${{ inputs.registry }}
           INPUT_GHCR: ${{ inputs.ghcr }}
-          INPUT_LAYER_CACHE: ${{ inputs.layer-cache }}
+          LAYER_CACHE: ${{ matrix.entry.layer-cache }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           images=()
@@ -377,7 +404,7 @@ jobs:
           cache_to=""
 
           # GitHub Actions layer cache, one scope per image. A failed cache export does not fail the build.
-          if [[ "$INPUT_LAYER_CACHE" == "gha" ]]; then
+          if [[ "$LAYER_CACHE" == "gha" ]]; then
             cache_scope="publish-oci-$OCI_IMAGE"
             cache_from="type=gha,scope=$cache_scope"
             cache_to="type=gha,scope=$cache_scope,mode=max,ignore-error=true"
