@@ -1,0 +1,25 @@
+# {{name}}
+
+{{description}}
+
+## Usage
+
+{{{usage-example type="action" name=name inputs=inputs version=version}}}
+
+## Latest versions
+
+{{{version-examples type="action" name=name version=version}}}
+
+## Configuration
+
+mise discovers the config in the directory of `tool-versions-file` and its parents: `mise.toml`, `.mise.toml`,
+`mise.<env>.toml`, `.config/mise.toml`, `.config/mise/config.toml`, `mise/config.toml`, `.mise/config.toml`, `mise.lock`
+and `.tool-versions`. The file named by `tool-versions-file` does not have to exist.
+
+- `python` implies `uv` unless the config pins it. The implied `uv` is not listed in the `versions` output.
+- The mise cache is saved after the job, so tools installed by later steps are cached too.
+- See the [mise-action README](https://github.com/jdx/mise-action#readme) for `--locked` installs and `[env]` export.
+
+## Inputs
+
+{{> inputs-table inputs}}
