@@ -1,0 +1,366 @@
+name: Publish npm
+
+on:
+  workflow_call:
+    inputs:
+      releases:
+        type: string
+        required: true
+        description: |-
+          Release list v2 of a stack as a JSON array, the `releases` output of a stack.
+          This workflow publishes the entries tagged `dist` from their dist payload.
+          An empty string or `[]` skips all work.
+          **Example:** `needs.ci.outputs.releases`
+
+      npm:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Allow publishing to npmjs.
+          Packages opt in through `publishConfig.npm: true` in their `package.json`.
+          **Default:** `false`
+          **Authentication:** OIDC via [npm trusted publishing](https://docs.npmjs.com/trusted-publishers).
+
+      ghpr:
+        type: boolean
+        required: false
+        default: false
+        description: |-
+          Allow publishing to GitHub Packages.
+          Packages opt in through `publishConfig.ghpr: true` in their `package.json` and must be scoped.
+          **Default:** `false`
+          **Authentication:** Uses `GITHUB_TOKEN` (automatically available)
+
+      provenance:
+        type: boolean
+        required: false
+        default: true
+        description: |-
+          Generate npm provenance attestations when publishing to npmjs.
+          **Default:** `true`
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Publish the selected entries of the release list from the dist payload.
+  publish:
+    name: Packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: inputs.releases != '' && inputs.releases != '[]'
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      # Select the entries tagged dist and resolve their payload.
+      - name: Select packages
+        id: select
+        env:
+          RELEASES: ${{ inputs.releases }}
+        run: |
+          set -euo pipefail
+
+          errors=$(jq -r '
+            .[] | select(has("latest") | not)
+            | "Entry \(.id // .path) is not a release list v2 entry (missing latest)"
+          ' <<< "$RELEASES")
+
+          if [[ -n "$errors" ]]; then
+            while IFS= read -r error; do
+              echo "::error::$error"
+            done <<< "$errors"
+            exit 1
+          fi
+
+          packages=$(jq -c '
+            map(select(any(.tags[]?; . == "dist"))
+              | .artifact = (if .catchUp then "payload-dist-\(.releaseSha)" else "payload-dist" end)
+              | .file = "\(.id).tgz")
+          ' <<< "$RELEASES")
+
+          # One distinct dist artifact is downloaded by name, several by the pattern "{a,b,...}".
+          artifacts=$(jq -c '[.[].artifact] | unique' <<< "$packages")
+
+          {
+            echo "packages=$packages"
+            echo "single=$(jq -r 'if length == 1 then .[0] else "" end' <<< "$artifacts")"
+            echo "pattern=$(jq -r 'if length > 1 then "{\(join(","))}" else "" end' <<< "$artifacts")"
+          } >> "$GITHUB_OUTPUT"
+
+          if [[ "$packages" == "[]" ]]; then
+            echo "No entries are tagged dist, nothing to publish"
+          fi
+
+      # A re-run whose commit is no longer the branch tip must not move the latest dist-tag.
+      - name: Re-run guard
+        id: guard
+        if: steps.select.outputs.packages != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          stale="false"
+          if [[ "$GITHUB_RUN_ATTEMPT" != "1" ]]; then
+            if ! tip=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha) \
+              || [[ "$tip" != "$GITHUB_SHA" ]]; then
+              stale="true"
+              echo "::warning::Re-run of a superseded run: stable packages are published as backport"
+            fi
+          fi
+          echo "stale=$stale" >> "$GITHUB_OUTPUT"
+
+      # Each artifact lands in its own directory, payload/<artifact>.
+      - name: Download payload
+        if: steps.select.outputs.single != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ steps.select.outputs.single }}
+          path: ${{ runner.temp }}/payload/${{ steps.select.outputs.single }}
+
+      - name: Download payloads
+        if: steps.select.outputs.pattern != ''
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ steps.select.outputs.pattern }}
+          path: ${{ runner.temp }}/payload
+
+      - name: Setup Node
+        if: steps.select.outputs.packages != '[]'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # Trusted publishing requires npm 11.5.1 or newer.
+      - name: Setup npm
+        if: steps.select.outputs.packages != '[]'
+        run: |
+          current=$(npm --version)
+          if [[ "$(printf '%s\n' "11.5.1" "$current" | sort -V | head -n1)" != "11.5.1" ]]; then
+            npm install --global npm@11
+          fi
+          echo "npm $(npm --version)"
+
+      # A failing package is recorded and the loop continues; the step fails at the end.
+      - name: Publish
+        if: steps.select.outputs.packages != '[]'
+        env:
+          PACKAGES: ${{ steps.select.outputs.packages }}
+          INPUT_NPM: ${{ inputs.npm }}
+          INPUT_GHPR: ${{ inputs.ghpr }}
+          INPUT_PROVENANCE: ${{ inputs.provenance }}
+          STALE: ${{ steps.guard.outputs.stale }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          payload="$RUNNER_TEMP/payload"
+          workdir="$RUNNER_TEMP/work"
+          npm_registry="https://registry.npmjs.org"
+          ghpr_registry="https://npm.pkg.github.com"
+
+          # Holds the GitHub Packages auth line; npm resolves the token from the environment.
+          npmrc=$(mktemp)
+          echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > "$npmrc"
+
+          # A pattern download does not fail on a missing artifact and unpacks flat when only one matches.
+          mapfile -t artifacts < <(jq -r '[.[].artifact] | unique | .[]' <<< "$PACKAGES")
+          if [[ -n "$(find "$payload" -maxdepth 1 -type f 2> /dev/null)" ]]; then
+            echo "::error::Only one of $(jq -rn '$ARGS.positional | join(", ")' --args "${artifacts[@]}") was downloaded"
+            exit 1
+          fi
+          missing=0
+          for artifact in "${artifacts[@]}"; do
+            if [[ ! -d "$payload/$artifact" ]]; then
+              echo "::error::Artifact $artifact was not downloaded"
+              missing=1
+            fi
+          done
+          if [[ "$missing" == "1" ]]; then
+            exit 1
+          fi
+
+          mapfile -t entries < <(jq -c '.[]' <<< "$PACKAGES")
+
+          # Extracts every tarball into its own directory and maps, per artifact, each package name
+          # to its tarball version ("old") and released version ("new").
+          version_maps='{}'
+          for i in "${!entries[@]}"; do
+            artifact=$(jq -r '.artifact' <<< "${entries[$i]}")
+            file=$(jq -r '.file' <<< "${entries[$i]}")
+            new=$(jq -r '.version' <<< "${entries[$i]}")
+            mkdir -p "$workdir/$i"
+            tar -xzf "$payload/$artifact/$file" -C "$workdir/$i" 2> /dev/null || rm -rf "${workdir:?}/$i/package"
+
+            if [[ -f "$workdir/$i/package/package.json" ]]; then
+              version_maps=$(jq -c --argjson maps "$version_maps" --arg artifact "$artifact" --arg new "$new" \
+                '. as $pkg | $maps | .[$artifact] += {($pkg.name): {old: $pkg.version, new: $new}}' \
+                "$workdir/$i/package/package.json")
+            fi
+          done
+
+          failures=()
+
+          # Sets "result" to "published", "skipped (exists)" or "failed".
+          publish_to() {
+            local registry="$1" name="$2" version="$3" tarball="$4"
+            shift 4
+
+            local existing
+            existing=$(npm view "$name@$version" version --registry "$registry" --userconfig "$npmrc" 2> /dev/null || true)
+            if [[ "$existing" == "$version" ]]; then
+              echo "::notice::$name@$version already exists on $registry, skipping"
+              result="skipped (exists)"
+              return
+            fi
+
+            if npm publish "$tarball" --registry "$registry" --userconfig "$npmrc" "$@"; then
+              result="published"
+            else
+              echo "::error::Publishing $name@$version to $registry failed"
+              failures+=("$name@$version on $registry")
+              result="failed"
+            fi
+          }
+
+          # Records a package failure that happens before publishing.
+          fail_package() {
+            local name="$1" version="$2" tag="$3" reason="$4" label="$5"
+            echo "::error::$reason"
+            failures+=("$name@$version: $reason")
+            echo "| \`$name\` | \`$version\` | \`$tag\` | failed ($label) | failed ($label) |" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          {
+            echo "### npm packages"
+            echo ""
+            echo "| Package | Version | Tag | npmjs | GitHub Packages |"
+            echo "| :------ | :------ | :-- | :---- | :-------------- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for i in "${!entries[@]}"; do
+            entry="${entries[$i]}"
+            entry_name=$(jq -r '.id' <<< "$entry")
+            artifact=$(jq -r '.artifact' <<< "$entry")
+            file=$(jq -r '.file' <<< "$entry")
+            version=$(jq -r '.version' <<< "$entry")
+            kind=$(jq -r '.kind' <<< "$entry")
+            latest=$(jq -r '.latest' <<< "$entry")
+
+            # Prereleases take their channel, the latest stable entry of a current run "latest", others "backport".
+            if [[ "$kind" == "prerelease" ]]; then
+              tag=$(jq -r '.channel' <<< "$entry")
+            elif [[ "$latest" == "true" ]] && [[ "$STALE" != "true" ]]; then
+              tag="latest"
+            else
+              tag="backport"
+            fi
+
+            manifest_file="$workdir/$i/package/package.json"
+            if [[ ! -f "$manifest_file" ]]; then
+              fail_package "$entry_name" "$version" "$tag" "Entry $entry_name has no tarball '$file' with a package/package.json in the payload" "tarball"
+              continue
+            fi
+
+            manifest=$(< "$manifest_file")
+            name=$(jq -r '.name' <<< "$manifest")
+            is_private=$(jq -r '.private // false' <<< "$manifest")
+            publish_npm=$(jq -r '.publishConfig.npm // false' <<< "$manifest")
+            publish_ghpr=$(jq -r '.publishConfig.ghpr // false' <<< "$manifest")
+            npm_access=$(jq -r '.publishConfig.npmAccess // "public"' <<< "$manifest")
+
+            if [[ "$is_private" == "true" ]]; then
+              echo "::notice::Skipping private package $name"
+              continue
+            fi
+
+            ghpr_result="disabled"
+            use_ghpr="false"
+            if [[ "$INPUT_GHPR" == "true" ]] && [[ "$publish_ghpr" == "true" ]]; then
+              if [[ "$name" == @*/* ]]; then
+                use_ghpr="true"
+              else
+                echo "::warning::Skipping GitHub Packages for unscoped package $name"
+                ghpr_result="skipped (unscoped)"
+              fi
+            fi
+
+            npm_result="disabled"
+            use_npm="false"
+            if [[ "$INPUT_NPM" == "true" ]] && [[ "$publish_npm" == "true" ]]; then
+              use_npm="true"
+            fi
+
+            if [[ "$use_ghpr" != "true" ]] && [[ "$use_npm" != "true" ]]; then
+              echo "::notice::No registry applies to $name, skipping"
+              echo "| \`$name\` | \`$version\` | \`$tag\` | $npm_result | $ghpr_result |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            echo "Processing $name@$version (tag: $tag)"
+
+            # yarn pack replaces every workspace: range; a remaining one means the tarball was not created by it.
+            leftover=$(jq -r '
+              [(.dependencies, .peerDependencies, .optionalDependencies, .devDependencies)
+                | select(type == "object") | to_entries[]
+                | select((.value | type) == "string" and (.value | startswith("workspace:")))
+                | "\(.key)@\(.value)"]
+              | unique | join(", ")
+            ' <<< "$manifest")
+            if [[ -n "$leftover" ]]; then
+              fail_package "$name" "$version" "$tag" "$name has workspace: ranges, the tarball was not created with yarn pack: $leftover" "dependencies"
+              continue
+            fi
+
+            # Sets the released version and moves "<old>", "^<old>" and "~<old>" ranges of packages
+            # in the version map of the entry's artifact to their released version. Other ranges are kept as written.
+            version_map=$(jq -c --arg artifact "$artifact" '.[$artifact] // {}' <<< "$version_maps")
+            jq --arg version "$version" --argjson map "$version_map" '
+              .version = $version
+              | reduce ("dependencies", "peerDependencies", "optionalDependencies", "devDependencies") as $field (.;
+                  if (.[$field] | type) == "object" then
+                    .[$field] |= with_entries(
+                      $map[.key] as $v
+                      | if $v != null and (.value | type) == "string" then
+                          (first(("", "^", "~") as $prefix | select(.value == $prefix + $v.old) | $prefix) // null) as $prefix
+                          | if $prefix != null then .value = $prefix + $v.new else . end
+                        else . end)
+                  else . end)
+            ' <<< "$manifest" > "$manifest_file"
+
+            # Re-creates the tarball with the members of the original tarball; no npm lifecycle runs.
+            tarball="$workdir/$i.tgz"
+            members="$workdir/$i.members"
+            if ! { tar -tzf "$payload/$artifact/$file" > "$members" && tar -czf "$tarball" -C "$workdir/$i" --no-recursion -T "$members"; }; then
+              fail_package "$name" "$version" "$tag" "Re-creating the tarball of $name@$version failed" "tarball"
+              continue
+            fi
+
+            if [[ "$use_ghpr" == "true" ]]; then
+              publish_to "$ghpr_registry" "$name" "$version" "$tarball" --tag "$tag"
+              ghpr_result="$result"
+            fi
+
+            if [[ "$use_npm" == "true" ]]; then
+              npm_args=(--access "$npm_access" --tag "$tag")
+              if [[ "$INPUT_PROVENANCE" == "true" ]]; then
+                npm_args+=(--provenance)
+              fi
+              publish_to "$npm_registry" "$name" "$version" "$tarball" "${npm_args[@]}"
+              npm_result="$result"
+            fi
+
+            echo "| \`$name\` | \`$version\` | \`$tag\` | $npm_result | $ghpr_result |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          if [[ ${#failures[@]} -gt 0 ]]; then
+            echo "Failed:"
+            printf '  - %s\n' "${failures[@]}"
+            exit 1
+          fi
