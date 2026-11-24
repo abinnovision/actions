@@ -1,0 +1,149 @@
+name: Triage Dependabot PR
+author: "abi group GmbH"
+description: |
+  Automatically approve and enable auto-merge for Dependabot pull requests.
+  By default, all update types (major, minor, patch) are auto-approved and
+  auto-merged via squash.
+
+inputs:
+  token:
+    required: false
+    default: ${{ github.token }}
+    description: |
+      GitHub token with pull-requests:write and contents:write permissions.
+  approve-update-types:
+    required: false
+    default: "major minor patch"
+    description: |
+      Space-separated list of semver update types to auto-approve.
+      Supported values: major, minor, patch.
+      Auto-merge is enabled regardless of this setting.
+  auto-merge:
+    required: false
+    default: "true"
+    description: |
+      Whether to enable auto-merge on the PR.
+  merge-method:
+    required: false
+    default: "squash"
+    description: |
+      Merge method to use. One of: squash, merge, rebase.
+
+outputs:
+  update-type:
+    description: "The semver update type detected by dependabot/fetch-metadata."
+    value: ${{ steps.metadata.outputs.update-type }}
+  approved:
+    description: "Whether the PR was approved by this action."
+    value: ${{ steps.approve.outputs.approved }}
+
+runs:
+  using: composite
+  steps:
+    - id: gate
+      name: Validate context
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        ACTOR: ${{ github.actor }}
+      run: |
+        set -euo pipefail
+
+        if [[ "$EVENT_NAME" != "pull_request" && "$EVENT_NAME" != "pull_request_target" ]]; then
+          echo "::error::triage-dependabot-pr requires a pull_request or pull_request_target trigger (got '$EVENT_NAME')."
+          exit 1
+        fi
+
+        if [[ -z "$PR_NUMBER" ]]; then
+          echo "::error::No pull request number found in the event payload."
+          exit 1
+        fi
+
+        if [[ "$ACTOR" != "dependabot[bot]" ]]; then
+          echo "::warning::This PR was not opened by dependabot (actor: '$ACTOR'). Skipping."
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "skip=false" >> "$GITHUB_OUTPUT"
+
+    - id: metadata
+      name: Fetch Dependabot metadata
+      if: steps.gate.outputs.skip != 'true'
+      uses: dependabot/fetch-metadata@v3
+      with:
+        github-token: ${{ inputs.token }}
+
+    - id: review-status
+      name: Resolve review status
+      if: steps.gate.outputs.skip != 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        set -euo pipefail
+
+        REVIEW_COUNT=$(gh pr view "$PR_NUMBER" --json reviews --jq '.reviews | length')
+        if [[ "$REVIEW_COUNT" == "0" ]]; then
+          echo "has_reviews=false" >> "$GITHUB_OUTPUT"
+          echo "last_review_dismissed=false" >> "$GITHUB_OUTPUT"
+        else
+          LAST_STATE=$(gh pr view "$PR_NUMBER" --json reviews --jq '.reviews[-1].state')
+          echo "has_reviews=true" >> "$GITHUB_OUTPUT"
+          if [[ "$LAST_STATE" == "DISMISSED" ]]; then
+            echo "last_review_dismissed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "last_review_dismissed=false" >> "$GITHUB_OUTPUT"
+          fi
+        fi
+
+    - id: auto-merge
+      name: Enable auto-merge
+      if: steps.gate.outputs.skip != 'true' && inputs.auto-merge == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        MERGE_METHOD: ${{ inputs.merge-method }}
+      run: |
+        set -euo pipefail
+        gh pr merge --auto --"$MERGE_METHOD" "$PR_URL"
+
+    - id: approve
+      name: Auto-approve PR
+      if: steps.gate.outputs.skip != 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        HAS_REVIEWS: ${{ steps.review-status.outputs.has_reviews }}
+        LAST_REVIEW_DISMISSED: ${{ steps.review-status.outputs.last_review_dismissed }}
+        APPROVE_TYPES: ${{ inputs.approve-update-types }}
+      run: |
+        set -euo pipefail
+
+        SHOULD_APPROVE=false
+        for type in $APPROVE_TYPES; do
+          if [[ "$UPDATE_TYPE" == "version-update:semver-${type}" ]]; then
+            SHOULD_APPROVE=true
+            break
+          fi
+        done
+
+        if [[ "$SHOULD_APPROVE" != "true" ]]; then
+          echo "Update type '$UPDATE_TYPE' not in approve list ($APPROVE_TYPES). Skipping approval."
+          echo "approved=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        if [[ "$HAS_REVIEWS" == "false" || "$LAST_REVIEW_DISMISSED" == "true" ]]; then
+          echo "Approving PR for update type: $UPDATE_TYPE"
+          gh pr review --approve "$PR_URL"
+          echo "approved=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "PR already has non-dismissed reviews. Skipping approval."
+          echo "approved=false" >> "$GITHUB_OUTPUT"
+        fi
